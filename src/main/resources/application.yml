@@ -1,6 +1,19 @@
 server:
   port: 8080
+  servlet:
+    context-path: careergraph/api/v1
 
 spring:
   profiles:
     active: dev
+
+logging:
+  level:
+    org.neo4j.driver: DEBUG
+    org.springframework.data.neo4j: DEBUG
+    org.springframework.transaction: DEBUG
+
+jwt:
+  signer-key: uT+Q3VZKCE+yNxmPoB0SH7qqDB8EGtBQY/F1GK2shIRKMZasRvvvyI5T/5y/FDX+
+  valid-duration: 3600
+  refreshable-duration: 36000
