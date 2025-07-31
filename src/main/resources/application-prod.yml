@@ -1,0 +1,16 @@
+server:
+  port: 8080
+
+spring:
+
+  neo4j:
+    database: movierecommendation
+    uri: bolt://localhost:7687
+    authentication:
+      username: neo4j
+      password: ${NEO4J_PASSWORD}
+
+logging:
+  level:
+    org.neo4j.driver: DEBUG
+    org.springframework.data.neo4j: DEBUG
