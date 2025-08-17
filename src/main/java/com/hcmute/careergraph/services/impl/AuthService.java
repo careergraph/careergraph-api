@@ -10,7 +10,7 @@ import com.hcmute.careergraph.dtos.response.auth.LoginResponse;
 import com.hcmute.careergraph.entities.mysql.Token;
 
 import com.hcmute.careergraph.entities.mysql.User;
-import com.hcmute.careergraph.enums.EErrorCode;
+import com.hcmute.careergraph.enums.ErrorType;
 import com.hcmute.careergraph.exception.AppException;
 import com.hcmute.careergraph.repository.sql.TokenRepository;
 import com.hcmute.careergraph.repository.sql.UserRepository;
@@ -81,7 +81,7 @@ public class AuthService implements IAuthService {
         User existedUser = userRepository.findByUsername(request.getUsername()).get();
 
         if (!passwordEncoder.matches(request.getPassword(), existedUser.getPassword())) {
-            throw new AppException(EErrorCode.UNAUTHORIZED);
+            throw new AppException(ErrorType.UNAUTHORIZED);
         }
 
         String token = generateToken(existedUser);
@@ -91,7 +91,7 @@ public class AuthService implements IAuthService {
                     .token(token)
                     .build();
         } else {
-            throw new AppException(EErrorCode.UNAUTHORIZED);
+            throw new AppException(ErrorType.UNAUTHORIZED);
         }
     }
 
@@ -112,7 +112,7 @@ public class AuthService implements IAuthService {
         try {
             tokenRepository.save(recentToken);
         } catch (RuntimeException e) {
-            throw new AppException(EErrorCode.UNSAVED_DATA);
+            throw new AppException(ErrorType.UNSAVED_DATA);
         }
 
         String username = signedJWT.getJWTClaimsSet().getSubject();
@@ -124,7 +124,7 @@ public class AuthService implements IAuthService {
         if (newToken != null && !newToken.isEmpty()) {
             return newToken;
         } else {
-            throw new AppException(EErrorCode.UNAUTHORIZED);
+            throw new AppException(ErrorType.UNAUTHORIZED);
         }
     }
 
@@ -146,7 +146,7 @@ public class AuthService implements IAuthService {
             log.info("Token: {}", token);
 
         } catch (RuntimeException e) {
-            throw new AppException(EErrorCode.UNSAVED_DATA);
+            throw new AppException(ErrorType.UNSAVED_DATA);
         }
     }
 
@@ -193,7 +193,7 @@ public class AuthService implements IAuthService {
             var verified = signedJWT.verify(verifier);
 
             if (!verified || !expTime.after(new Date())) {
-                throw new AppException(EErrorCode.UNAUTHORIZED);
+                throw new AppException(ErrorType.UNAUTHORIZED);
             }
 
             // Check token logout
@@ -201,13 +201,13 @@ public class AuthService implements IAuthService {
             boolean isExisted = tokenRepository.existsById(jit);
 
             if (isExisted) {
-                throw new AppException(EErrorCode.UNAUTHORIZED);
+                throw new AppException(ErrorType.UNAUTHORIZED);
             }
 
             return signedJWT;
 
         } catch (ParseException | JOSEException e) {
-            throw new AppException(EErrorCode.UNAUTHORIZED);
+            throw new AppException(ErrorType.UNAUTHORIZED);
         }
     }
 }

@@ -1,12 +1,12 @@
 package com.hcmute.careergraph.entities.mysql;
 
+import com.hcmute.careergraph.entities.base.AbstractTable;
 import jakarta.persistence.*;
 import lombok.*;
 import lombok.experimental.SuperBuilder;
 
 import java.io.Serializable;
 import java.time.LocalDate;
-import java.time.Period;
 
 @Entity
 @Getter
@@ -16,7 +16,7 @@ import java.time.Period;
 @AllArgsConstructor
 @EqualsAndHashCode(callSuper = true)
 @Table(name = "tbl_user")
-public class User extends Abstract<String> implements Serializable {
+public class User extends AbstractTable<String> implements Serializable {
 
     @Column(name = "fullname")
     private String fullname;
@@ -39,14 +39,4 @@ public class User extends Abstract<String> implements Serializable {
     @OneToOne(cascade = CascadeType.ALL)
     @JoinColumn(name = "address_id", nullable = false)
     private Address address;
-
-    @Transient
-    private int age;
-
-    public int getAge() {
-        if (this.dob != null) {
-            return Period.between(this.dob, LocalDate.now()).getYears();
-        }
-        return 0;
-    }
 }

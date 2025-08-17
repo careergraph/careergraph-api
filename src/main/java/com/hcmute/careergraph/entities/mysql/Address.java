@@ -1,6 +1,7 @@
 package com.hcmute.careergraph.entities.mysql;
 
 
+import com.hcmute.careergraph.entities.base.AbstractTable;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Table;
@@ -17,7 +18,7 @@ import java.io.Serializable;
 @AllArgsConstructor
 @EqualsAndHashCode(callSuper = true)
 @Table(name = "tbl_address")
-public class Address extends Abstract<String> implements Serializable {
+public class Address extends AbstractTable<String> implements Serializable {
 
     @Column(name = "country")
     private String country;

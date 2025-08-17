@@ -1,7 +1,7 @@
 package com.hcmute.careergraph.config.security;
 
 import com.hcmute.careergraph.dtos.request.auth.IntrospectRequest;
-import com.hcmute.careergraph.enums.EErrorCode;
+import com.hcmute.careergraph.enums.ErrorType;
 import com.hcmute.careergraph.exception.AppException;
 import com.hcmute.careergraph.services.impl.AuthService;
 import lombok.RequiredArgsConstructor;
@@ -37,7 +37,7 @@ public class JwtDecoderCustom implements JwtDecoder {
                 IntrospectRequest.builder().token(token).build());
 
         if (!response.isValid())
-            throw new AppException(EErrorCode.UNAUTHORIZED);
+            throw new AppException(ErrorType.UNAUTHORIZED);
 
         if (Objects.isNull(nimbusJwtDecoder)) {
             SecretKeySpec secretKeySpec = new SecretKeySpec(SIGNER_KEY.getBytes(), "HS512");

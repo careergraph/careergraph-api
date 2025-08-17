@@ -1,7 +1,7 @@
 package com.hcmute.careergraph.exception;
 
-import com.hcmute.careergraph.enums.EErrorCode;
-import com.hcmute.careergraph.helper.ApiResponse;
+import com.hcmute.careergraph.enums.ErrorType;
+import com.hcmute.careergraph.helper.RestResponse;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -16,32 +16,32 @@ public class GlobalExceptionHandler {
 
 
     @ExceptionHandler(value = Exception.class)
-    ResponseEntity<ApiResponse> handlingRuntimeException(RuntimeException exception) {
+    ResponseEntity<RestResponse> handlingRuntimeException(RuntimeException exception) {
         log.error("Exception: ", exception);
-        ApiResponse apiResponse = new ApiResponse();
+        RestResponse restResponse = new RestResponse();
 
-        apiResponse.setCode(HttpStatus.INTERNAL_SERVER_ERROR.value());
-        apiResponse.setMessage(exception.getMessage());
+        restResponse.setCode(HttpStatus.INTERNAL_SERVER_ERROR.value());
+        restResponse.setMessage(exception.getMessage());
 
-        return ResponseEntity.internalServerError().body(apiResponse);
+        return ResponseEntity.internalServerError().body(restResponse);
     }
 
     @ExceptionHandler(value = AppException.class)
-    ResponseEntity<ApiResponse> handlingAppException(AppException exception) {
-        EErrorCode errorCode = exception.getErrorCode();
-        ApiResponse apiResponse = new ApiResponse();
+    ResponseEntity<RestResponse> handlingAppException(AppException exception) {
+        ErrorType errorCode = exception.getErrorCode();
+        RestResponse restResponse = new RestResponse();
 
-        apiResponse.setCode(errorCode.getCode());
-        apiResponse.setMessage(errorCode.getMessage());
+        restResponse.setCode(errorCode.getCode());
+        restResponse.setMessage(errorCode.getMessage());
 
-        return ResponseEntity.status(errorCode.getCode()).body(apiResponse);
+        return ResponseEntity.status(errorCode.getCode()).body(restResponse);
     }
 
     @ExceptionHandler(value = AccessDeniedException.class)
-    ResponseEntity<ApiResponse> handlingAccessDeniedException(AccessDeniedException exception) {
+    ResponseEntity<RestResponse> handlingAccessDeniedException(AccessDeniedException exception) {
 
         return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                .body(ApiResponse.builder()
+                .body(RestResponse.builder()
                         .code(HttpStatus.UNAUTHORIZED.value())
                         .message(exception.getMessage())
                         .build());

@@ -1,6 +1,6 @@
 package com.hcmute.careergraph.config.security;
 
-import com.hcmute.careergraph.helper.ApiResponse;
+import com.hcmute.careergraph.helper.RestResponse;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -18,7 +18,7 @@ public class JwtAuthenticationEntryPointConfig implements AuthenticationEntryPoi
         response.setContentType("application/json");
         response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
 
-        ApiResponse errorResponse = ApiResponse.builder()
+        RestResponse errorResponse = RestResponse.builder()
                 .code(401)
                 .message("Unauthorized - Invalid credentials")
                 .build();

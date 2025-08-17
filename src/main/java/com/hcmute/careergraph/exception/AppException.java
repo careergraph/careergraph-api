@@ -1,6 +1,6 @@
 package com.hcmute.careergraph.exception;
 
-import com.hcmute.careergraph.enums.EErrorCode;
+import com.hcmute.careergraph.enums.ErrorType;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -8,9 +8,9 @@ import lombok.Setter;
 @Setter
 public class AppException extends RuntimeException {
 
-    private EErrorCode errorCode;
+    private ErrorType errorCode;
 
-    public AppException(EErrorCode errorCode) {
+    public AppException(ErrorType errorCode) {
         super(errorCode.getMessage());
         this.errorCode = errorCode;
     }
