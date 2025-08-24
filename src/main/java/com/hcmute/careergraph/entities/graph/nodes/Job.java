@@ -4,7 +4,6 @@ import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import com.hcmute.careergraph.constant.EntityLabels;
 import com.hcmute.careergraph.deserialize.graph.nodes.JobDeserializer;
 import com.hcmute.careergraph.entities.base.BaseGraph;
-import com.hcmute.careergraph.entities.graph.rel.ApplicationRel;
 import com.hcmute.careergraph.entities.graph.rel.SkillRel;
 import com.hcmute.careergraph.enums.EmploymentType;
 import com.hcmute.careergraph.enums.JobStatus;
