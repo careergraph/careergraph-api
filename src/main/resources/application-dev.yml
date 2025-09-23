@@ -1,36 +1,30 @@
 spring:
-  neo4j:
-    database: careergraph
-    uri: bolt://localhost:7687
-    authentication:
-      username: neo4j
-      password: Congquy2004@
-    pool:
-      max-connection-pool-size: 16
-      idle-time-before-connection-test: 10s
-      max-connection-lifetime: 1h
-
   datasource:
-    url: jdbc:mysql://localhost:3306/careergraph?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
-    username: root
-    password: root
-    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: jdbc:postgresql://localhost:5432/careergraph
+    username: postgres
+    password: postgres
+
     hikari:
       maximum-pool-size: 20
       minimum-idle: 5
       connection-timeout: 30000
 
   jpa:
+    database-platform: org.hibernate.dialect.PostgreSQLDialect
+    show-sql: true
     hibernate:
       ddl-auto: update
-    show-sql: true
-    properties:
-      hibernate:
-        dialect: org.hibernate.dialect.MySQL8Dialect
-        jdbc:
-          batch_size: 20
-        order_inserts: true
-        order_updates: true
+
+  #  neo4j:
+  #    database: careergraph
+  #    uri: bolt://localhost:7687
+  #    authentication:
+  #      username: neo4j
+  #      password: Congquy2004@
+  #    pool:
+  #      max-connection-pool-size: 16
+  #      idle-time-before-connection-test: 10s
+  #      max-connection-lifetime: 1h
 
   redis:
     host: localhost
