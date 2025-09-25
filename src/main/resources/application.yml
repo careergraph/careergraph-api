@@ -14,6 +14,25 @@ logging:
     org.springframework.transaction: DEBUG
 
 jwt:
-  signer-key: uT+Q3VZKCE+yNxmPoB0SH7qqDB8EGtBQY/F1GK2shIRKMZasRvvvyI5T/5y/FDX+
-  valid-duration: 3600
-  refreshable-duration: 36000
+  signer-key: "ThL7qUN45V6bqcS8kDFtsvAnDvtCx8Oagwk3o51sVv51UJF/3fg2NNXo51km3CAlLY4y8iJT3kD0VWE7IJ5W9A=="
+  valid-duration: 3600         # 1h
+  refreshable-duration: 36000  # 10h
+
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+    operations-sorter: method
+    tags-sorter: alpha
+    try-it-out-enabled: true
+    filter: true
+  packages-to-scan: com.hcmute.careergraph.controller
+  paths-to-match: /api/**
+
+swagger:
+  username: admin
+  password: Password1!
+
+support:
+  email: congquynguyen296@gmail.com
