@@ -9,18 +9,33 @@ import org.springframework.http.HttpStatusCode;
 @Getter
 @FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
 public enum ErrorType {
-    UNAUTHORIZED(401, "Token invalid or expiry time", HttpStatus.UNAUTHORIZED),
-    UNSAVED_DATA(501, "The process of saving the object is invalid", HttpStatus.INTERNAL_SERVER_ERROR),
-    API_CALL_FAILED(502, "Call API fail", HttpStatus.INTERNAL_SERVER_ERROR),
+
+    // --- AUTHENTICATION & AUTHORIZATION ---
+    UNAUTHORIZED(401, HttpStatus.UNAUTHORIZED),
+    FORBIDDEN(403, HttpStatus.FORBIDDEN),
+
+    // --- CLIENT ERRORS ---
+    BAD_REQUEST(400, HttpStatus.BAD_REQUEST),
+    NOT_FOUND(404, HttpStatus.NOT_FOUND),
+    METHOD_NOT_ALLOWED(405, HttpStatus.METHOD_NOT_ALLOWED),
+    CONFLICT(409, HttpStatus.CONFLICT),
+    VALIDATION_FAILED(422, HttpStatus.UNPROCESSABLE_ENTITY),
+
+    // --- SERVER ERRORS ---
+    INTERNAL_ERROR(500, HttpStatus.INTERNAL_SERVER_ERROR),
+    UNSAVED_DATA(501, HttpStatus.INTERNAL_SERVER_ERROR),
+    API_CALL_FAILED(502, HttpStatus.BAD_GATEWAY),
+    SERVICE_UNAVAILABLE(503, HttpStatus.SERVICE_UNAVAILABLE),
+    TIMEOUT(504, HttpStatus.GATEWAY_TIMEOUT),
+
     ;
 
-    ErrorType(int code, String message, HttpStatusCode httpStatusCode) {
+    int code;
+    HttpStatusCode httpStatusCode;
+
+    ErrorType(int code, HttpStatusCode httpStatusCode) {
         this.code = code;
-        this.message = message;
         this.httpStatusCode = httpStatusCode;
     }
-
-    int code;
-    String message;
-    HttpStatusCode httpStatusCode;
 }
+
