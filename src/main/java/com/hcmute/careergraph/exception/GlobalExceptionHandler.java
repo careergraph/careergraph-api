@@ -32,7 +32,7 @@ public class GlobalExceptionHandler {
         RestResponse restResponse = new RestResponse();
 
         restResponse.setCode(errorCode.getCode());
-        restResponse.setMessage(errorCode.getMessage());
+        restResponse.setMessage(exception.getErrorMessage());
 
         return ResponseEntity.status(errorCode.getCode()).body(restResponse);
     }

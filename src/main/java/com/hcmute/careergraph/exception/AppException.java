@@ -9,9 +9,10 @@ import lombok.Setter;
 public class AppException extends RuntimeException {
 
     private ErrorType errorCode;
+    private String errorMessage;
 
-    public AppException(ErrorType errorCode) {
-        super(errorCode.getMessage());
+    public AppException(ErrorType errorCode, String string) {
+        this.setErrorMessage(string);
         this.errorCode = errorCode;
     }
 }
