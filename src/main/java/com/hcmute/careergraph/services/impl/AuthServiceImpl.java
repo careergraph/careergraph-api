@@ -14,6 +14,9 @@ import com.hcmute.careergraph.services.MailService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.security.oauth2.jwt.JwtDecoder;
+import org.springframework.security.oauth2.jwt.JwtException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -29,6 +32,7 @@ public class AuthServiceImpl implements AuthService {
     private final JwtTokenService jwtTokenService;
     private final IRedisService redisService;
     private final MailService mailService;
+    private final JwtDecoder jwtDecoder;
 
     @Value("${jwt.valid-duration}")
     private long accessTtl;
@@ -111,16 +115,58 @@ public class AuthServiceImpl implements AuthService {
 
     @Override
     public void logout(String accessToken) {
-        // store a blacklist flag using token value with small TTL as fallback
-        redisService.setObject("blt:" + accessToken, true, (int) accessTtl);
+        try {
+            // Decode the access token to get JTI
+            Jwt jwt = jwtDecoder.decode(accessToken);
+            String jti = jwt.getId();
+            
+            // Blacklist the token using JTI
+            jwtTokenService.blacklist(jti, accessTtl);
+        } catch (JwtException e) {
+            // If token is invalid, we can't blacklist it, but that's okay
+            // The token will naturally expire
+        }
     }
 
     @Override
     public AuthResponses.TokenResponse refresh(String refreshToken) {
-        // Ideally validate token type == refresh and not blacklisted
-        // For brevity, only issue new tokens based on subject
-        // In a real system, parse refresh token -> account id
-        throw new UnsupportedOperationException("Implement refresh with token parsing");
+        try {
+            // Decode the refresh token to get claims
+            Jwt jwt = jwtDecoder.decode(refreshToken);
+            
+            // Validate token type
+            String tokenType = jwt.getClaimAsString("type");
+            if (!"refresh".equals(tokenType)) {
+                throw new AppException(ErrorType.UNAUTHORIZED, "Invalid token type");
+            }
+            
+            // Check if token is blacklisted
+            String jti = jwt.getId();
+            if (jwtTokenService.isBlacklisted(jti)) {
+                throw new AppException(ErrorType.UNAUTHORIZED, "Token is blacklisted");
+            }
+            
+            // Get account from subject (account ID)
+            String accountId = jwt.getSubject();
+            Account account = accountRepository.findById(accountId)
+                    .orElseThrow(() -> new AppException(ErrorType.NOT_FOUND, "Account not found"));
+            
+            // Generate new tokens
+            String newAccessToken = jwtTokenService.generateAccessToken(account);
+            String newRefreshToken = jwtTokenService.generateRefreshToken(account);
+            
+            // Blacklist the old refresh token
+            jwtTokenService.blacklist(jti, refreshTtl);
+            
+            return AuthResponses.TokenResponse.builder()
+                    .accessToken(newAccessToken)
+                    .refreshToken(newRefreshToken)
+                    .expiresIn(accessTtl)
+                    .build();
+                    
+        } catch (JwtException e) {
+            throw new AppException(ErrorType.UNAUTHORIZED, "Invalid refresh token");
+        }
     }
 
     @Override
