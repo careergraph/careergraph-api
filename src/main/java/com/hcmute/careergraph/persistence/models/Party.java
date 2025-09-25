@@ -21,9 +21,6 @@ import java.util.Set;
 @SuperBuilder
 public abstract class Party extends BaseEntity {
 
-    @Column(name = "name")
-    private String name;
-
     @Column(name = "tagname")
     private String tagname;
 
@@ -42,11 +39,11 @@ public abstract class Party extends BaseEntity {
     @Column(name = "no_of_connections", columnDefinition = "int default 0")
     private int noOfConnections;
 
-    // Quan hệ với Contact
+    // Contact
     @OneToMany(mappedBy = "party", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
     private Set<Contact> contacts = new HashSet<>();
 
-    // Quan hệ với Address
+    // Address
     @OneToMany(mappedBy = "party", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
     private Set<Address> addresses = new HashSet<>();
 
