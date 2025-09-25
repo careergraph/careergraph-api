@@ -12,11 +12,11 @@ import java.io.Serializable;
 @Builder
 @AllArgsConstructor
 @NoArgsConstructor
-public class RestResponse implements Serializable {
+public class RestResponse<T> implements Serializable {
 
     private int code;
 
     private String message;
 
-    private Object data;
+    private T data;
 }

@@ -6,6 +6,7 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
+import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
 import org.springframework.security.oauth2.server.resource.authentication.JwtGrantedAuthoritiesConverter;
 import org.springframework.security.web.SecurityFilterChain;
@@ -15,15 +16,19 @@ public class SecurityConfig {
 
     private final String[] PUBLIC_ENDPOINTS = {
             "auth/login",
-            "auth/logout",
-            "auth/refresh-token"
+            "auth/register",
+            "auth/forgot-password",
+            "auth/reset-password",
+            "auth/refresh-token",
+            "auth/confirm-otp",
+            "auth/resend-otp"
     };
 
     @Autowired
     private CorsConfig corsConfig;
 
     @Autowired
-    JwtDecoderCustom jwtDecoder;
+    private JwtDecoder jwtDecoder;
 
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
@@ -49,7 +54,9 @@ public class SecurityConfig {
                         .jwt(jwtConfigurer -> jwtConfigurer
                                 .decoder(jwtDecoder)
                                 .jwtAuthenticationConverter(jwtAuthenticationConverter()))
-                        .authenticationEntryPoint(new JwtAuthenticationEntryPointConfig()));
+                        .authenticationEntryPoint(new JwtAuthenticationEntryPointConfig()))
+                .httpBasic(AbstractHttpConfigurer::disable)
+                .formLogin(AbstractHttpConfigurer::disable);
 
         return http.build();
     }
