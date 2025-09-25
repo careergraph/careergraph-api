@@ -10,7 +10,7 @@ import lombok.experimental.SuperBuilder;
 import java.util.Set;
 
 @Entity
-@Table(name = "jobs")
+@Table(name = "skills")
 @Getter
 @Setter
 @SuperBuilder
