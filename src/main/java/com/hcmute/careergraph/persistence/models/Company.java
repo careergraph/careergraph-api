@@ -16,7 +16,7 @@ import java.util.Set;
 @SuperBuilder
 @NoArgsConstructor
 @JsonIgnoreProperties(ignoreUnknown = true)
-public class Company extends Party {
+public class Company extends BaseEntity {
 
     @Column(name = "size")
     private String size;
@@ -28,10 +28,10 @@ public class Company extends Party {
     private String ceoName;
 
     @Column(name = "no_of_members", columnDefinition = "int default 0")
-    private int noOfMembers;
+    private Integer noOfMembers;
 
     @Column(name = "year_founded")
-    private int yearFounded;
+    private Integer yearFounded;
 
     // One-to-Many relationship with Job
     @OneToMany(mappedBy = "company", cascade = CascadeType.ALL, orphanRemoval = true)

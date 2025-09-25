@@ -7,6 +7,7 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.experimental.SuperBuilder;
 
+import java.util.HashSet;
 import java.util.Set;
 
 @Entity
@@ -16,7 +17,7 @@ import java.util.Set;
 @SuperBuilder
 @NoArgsConstructor
 @JsonIgnoreProperties(ignoreUnknown = true)
-public class Candidate extends Party {
+public class Candidate extends BaseEntity {
 
     @Column(name = "first_name")
     private String firstName;
