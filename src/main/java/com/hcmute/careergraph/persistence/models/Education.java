@@ -16,7 +16,7 @@ import java.util.Set;
 @SuperBuilder
 @NoArgsConstructor
 @JsonIgnoreProperties(ignoreUnknown = true)
-public class Education extends BaseEntity {
+public class Education extends Party {
 
     @Column(name = "start_date")
     private String startDate;
