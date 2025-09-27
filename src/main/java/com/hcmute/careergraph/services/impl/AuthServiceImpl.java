@@ -6,7 +6,9 @@ import com.hcmute.careergraph.exception.AppException;
 import com.hcmute.careergraph.persistence.dtos.request.AuthRequests;
 import com.hcmute.careergraph.persistence.dtos.response.AuthResponses;
 import com.hcmute.careergraph.persistence.models.Account;
+import com.hcmute.careergraph.persistence.models.Candidate;
 import com.hcmute.careergraph.repositories.AccountRepository;
+import com.hcmute.careergraph.repositories.CandidateRepository;
 import com.hcmute.careergraph.services.AuthService;
 import com.hcmute.careergraph.services.IRedisService;
 import com.hcmute.careergraph.services.JwtTokenService;
@@ -24,11 +26,14 @@ import java.security.SecureRandom;
 import java.util.Optional;
 
 @Service
+@Transactional
 @RequiredArgsConstructor
 public class AuthServiceImpl implements AuthService {
 
     private final AccountRepository accountRepository;
+    private final CandidateRepository candidateRepository;
     private final PasswordEncoder passwordEncoder;
+
     private final JwtTokenService jwtTokenService;
     private final IRedisService redisService;
     private final MailService mailService;
@@ -41,18 +46,26 @@ public class AuthServiceImpl implements AuthService {
     private long refreshTtl;
 
     @Override
-    @Transactional
     public void register(AuthRequests.RegisterRequest request) {
         if (accountRepository.existsByEmail(request.getEmail())) {
             throw new AppException(ErrorType.CONFLICT, "Invalid OTP");
         }
+
+        // Create account
         Account account = Account.builder()
                 .email(request.getEmail())
                 .passwordHash(passwordEncoder.encode(request.getPassword()))
                 .role(Role.USER)
                 .emailVerified(false)
                 .build();
-        accountRepository.save(account);
+
+        // Create candidate
+        Candidate candidate = Candidate.builder()
+                .account(account)
+                .build();
+        account.setCandidate(candidate);
+
+        candidateRepository.save(candidate);
 
         String otp = generateOtp();
         redisService.setObject(otpKey(request.getEmail()), otp, 300);
@@ -60,7 +73,6 @@ public class AuthServiceImpl implements AuthService {
     }
 
     @Override
-    @Transactional
     public void confirmOtp(AuthRequests.ConfirmOtpRequest request) {
         String cachedOtp = redisService.getObject(otpKey(request.getEmail()), String.class);
 
@@ -179,7 +191,6 @@ public class AuthServiceImpl implements AuthService {
     }
 
     @Override
-    @Transactional
     public void resetPassword(AuthRequests.ResetPasswordRequest request) {
         String cached = redisService.getObject(otpKey(request.getEmail()), String.class);
         if (cached == null || !cached.equals(request.getOtp())) {
