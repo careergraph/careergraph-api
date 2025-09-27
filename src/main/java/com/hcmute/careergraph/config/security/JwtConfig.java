@@ -16,12 +16,10 @@ import org.springframework.security.oauth2.jwt.*;
 
 import javax.crypto.spec.SecretKeySpec;
 import java.time.Instant;
-import java.time.temporal.ChronoUnit;
 import java.util.Base64;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.UUID;
 
 @Configuration
 @RequiredArgsConstructor
