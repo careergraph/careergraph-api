@@ -20,7 +20,7 @@ public class GlobalExceptionHandler {
         log.error("Exception: ", exception);
         RestResponse restResponse = new RestResponse();
 
-        restResponse.setCode(HttpStatus.INTERNAL_SERVER_ERROR.value());
+        restResponse.setStatus(HttpStatus.INTERNAL_SERVER_ERROR);
         restResponse.setMessage(exception.getMessage());
 
         return ResponseEntity.internalServerError().body(restResponse);
@@ -31,7 +31,7 @@ public class GlobalExceptionHandler {
         ErrorType errorCode = exception.getErrorCode();
         RestResponse restResponse = new RestResponse();
 
-        restResponse.setCode(errorCode.getCode());
+        restResponse.setStatus(HttpStatus.OK);
         restResponse.setMessage(exception.getErrorMessage());
 
         return ResponseEntity.status(errorCode.getCode()).body(restResponse);
@@ -42,7 +42,7 @@ public class GlobalExceptionHandler {
 
         return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
                 .body(RestResponse.builder()
-                        .code(HttpStatus.UNAUTHORIZED.value())
+                        .status(HttpStatus.UNAUTHORIZED)
                         .message(exception.getMessage())
                         .build());
     }

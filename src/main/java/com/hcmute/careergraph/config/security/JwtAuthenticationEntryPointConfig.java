@@ -4,6 +4,7 @@ import com.hcmute.careergraph.helper.RestResponse;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.web.AuthenticationEntryPoint;
 
@@ -19,7 +20,7 @@ public class JwtAuthenticationEntryPointConfig implements AuthenticationEntryPoi
         response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
 
         RestResponse errorResponse = RestResponse.builder()
-                .code(401)
+                .status(HttpStatus.UNAUTHORIZED)
                 .message("Unauthorized - Invalid credentials")
                 .build();
 

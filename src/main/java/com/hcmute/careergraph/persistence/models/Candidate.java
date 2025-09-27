@@ -7,7 +7,6 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.experimental.SuperBuilder;
 
-import java.util.HashSet;
 import java.util.Set;
 
 @Entity
@@ -17,7 +16,7 @@ import java.util.Set;
 @SuperBuilder
 @NoArgsConstructor
 @JsonIgnoreProperties(ignoreUnknown = true)
-public class Candidate extends BaseEntity {
+public class Candidate extends Party {
 
     @Column(name = "first_name")
     private String firstName;
@@ -54,6 +53,10 @@ public class Candidate extends BaseEntity {
 
     @Column(name = "resume")
     private String resume;
+
+    // Account
+    @OneToOne(mappedBy = "candidate", cascade = CascadeType.ALL, orphanRemoval = true)
+    private Account account;
 
     // Connection relationships (bidirectional)
     @OneToMany(mappedBy = "candidate", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)

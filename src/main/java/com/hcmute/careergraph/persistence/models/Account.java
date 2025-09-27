@@ -31,6 +31,8 @@ public class Account extends BaseEntity {
 
     @Column(name = "email_verified", nullable = false)
     private boolean emailVerified;
+
+    @OneToOne
+    @JoinColumn(name = "candidate_id", referencedColumnName = "id")
+    private Candidate candidate;
 }
-
-
