@@ -45,3 +45,10 @@ spring:
         min-idle: 0
         max-wait: -1ms
       shutdown-timeout: 100ms
+
+integration:  # When deploy -> Update into application.yml from docker-compose
+  minio:
+    url: http://localhost:9000
+    accessKey: minioadmin
+    secretKey: minioadmin
+    bucket: careergraph
