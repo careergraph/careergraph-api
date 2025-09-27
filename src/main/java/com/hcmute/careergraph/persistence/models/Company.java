@@ -16,7 +16,7 @@ import java.util.Set;
 @SuperBuilder
 @NoArgsConstructor
 @JsonIgnoreProperties(ignoreUnknown = true)
-public class Company extends BaseEntity {
+public class Company extends Party {
 
     @Column(name = "size")
     private String size;

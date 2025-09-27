@@ -13,4 +13,5 @@ public class MinioProperties {
     private String accessKey;
     private String secretKey;
     private String url;
+    private String bucket;
 }
