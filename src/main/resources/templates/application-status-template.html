@@ -2,33 +2,65 @@
 <html lang="en" xmlns:th="http://www.thymeleaf.org">
 <head>
   <meta charset="UTF-8" />
-  <title>Application Status</title>
+  <title>Application Status Update</title>
   <style>
     body { font-family:'Inter', Arial, sans-serif; background:#f8fafc; margin:0; padding:20px; color:#374151; }
     .email-container { max-width:600px; margin:auto; background:#fff; border-radius:8px; box-shadow:0 4px 12px rgba(0,0,0,0.05); }
     .header { padding:30px 40px 20px; border-bottom:1px solid #e5e7eb; }
     .content { padding:40px; }
     .status-box { border-left:4px solid #3b82f6; padding:16px; background:#f9fafb; border-radius:6px; margin-bottom:20px; }
+    .notes-box { background:#f9fafb; padding:16px; border-radius:6px; margin-top:20px; }
+    .timeline { display:flex; align-items:center; margin:20px 0; }
+    .timeline-item { flex:1; text-align:center; position:relative; }
+    .timeline-item:not(:last-child):after { content:''; position:absolute; right:-50%; top:50%; width:100%; height:2px; background:#e5e7eb; }
     .footer { background:#f9fafb; padding:24px 40px; text-align:center; border-top:1px solid #e5e7eb; font-size:12px; color:#9ca3af; }
   </style>
 </head>
 <body>
 <div class="email-container">
   <div class="header">
-    <img th:src="${logoUrl}" width="120" alt="Logo" />
+    <img th:src="${companyLogo}" width="120" alt="${companyName} Logo" />
   </div>
   <div class="content">
-    <h2>Trạng thái hồ sơ ứng tuyển</h2>
-    <p th:text="'Xin chào ' + ${username} + ','">Xin chào John,</p>
+    <h2>Application Status Update</h2>
+    <p>Dear ${candidateName},</p>
+
     <div class="status-box">
-      <p>Hồ sơ của bạn ứng tuyển vào vị trí <strong th:text="${jobTitle}">Backend Developer</strong> đã được cập nhật:</p>
-      <p><strong th:text="${status}">Được mời phỏng vấn</strong></p>
+      <h3>Status Update for ${jobTitle}</h3>
+      <p>Your application status has been updated from <strong>${oldStatus}</strong> to <strong>${status}</strong> on ${updateDate}.</p>
     </div>
-    <p>Chúng tôi sẽ liên hệ với bạn sớm để trao đổi chi tiết.</p>
+
+    <div th:if="${notes}" class="notes-box">
+      <h4>Additional Notes:</h4>
+      <p>${notes}</p>
+    </div>
+
+    <div class="timeline">
+      <div class="timeline-item" th:classappend="${status == 'SUBMITTED' ? 'active' : ''}">
+        <div>Submitted</div>
+      </div>
+      <div class="timeline-item" th:classappend="${status == 'REVIEWING' ? 'active' : ''}">
+        <div>Reviewing</div>
+      </div>
+      <div class="timeline-item" th:classappend="${status == 'INTERVIEW' ? 'active' : ''}">
+        <div>Interview</div>
+      </div>
+      <div class="timeline-item" th:classappend="${status == 'OFFERED' ? 'active' : ''}">
+        <div>Offered</div>
+      </div>
+    </div>
+
+    <p th:if="${status == 'INTERVIEW'}">
+      Our HR team will contact you shortly to schedule the interview.
+    </p>
+    <p th:if="${status == 'OFFERED'}">
+      Congratulations! Please check your dashboard for the complete offer details.
+    </p>
   </div>
+
   <div class="footer">
-    <p th:text="${companyName}">CareerGraph</p>
-    <p>© 2025 CareerGraph</p>
+    <p>${companyName}</p>
+    <p>© 2023 All rights reserved</p>
   </div>
 </div>
 </body>

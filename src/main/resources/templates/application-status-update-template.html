@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Application Status Update</title>
+</head>
+<body>
+    <h2>Application Status Update</h2>
+    <p>Dear ${candidateName},</p>
+    
+    <p>There has been an update regarding your application for the <strong>${jobTitle}</strong> position at ${companyName}.</p>
+    
+    <p>Your application status has been updated to: <strong>${status}</strong></p>
+    
+    <#if status == 'SCREENING'>
+    <p>We would like to schedule an initial phone screening with you. Please expect a call or email soon to arrange this.</p>
+    </#if>
+    
+    <#if status == 'INTERVIEWING'>
+    <p>Congratulations! We would like to invite you for an interview. You will receive a separate email with the interview details shortly.</p>
+    </#if>
+    
+    <p>You can log into your candidate dashboard to view more details about your application.</p>
+    
+    <p>Best regards,<br>
+    ${companyName} Hiring Team</p>
+</body>
+</html>

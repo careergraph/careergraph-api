@@ -10,7 +10,7 @@ import com.hcmute.careergraph.persistence.models.Candidate;
 import com.hcmute.careergraph.repositories.AccountRepository;
 import com.hcmute.careergraph.repositories.CandidateRepository;
 import com.hcmute.careergraph.services.AuthService;
-import com.hcmute.careergraph.services.IRedisService;
+import com.hcmute.careergraph.services.RedisService;
 import com.hcmute.careergraph.services.JwtTokenService;
 import com.hcmute.careergraph.services.MailService;
 import lombok.RequiredArgsConstructor;
@@ -35,7 +35,7 @@ public class AuthServiceImpl implements AuthService {
     private final PasswordEncoder passwordEncoder;
 
     private final JwtTokenService jwtTokenService;
-    private final IRedisService redisService;
+    private final RedisService redisService;
     private final MailService mailService;
     private final JwtDecoder jwtDecoder;
 
