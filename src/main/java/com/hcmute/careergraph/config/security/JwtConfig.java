@@ -1,6 +1,6 @@
 package com.hcmute.careergraph.config.security;
 
-import com.hcmute.careergraph.services.IRedisService;
+import com.hcmute.careergraph.services.RedisService;
 import com.nimbusds.jose.JWSAlgorithm;
 import com.nimbusds.jose.JWSHeader;
 import com.nimbusds.jose.JWSObject;
@@ -28,7 +28,7 @@ public class JwtConfig {
     @Value("${jwt.signer-key}")
     private String signerKey;
 
-    private final IRedisService redisService;
+    private final RedisService redisService;
 
     @Bean
     public JwtEncoder jwtEncoder() {
@@ -43,10 +43,10 @@ public class JwtConfig {
     // Custom JwtDecoder class để handle blacklist
     public static class CustomJwtDecoder implements JwtDecoder {
 
-        private final IRedisService redisService;
+        private final RedisService redisService;
         private final NimbusJwtDecoder nimbusJwtDecoder;
 
-        public CustomJwtDecoder(String signerKey, IRedisService redisService) {
+        public CustomJwtDecoder(String signerKey, RedisService redisService) {
             this.redisService = redisService;
 
             // Initialize decoder

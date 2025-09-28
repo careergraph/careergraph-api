@@ -1,6 +1,6 @@
 package com.hcmute.careergraph.mapper;
 
-import com.hcmute.careergraph.persistence.dtos.EducationDto;
+import com.hcmute.careergraph.persistence.dtos.response.EducationDto;
 import com.hcmute.careergraph.persistence.models.Education;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
