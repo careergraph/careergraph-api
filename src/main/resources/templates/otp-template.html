@@ -3,56 +3,125 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="x-apple-disable-message-reformatting" />
     <title>OTP Verification</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap');
+
+        .email-container {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            line-height: 1.6;
+            color: #374151;
+        }
+
+        @media only screen and (max-width: 600px) {
+            .mobile-padding {
+                padding: 20px !important;
+            }
+            .mobile-text {
+                font-size: 28px !important;
+                letter-spacing: 4px !important;
+            }
+        }
+    </style>
 </head>
-<body style="margin:0; padding:0; font-family: Arial, sans-serif; background-color:#f4f4f4;">
+<body style="margin:0; padding:0; background-color:#f8fafc;">
 
 <!-- Container -->
-<table width="100%" cellpadding="0" cellspacing="0" style="padding: 20px 0; background-color:#f4f4f4;">
+<table width="100%" cellpadding="0" cellspacing="0" style="padding: 20px 0; background-color:#f8fafc;">
     <tr>
         <td align="center">
-            <table width="600" cellpadding="0" cellspacing="0" style="background-color:#ffffff; border-radius:10px; overflow:hidden;">
+            <table width="600" cellpadding="0" cellspacing="0" class="email-container" style="background-color:#ffffff; border-radius:8px; overflow:hidden; box-shadow: 0 4px 12px rgba(0,0,0,0.05);">
 
                 <!-- HEADER -->
-                <tr style="background-color:#1f1f1f; padding: 20px;">
-                    <td style="padding:20px; text-align:left;">
-                        <img th:src="${logoUrl}" alt="Logo" width="120" style="display:block;" />
-                    </td>
-                    <td style="padding:20px; text-align:right; color:#ffffff; font-size:14px;">
-                        <span th:text="${date}">26 Sep, 2025</span>
+                <tr>
+                    <td style="background-color:#ffffff; padding:30px 40px 20px 40px; border-bottom: 1px solid #e5e7eb;">
+                        <table width="100%" cellpadding="0" cellspacing="0">
+                            <tr>
+                                <td style="text-align:left;">
+                                    <img th:src="${logoUrl}" alt="Logo" width="120" style="display:block;" />
+                                </td>
+                                <td style="text-align:right; color:#6b7280; font-size:14px; font-weight: 500;">
+                                    <span th:text="${date}">26 Sep, 2025</span>
+                                </td>
+                            </tr>
+                        </table>
                     </td>
                 </tr>
 
-                <!-- MAIN -->
+                <!-- MAIN CONTENT -->
                 <tr>
-                    <td colspan="2" style="padding:40px; text-align:center;">
-                        <h1 style="margin:0; font-size:24px; color:#333;">Your OTP Code</h1>
-                        <p style="margin:15px 0 0 0; font-size:16px; color:#555;" th:text="'Hey ' + ${username} + ','">Hey Candidate,</p>
-                        <p style="margin:20px 0 0 0; font-size:16px; color:#555;">
-                            Thank you for choosing <span th:text="${companyName}">CareerGraph</span>.<br/>
-                            Use the following OTP to complete the procedure. OTP is valid for
-                            <span style="font-weight:bold; color:#000;">5 minutes</span>. Do not share this code with anyone.
+                    <td class="mobile-padding" style="padding: 40px;">
+
+                        <!-- Title & Greeting -->
+                        <h1 style="margin:0 0 8px 0; font-size:24px; font-weight:600; color:#111827; text-align:center;">
+                            Xác thực OTP
+                        </h1>
+                        <p style="margin:0 0 32px 0; font-size:16px; color:#6b7280; text-align:center;" th:text="'Xin chào ' + ${username} + '!'">
+                            Xin chào Candidate!
                         </p>
-                        <p style="margin:40px 0 0 0; font-size:36px; font-weight:bold; letter-spacing:8px; color:#ba3d4f;" th:text="${otp}">123456</p>
-                    </td>
-                </tr>
 
-                <!-- HELP -->
-                <tr>
-                    <td colspan="2" style="padding:30px; text-align:center; font-size:14px; color:#888;">
-                        Need help? Contact
-                        <a th:href="'mailto:' + ${supportEmail}" style="color:#499fb6; text-decoration:none;" th:text="${supportEmail}">support@careergraph.com</a>
-                        or visit our
-                        <a th:href="${helpCenterUrl}" target="_blank" style="color:#499fb6; text-decoration:none;">Help Center</a>.
+                        <!-- Message -->
+                        <div style="background-color:#f9fafb; border-radius:8px; padding:24px; margin-bottom:32px; border-left:4px solid #3b82f6;">
+                            <p style="margin:0; font-size:16px; color:#374151; line-height:1.6;">
+                                Cảm ơn bạn đã chọn <strong th:text="${companyName}" style="color:#1f2937;">CareerGraph</strong>.<br/>
+                                Vui lòng sử dụng mã OTP dưới đây để hoàn tất xác thực.
+                            </p>
+                        </div>
+
+                        <!-- OTP Code -->
+                        <div style="text-align:center; margin:40px 0;">
+                            <div style="background-color:#f8fafc; border:2px solid #e5e7eb; border-radius:12px; padding:30px; display:inline-block; min-width:200px;">
+                                <p style="margin:0 0 8px 0; font-size:12px; color:#6b7280; font-weight:600; text-transform:uppercase; letter-spacing:1px;">
+                                    MÃ OTP
+                                </p>
+                                <div class="mobile-text" style="font-family:'Courier New', monospace; font-size:36px; font-weight:600; color:#1f2937; letter-spacing:6px;" th:text="${otp}">
+                                    123456
+                                </div>
+                                <p style="margin:12px 0 0 0; font-size:13px; color:#ef4444; font-weight:500;">
+                                    Có hiệu lực trong <strong>5 phút</strong>
+                                </p>
+                            </div>
+                        </div>
+
+                        <!-- Security Notice -->
+                        <div style="background-color:#fef3c7; border:1px solid #f59e0b; border-radius:6px; padding:16px; margin:32px 0;">
+                            <p style="margin:0; font-size:14px; color:#92400e; text-align:center;">
+                                <strong>⚠️ Lưu ý:</strong> Không chia sẻ mã này với bất kỳ ai
+                            </p>
+                        </div>
+
+                        <!-- Help Section -->
+                        <div style="text-align:center; margin-top:40px; padding-top:32px; border-top:1px solid #e5e7eb;">
+                            <p style="margin:0 0 16px 0; font-size:14px; color:#6b7280;">
+                                Cần hỗ trợ? Liên hệ với chúng tôi
+                            </p>
+                            <p style="margin:0;">
+                                <a th:href="'mailto:' + ${supportEmail}" style="color:#3b82f6; text-decoration:none; font-weight:500;" th:text="${supportEmail}">
+                                    support@careergraph.com
+                                </a>
+                                <span style="color:#d1d5db; margin:0 8px;">|</span>
+                                <a th:href="${helpCenterUrl}" target="_blank" style="color:#3b82f6; text-decoration:none; font-weight:500;">
+                                    Trung tâm hỗ trợ
+                                </a>
+                            </p>
+                        </div>
+
                     </td>
                 </tr>
 
                 <!-- FOOTER -->
                 <tr>
-                    <td colspan="2" style="background-color:#f4f4f4; padding:20px; text-align:center; font-size:12px; color:#888;">
-                        <p style="margin:0;" th:text="${companyName}">CareerGraph</p>
-                        <p style="margin:5px 0 0 0;" th:text="${companyAddress}">123 Street, City, Country</p>
-                        <p style="margin:5px 0 0 0;">Copyright © <span th:text="${year}">2025</span> <span th:text="${companyName}">CareerGraph</span>. All rights reserved.</p>
+                    <td style="background-color:#f9fafb; padding:24px 40px; text-align:center; border-top:1px solid #e5e7eb;">
+                        <p style="margin:0 0 4px 0; font-size:14px; font-weight:600; color:#374151;" th:text="${companyName}">
+                            CareerGraph
+                        </p>
+                        <p style="margin:0 0 8px 0; font-size:13px; color:#6b7280;" th:text="${companyAddress}">
+                            123 Street, City, Country
+                        </p>
+                        <p style="margin:0; font-size:12px; color:#9ca3af;">
+                            © <span th:text="${year}">2025</span> <span th:text="${companyName}">CareerGraph</span>. Tất cả quyền được bảo lưu.
+                        </p>
                     </td>
                 </tr>
 
