@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+  <meta charset="UTF-8" />
+  <title>Unread Messages</title>
+  <style>
+    body { font-family:'Inter', Arial, sans-serif; background:#f8fafc; margin:0; padding:20px; color:#374151; }
+    .email-container { max-width:600px; margin:auto; background:#fff; border-radius:8px; box-shadow:0 4px 12px rgba(0,0,0,0.05); }
+    .header { padding:30px 40px 20px; border-bottom:1px solid #e5e7eb; }
+    .content { padding:40px; text-align:center; }
+    .count { font-size:36px; font-weight:700; color:#3b82f6; margin:20px 0; }
+    .footer { background:#f9fafb; padding:24px 40px; text-align:center; border-top:1px solid #e5e7eb; font-size:12px; color:#9ca3af; }
+  </style>
+</head>
+<body>
+<div class="email-container">
+  <div class="header">
+    <img th:src="${logoUrl}" width="120" alt="Logo" />
+  </div>
+  <div class="content">
+    <h2>Bạn có tin nhắn mới</h2>
+    <p th:text="'Xin chào ' + ${username} + ','">Xin chào John,</p>
+    <p>Bạn có <span class="count" th:text="${unreadCount}">3</span> tin nhắn chưa đọc.</p>
+    <p><a th:href="${messagesUrl}" style="color:#3b82f6; font-weight:500;">Xem ngay</a></p>
+  </div>
+  <div class="footer">
+    <p th:text="${companyName}">CareerGraph</p>
+    <p>© 2025 CareerGraph</p>
+  </div>
+</div>
+</body>
+</html>
