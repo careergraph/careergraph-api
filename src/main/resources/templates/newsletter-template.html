@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+  <meta charset="UTF-8" />
+  <title>Career Newsletter</title>
+  <style>
+    body { font-family:'Inter', Arial, sans-serif; background:#f8fafc; margin:0; padding:20px; color:#374151; }
+    .email-container { max-width:600px; margin:auto; background:#fff; border-radius:8px; box-shadow:0 4px 12px rgba(0,0,0,0.05); }
+    .header { padding:30px 40px 20px; border-bottom:1px solid #e5e7eb; }
+    .content { padding:40px; }
+    .article { margin-bottom:24px; }
+    .article h3 { margin:0 0 8px; font-size:18px; }
+    .article p { margin:0 0 8px; }
+    .footer { background:#f9fafb; padding:24px 40px; text-align:center; border-top:1px solid #e5e7eb; font-size:12px; color:#9ca3af; }
+  </style>
+</head>
+<body>
+<div class="email-container">
+  <div class="header">
+    <img th:src="${logoUrl}" width="120" alt="Logo" />
+  </div>
+  <div class="content">
+    <h2>Bản tin nghề nghiệp hàng tuần</h2>
+    <p>Cập nhật những cơ hội việc làm và mẹo nghề nghiệp mới nhất.</p>
+    <div th:each="article : ${articles}" class="article">
+      <h3 th:text="${article.title}">Kỹ năng Java quan trọng 2025</h3>
+      <p th:text="${article.summary}">Tóm tắt nội dung...</p>
+      <a th:href="${article.link}" style="color:#3b82f6; font-weight:500;">Đọc tiếp</a>
+    </div>
+  </div>
+  <div class="footer">
+    <p th:text="${companyName}">CareerGraph</p>
+    <p>© 2025 CareerGraph</p>
+  </div>
+</div>
+</body>
+</html>
