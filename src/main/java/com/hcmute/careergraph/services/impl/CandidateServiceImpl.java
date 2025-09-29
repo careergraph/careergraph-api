@@ -1,6 +1,6 @@
 package com.hcmute.careergraph.services.impl;
 
-import com.hcmute.careergraph.config.security.SecurityUtils;
+import com.hcmute.careergraph.helper.SecurityUtils;
 import com.hcmute.careergraph.enums.FileType;
 import com.hcmute.careergraph.helper.StringHelper;
 import com.hcmute.careergraph.mapper.CandidateMapper;
@@ -16,6 +16,8 @@ import org.springframework.data.crossstore.ChangeSetPersister;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
+
+import java.util.List;
 
 @Service
 @Transactional
@@ -52,7 +54,7 @@ public class CandidateServiceImpl implements CandidateService {
         switch (fileType) {
             case AVATAR -> candidate.setAvatar(objectName);
             case COVER  -> candidate.setCover(objectName);
-            case RESUME -> candidate.setResume(objectName);
+            case RESUME -> candidate.setResumes(List.of(objectName));
         }
         candidateRepository.save(candidate);
 
@@ -74,7 +76,7 @@ public class CandidateServiceImpl implements CandidateService {
         String objectKey = switch (fileType) {
             case AVATAR -> candidate.getAvatar();
             case COVER  -> candidate.getCover();
-            case RESUME -> candidate.getResume();
+            case RESUME -> candidate.getResumes().get(0);
         };
 
         if (objectKey == null)

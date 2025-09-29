@@ -20,6 +20,8 @@ public interface AuthService {
     void forgotPassword(AuthRequests.ForgotPasswordRequest request);
     
     void resetPassword(AuthRequests.ResetPasswordRequest request);
+
+    AuthResponses.TokenResponse googleLogin(AuthRequests.GoogleLoginRequest request);
 }
 
 

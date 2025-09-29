@@ -1,6 +1,6 @@
 package com.hcmute.careergraph.mapper;
 
-import com.hcmute.careergraph.persistence.dtos.ContactDto;
+import com.hcmute.careergraph.persistence.dtos.response.ContactDto;
 import com.hcmute.careergraph.persistence.models.Contact;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
