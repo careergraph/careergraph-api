@@ -92,4 +92,14 @@ public class AuthController {
                 .message("Password reset successfully")
                 .build();
     }
+
+    @PostMapping("/google-login")
+    public RestResponse<AuthResponses.TokenResponse> googleLogin(@Valid @RequestBody AuthRequests.GoogleLoginRequest request) {
+        var tokens = authService.googleLogin(request);
+        return RestResponse.<AuthResponses.TokenResponse>builder()
+                .status(HttpStatus.OK)
+                .message("Login successful")
+                .data(tokens)
+                .build();
+    }
 }
