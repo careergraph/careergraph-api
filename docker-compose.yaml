@@ -50,57 +50,21 @@ services:
       - "9000:9000"
       - "9001:9001"
     volumes:
-      - ./data:/bitnami/minio/data
-      - ./config:/opt/bitnami/minio/config
+      - minio_data:/bitnami/minio/data
+      - minio_config:/opt/bitnami/minio/config
     networks:
       - careergraph-network
     command: minio server /bitnami/minio/data --console-address ":9001"
-
-    # Spring Boot Application
-#  app:
-#    build:
-#      context: .
-#      dockerfile: Dockerfile
-#    container_name: careergraph-app
-#    environment:
-#      # PostgreSQL configs
-#      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/careergraph
-#      SPRING_DATASOURCE_USERNAME: postgres
-#      SPRING_DATASOURCE_PASSWORD: postgres
-#      SPRING_DATASOURCE_DRIVER_CLASS_NAME: org.postgresql.Driver
-#
-#      # Redis configs
-#      SPRING_REDIS_HOST: redis
-#      SPRING_REDIS_PORT: 6379
-#
-#      # MinIO configs
-#      MINIO_ENDPOINT: http://minio:9000
-#      MINIO_ACCESS_KEY: minio
-#      MINIO_SECRET_KEY: minio
-#      MINIO_BUCKET: careergraph-bucket
-#
-#      # App configs
-#      SPRING_PROFILES_ACTIVE: dev
-#      SERVER_PORT: 8080
-#
-#    ports:
-#      - "8080:8080"
-#    depends_on:
-#      postgres:
-#        condition: service_healthy
-#      redis:
-#        condition: service_healthy
-#      minio:
-#        condition: service_started
-#    networks:
-#      - careergraph-network
-#    restart: unless-stopped
 
 # Volumes for data persistence
 volumes:
   postgres_data:
     driver: local
   redis_data:
+    driver: local
+  minio_data:
+    driver: local
+  minio_config:
     driver: local
 
 # Network for service communication

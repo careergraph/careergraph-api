@@ -1,7 +1,7 @@
 package com.hcmute.careergraph.services.impl;
 
 import com.hcmute.careergraph.persistence.models.Account;
-import com.hcmute.careergraph.services.IRedisService;
+import com.hcmute.careergraph.services.RedisService;
 import com.hcmute.careergraph.services.JwtTokenService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
@@ -17,7 +17,7 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class JwtTokenServiceImpl implements JwtTokenService {
 
-    private final IRedisService redisService;
+    private final RedisService redisService;
     private final JwtEncoder jwtEncoder;
 
     @Value("${jwt.valid-duration}")

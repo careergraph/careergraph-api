@@ -21,7 +21,8 @@ public class SecurityConfig {
             "auth/reset-password",
             "auth/refresh-token",
             "auth/confirm-otp",
-            "auth/resend-otp"
+            "auth/resend-otp",
+            "auth/google-login"
     };
 
     @Autowired

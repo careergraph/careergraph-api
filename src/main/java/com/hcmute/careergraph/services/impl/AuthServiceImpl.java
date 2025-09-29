@@ -10,7 +10,7 @@ import com.hcmute.careergraph.persistence.models.Candidate;
 import com.hcmute.careergraph.repositories.AccountRepository;
 import com.hcmute.careergraph.repositories.CandidateRepository;
 import com.hcmute.careergraph.services.AuthService;
-import com.hcmute.careergraph.services.IRedisService;
+import com.hcmute.careergraph.services.RedisService;
 import com.hcmute.careergraph.services.JwtTokenService;
 import com.hcmute.careergraph.services.MailService;
 import lombok.RequiredArgsConstructor;
@@ -24,6 +24,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.security.SecureRandom;
 import java.util.Optional;
+import com.google.api.client.googleapis.auth.oauth2.GoogleIdToken;
+import com.google.api.client.googleapis.auth.oauth2.GoogleIdTokenVerifier;
 
 @Service
 @Transactional
@@ -35,9 +37,10 @@ public class AuthServiceImpl implements AuthService {
     private final PasswordEncoder passwordEncoder;
 
     private final JwtTokenService jwtTokenService;
-    private final IRedisService redisService;
+    private final RedisService redisService;
     private final MailService mailService;
     private final JwtDecoder jwtDecoder;
+    private final GoogleIdTokenVerifier googleIdTokenVerifier;
 
     @Value("${jwt.valid-duration}")
     private long accessTtl;
@@ -213,6 +216,78 @@ public class AuthServiceImpl implements AuthService {
         SecureRandom random = new SecureRandom();
         int value = 100000 + random.nextInt(900000);
         return String.valueOf(value);
+    }
+
+    @Override
+    public AuthResponses.TokenResponse googleLogin(AuthRequests.GoogleLoginRequest request) {
+        try {
+            GoogleIdToken idToken = googleIdTokenVerifier.verify(request.getIdToken());
+            if (idToken == null) {
+                throw new AppException(ErrorType.UNAUTHORIZED, "Invalid Google ID token");
+            }
+
+            GoogleIdToken.Payload payload = idToken.getPayload();
+            String email = payload.getEmail();
+            boolean emailVerified = Boolean.TRUE.equals(payload.getEmailVerified());
+            String givenName = (String) payload.get("given_name");
+            String familyName = (String) payload.get("family_name");
+            String pictureUrl = (String) payload.get("picture");
+
+            Account account = accountRepository.findByEmail(email).orElse(null);
+            if (account == null) {
+                // Create new account and candidate
+                Candidate candidate = Candidate.builder().build();
+                account = Account.builder()
+                        .email(email)
+                        .passwordHash(passwordEncoder.encode("google:" + idToken.getPayload().getSubject()))
+                        .role(Role.USER)
+                        .emailVerified(emailVerified)
+                        .candidate(candidate)
+                        .build();
+                candidate.setAccount(account);
+                // Attach basic profile
+                candidate.setFirstName(givenName);
+                candidate.setLastName(familyName);
+                candidate.setAvatar(pictureUrl);
+                candidateRepository.save(candidate);
+            } else {
+                // Existing account: mark verified if Google confirmed
+                if (emailVerified && !account.isEmailVerified()) {
+                    account.setEmailVerified(true);
+                    accountRepository.save(account);
+                }
+                // Ensure candidate exists and update profile lightly
+                Candidate candidate = account.getCandidate();
+                if (candidate == null) {
+                    candidate = Candidate.builder()
+                            .account(account)
+                            .build();
+                    account.setCandidate(candidate);
+                }
+                if (candidate.getAvatar() == null && pictureUrl != null) {
+                    candidate.setAvatar(pictureUrl);
+                }
+                if (candidate.getFirstName() == null && givenName != null) {
+                    candidate.setFirstName(givenName);
+                }
+                if (candidate.getLastName() == null && familyName != null) {
+                    candidate.setLastName(familyName);
+                }
+                candidateRepository.save(candidate);
+            }
+
+            String accessToken = jwtTokenService.generateAccessToken(account);
+            String refreshToken = jwtTokenService.generateRefreshToken(account);
+            return AuthResponses.TokenResponse.builder()
+                    .accessToken(accessToken)
+                    .refreshToken(refreshToken)
+                    .expiresIn(accessTtl)
+                    .build();
+        } catch (AppException e) {
+            throw e;
+        } catch (Exception e) {
+            throw new AppException(ErrorType.UNAUTHORIZED, "Failed to verify Google token");
+        }
     }
 }
 

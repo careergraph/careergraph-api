@@ -18,6 +18,11 @@ jwt:
   valid-duration: 3600         # 1h
   refreshable-duration: 36000  # 10h
 
+google:
+  oauth:
+    client-id: "407408718192.apps.googleusercontent.com"
+    client-secret: "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"
+
 springdoc:
   api-docs:
     path: /v3/api-docs

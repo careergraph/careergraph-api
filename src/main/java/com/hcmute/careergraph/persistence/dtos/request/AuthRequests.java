@@ -54,6 +54,12 @@ public class AuthRequests {
         @Size(min = 8, max = 100)
         private String newPassword;
     }
+
+    @Data
+    public static class GoogleLoginRequest {
+        @NotBlank
+        private String idToken;
+    }
 }
 
 
