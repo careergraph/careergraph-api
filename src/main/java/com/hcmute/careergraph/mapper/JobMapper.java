@@ -11,5 +11,6 @@ public interface JobMapper {
     @Mapping(target = "jobId", source = "id")
     @Mapping(target = "requiredSkills", ignore = true)
     @Mapping(target = "applications", ignore = true)
+    @Mapping(target = "company", ignore = true)
     JobDto toDto(Job job);
 }

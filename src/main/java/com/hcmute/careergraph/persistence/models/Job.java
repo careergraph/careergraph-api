@@ -1,6 +1,7 @@
 package com.hcmute.careergraph.persistence.models;
 
 import com.hcmute.careergraph.enums.EmploymentType;
+import com.hcmute.careergraph.enums.JobCategory;
 import com.hcmute.careergraph.enums.Status;
 import jakarta.persistence.*;
 import lombok.Getter;
@@ -61,6 +62,10 @@ public class Job extends BaseEntity {
 
     @Column(name = "is_urgent")
     private Boolean isUrgent;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "job_category")
+    private JobCategory jobCategory;
 
     // Many-to-One relationship with Company
     @ManyToOne(fetch = FetchType.LAZY)

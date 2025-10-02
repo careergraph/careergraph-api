@@ -1,5 +1,6 @@
 package com.hcmute.careergraph.services.impl;
 
+import com.hcmute.careergraph.enums.JobCategory;
 import com.hcmute.careergraph.enums.Status;
 import com.hcmute.careergraph.mapper.JobMapper;
 import com.hcmute.careergraph.persistence.dtos.response.JobDto;
@@ -12,12 +13,16 @@ import com.hcmute.careergraph.services.JobService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
 
 @Service
 @Transactional
@@ -59,33 +64,41 @@ public class JobServiceImpl implements JobService {
 
         Job savedJob = jobRepository.save(job);
         log.info("Job created successfully with id: {}", savedJob.getId());
-        
-        return jobMapper.toDto(savedJob);
+
+        return convertToDto(job, false);
     }
 
     @Override
     @Transactional(readOnly = true)
     public JobDto getJobById(String id) {
         log.info("Getting job by id: {}", id);
+
         Job job = jobRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Job not found with id: " + id));
-        return jobMapper.toDto(job);
+
+        return convertToDto(job, true);
     }
 
     @Override
     @Transactional(readOnly = true)
     public Page<JobDto> getAllJobs(Pageable pageable) {
         log.info("Getting all jobs with pagination");
-        Page<Job> jobs = jobRepository.findAll(pageable);
-        return jobs.map(jobMapper::toDto);
+        Page<Job> jobPage = jobRepository.findAll(pageable);
+
+        List<JobDto> jobDtos = convertToDto(jobPage, false);
+
+        return new PageImpl<>(jobDtos, pageable, jobDtos.size());
     }
 
     @Override
     @Transactional(readOnly = true)
     public Page<JobDto> getJobsByCompany(String companyId, Pageable pageable) {
         log.info("Getting jobs by company id: {}", companyId);
-        Page<Job> jobs = jobRepository.findByCompanyId(companyId, pageable);
-        return jobs.map(jobMapper::toDto);
+        Page<Job> jobPage = jobRepository.findByCompanyId(companyId, pageable);
+
+        List<JobDto> jobDtos = convertToDto(jobPage, false);
+
+        return new PageImpl<>(jobDtos, pageable, jobDtos.size());
     }
 
     @Override
@@ -118,8 +131,8 @@ public class JobServiceImpl implements JobService {
 
         Job updatedJob = jobRepository.save(job);
         log.info("Job updated successfully with id: {}", updatedJob.getId());
-        
-        return jobMapper.toDto(updatedJob);
+
+        return convertToDto(job, false);
     }
 
     @Override
@@ -150,5 +163,109 @@ public class JobServiceImpl implements JobService {
         job.deactivate();
         jobRepository.save(job);
         log.info("Job deactivated successfully with id: {}", id);
+    }
+
+    @Override
+    public List<HashMap<String, Object>> getJobCategories() {
+
+        List<HashMap<String, Object>> result = new ArrayList<>();
+        List<JobCategory> jobCategories = List.of(JobCategory.values());
+        jobCategories.stream().map(category -> {
+            HashMap<String, Object> tmp = new HashMap<>();
+            tmp.put("type", category.name());
+            tmp.put("name", category.getDisplayName());
+            tmp.put("description", category.getDescription());
+
+            result.add(tmp);
+            return tmp;
+        }).toList();
+
+        return result;
+    }
+
+    // ========================================= CONVERT FUNC =========================================
+
+    /*
+    * Convert DTO from JobPage to JobList
+    * */
+    private List<JobDto> convertToDto(Page<Job> jobPage, boolean isDetail) {
+        List<JobDto> result = jobPage.stream()
+                .filter(job -> job.getStatus() == Status.ACTIVE)
+                .map(job -> {
+                    JobDto tmp = jobMapper.toDto(job);
+
+                    // Build category
+                    HashMap<String, Object> jobCategory = new HashMap<>();
+                    jobCategory.put("type", job.getJobCategory().name());
+                    jobCategory.put("name", job.getJobCategory().getDisplayName());
+                    jobCategory.put("description", job.getJobCategory().getDescription());
+                    tmp.setJobCategory(jobCategory);
+
+                    // Build detail
+                    if (isDetail) {
+                        putDetail(tmp);
+                    }
+
+                    return tmp;
+                })
+                .toList();
+
+        return result;
+    }
+
+    /*
+    * Convert DTO from list
+    * */
+    private List<JobDto> convertToDto(List<Job> jobs, boolean isDetail) {
+        List<JobDto> result = jobs.stream()
+                .filter(job -> job.getStatus() == Status.ACTIVE)
+                .map(job -> {
+                    JobDto tmp = jobMapper.toDto(job);
+
+                    // Build category
+                    HashMap<String, Object> jobCategory = new HashMap<>();
+                    jobCategory.put("type", job.getJobCategory().name());
+                    jobCategory.put("name", job.getJobCategory().getDisplayName());
+                    jobCategory.put("description", job.getJobCategory().getDescription());
+                    tmp.setJobCategory(jobCategory);
+
+                    // Build detail
+                    if (isDetail) {
+                        putDetail(tmp);
+                    }
+
+                    return tmp;
+                })
+                .toList();
+
+        return result;
+    }
+
+    /*
+    * Convert DTO from single record
+    * */
+    private JobDto convertToDto(Job job, boolean isDetail) {
+        JobDto result = jobMapper.toDto(job);
+
+        // Build category
+        HashMap<String, Object> jobCategory = new HashMap<>();
+        jobCategory.put("type", job.getJobCategory().name());
+        jobCategory.put("name", job.getJobCategory().getDisplayName());
+        jobCategory.put("description", job.getJobCategory().getDescription());
+        result.setJobCategory(jobCategory);
+
+        // Build detail
+        if (isDetail) {
+            putDetail(result);
+        }
+
+        return result;
+    }
+
+    /*
+    * Convert detail
+    * */
+    private void putDetail(JobDto jobDto) {
+        // TODO: application and required skill
     }
 }
