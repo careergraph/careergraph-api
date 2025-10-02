@@ -15,7 +15,7 @@ import java.nio.file.AccessDeniedException;
 public class GlobalExceptionHandler {
 
 
-    @ExceptionHandler(value = Exception.class)
+    @ExceptionHandler(value = RuntimeException.class)
     ResponseEntity<RestResponse> handlingRuntimeException(RuntimeException exception) {
         log.error("Exception: ", exception);
         RestResponse restResponse = new RestResponse();
