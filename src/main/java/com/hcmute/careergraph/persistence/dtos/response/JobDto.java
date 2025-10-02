@@ -1,12 +1,15 @@
 package com.hcmute.careergraph.persistence.dtos.response;
 
 import com.hcmute.careergraph.enums.EmploymentType;
+import com.hcmute.careergraph.enums.JobCategory;
 import com.hcmute.careergraph.enums.Status;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
+import java.util.HashMap;
+import java.util.Objects;
 import java.util.Set;
 
 @Getter
@@ -44,6 +47,8 @@ public class JobDto {
     private Status status;
 
     private Boolean isUrgent;
+
+    private HashMap<String, Object> jobCategory = new HashMap<>();
 
     private CompanyDto company;
 

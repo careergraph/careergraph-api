@@ -206,18 +206,6 @@ public class AuthServiceImpl implements AuthService {
         redisService.deleteObject(otpKey(request.getEmail()));
     }
 
-    /*============================================ HELPER METHOD ============================================*/
-
-    private String otpKey(String email) {
-        return "otp:" + email;
-    }
-
-    private String generateOtp() {
-        SecureRandom random = new SecureRandom();
-        int value = 100000 + random.nextInt(900000);
-        return String.valueOf(value);
-    }
-
     @Override
     public AuthResponses.TokenResponse googleLogin(AuthRequests.GoogleLoginRequest request) {
         try {
@@ -288,6 +276,18 @@ public class AuthServiceImpl implements AuthService {
         } catch (Exception e) {
             throw new AppException(ErrorType.UNAUTHORIZED, "Failed to verify Google token");
         }
+    }
+
+    /*============================================ HELPER METHOD ============================================*/
+
+    private String otpKey(String email) {
+        return "otp:" + email;
+    }
+
+    private String generateOtp() {
+        SecureRandom random = new SecureRandom();
+        int value = 100000 + random.nextInt(900000);
+        return String.valueOf(value);
     }
 }
 

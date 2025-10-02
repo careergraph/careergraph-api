@@ -22,7 +22,8 @@ public class SecurityConfig {
             "auth/refresh-token",
             "auth/confirm-otp",
             "auth/resend-otp",
-            "auth/google-login"
+            "auth/google-login",
+            "jobs/**"
     };
 
     @Autowired

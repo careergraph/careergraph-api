@@ -7,9 +7,13 @@ import com.hcmute.careergraph.services.JobService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
+
+import java.util.HashMap;
+import java.util.List;
 
 @RestController
 @RequestMapping("jobs")
@@ -39,8 +43,12 @@ public class JobController {
     }
 
     @GetMapping
-    public RestResponse<Page<JobDto>> getAllJobs(Pageable pageable) {
+    public RestResponse<Page<JobDto>> getAllJobs(@RequestParam(name = "page", defaultValue = "0") Integer page,
+                                                 @RequestParam(name = "size", defaultValue = "10") Integer size) {
+
+        Pageable pageable = PageRequest.of(page, size);
         Page<JobDto> jobs = jobService.getAllJobs(pageable);
+
         return RestResponse.<Page<JobDto>>builder()
                 .status(HttpStatus.OK)
                 .message("Jobs retrieved successfully")
@@ -49,7 +57,11 @@ public class JobController {
     }
 
     @GetMapping("/company/{companyId}")
-    public RestResponse<Page<JobDto>> getJobsByCompany(@PathVariable String companyId, Pageable pageable) {
+    public RestResponse<Page<JobDto>> getJobsByCompany(@PathVariable String companyId,
+                                                       @RequestParam(name = "page", defaultValue = "0") Integer page,
+                                                       @RequestParam(name = "size", defaultValue = "10") Integer size) {
+
+        Pageable pageable = PageRequest.of(page, size);
         Page<JobDto> jobs = jobService.getJobsByCompany(companyId, pageable);
         return RestResponse.<Page<JobDto>>builder()
                 .status(HttpStatus.OK)
@@ -92,6 +104,15 @@ public class JobController {
         return RestResponse.<Void>builder()
                 .status(HttpStatus.OK)
                 .message("Job deactivated successfully")
+                .build();
+    }
+
+    @GetMapping("/categories")
+    public RestResponse<List<HashMap<String, Object>>> getJobCategories() {
+        return RestResponse.<List<HashMap<String, Object>>>builder()
+                .status(HttpStatus.OK)
+                .message("List of job category")
+                .data(jobService.getJobCategories())
                 .build();
     }
 }
