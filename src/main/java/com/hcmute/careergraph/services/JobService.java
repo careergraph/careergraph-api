@@ -5,6 +5,9 @@ import com.hcmute.careergraph.persistence.dtos.request.JobRequest;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 
+import java.util.HashMap;
+import java.util.List;
+
 public interface JobService {
 
     JobDto createJob(JobRequest request);
@@ -22,4 +25,6 @@ public interface JobService {
     void activateJob(String id);
 
     void deactivateJob(String id);
+
+    List<HashMap<String, Object>> getJobCategories();
 }
