@@ -4,6 +4,7 @@ import com.hcmute.careergraph.helper.SecurityUtils;
 import com.hcmute.careergraph.enums.FileType;
 import com.hcmute.careergraph.helper.StringHelper;
 import com.hcmute.careergraph.mapper.CandidateMapper;
+import com.hcmute.careergraph.persistence.dtos.response.CandidateDto;
 import com.hcmute.careergraph.persistence.models.Candidate;
 import com.hcmute.careergraph.repositories.CandidateRepository;
 import com.hcmute.careergraph.services.CandidateService;
@@ -13,6 +14,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.apache.logging.log4j.util.InternalException;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.crossstore.ChangeSetPersister;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
@@ -83,5 +85,13 @@ public class CandidateServiceImpl implements CandidateService {
             throw new ChangeSetPersister.NotFoundException();
 
         return minioService.getFileUrl(objectKey);
+    }
+    @Override
+    public CandidateDto getMyProfile() throws ChangeSetPersister.NotFoundException {
+        String candidateId =  securityUtils.getCandidateId().get();
+        Candidate candidate = candidateRepository.findById(candidateId).
+                orElseThrow(ChangeSetPersister.NotFoundException::new);
+        return candidateMapper.toDto(candidate);
+
     }
 }
