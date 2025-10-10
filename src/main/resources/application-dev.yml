@@ -11,6 +11,8 @@ spring:
       idle-timeout: 600000  # 10m
       max-lifetime: 1800000 # 30m
       auto-commit: true
+      data-source-properties:
+        TimeZone: Asia/Ho_Chi_Minh
 
 
   jpa:
@@ -19,6 +21,8 @@ spring:
     hibernate:
       ddl-auto: update
       format_sql: true
+    properties:
+      hibernate.jdbc.time_zone: UTC
 
   # Neo4j
   # neo4j:
