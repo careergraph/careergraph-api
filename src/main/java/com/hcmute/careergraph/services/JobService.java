@@ -27,4 +27,6 @@ public interface JobService {
     void deactivateJob(String id);
 
     List<HashMap<String, Object>> getJobCategories();
+
+    Page<JobDto> getJobsPersonalized(Pageable pageable);
 }
