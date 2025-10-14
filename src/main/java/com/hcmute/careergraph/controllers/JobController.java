@@ -115,4 +115,17 @@ public class JobController {
                 .data(jobService.getJobCategories())
                 .build();
     }
+
+    @GetMapping("/personalized")
+    public RestResponse<Page<JobDto>> getJobsPersonalized(@RequestParam(name = "page", defaultValue = "0") Integer page,
+                                                          @RequestParam(name = "size", defaultValue = "10") Integer size) {
+
+        Pageable pageable = PageRequest.of(page, size);
+        Page<JobDto> jobs = jobService.getJobsPersonalized(pageable);
+        return RestResponse.<Page<JobDto>>builder()
+                .status(HttpStatus.OK)
+                .message("Jobs retrieved successfully")
+                .data(jobs)
+                .build();
+    }
 }

@@ -183,6 +183,11 @@ public class JobServiceImpl implements JobService {
         return result;
     }
 
+    @Override
+    public Page<JobDto> getJobsPersonalized(Pageable pageable) {
+        return null;
+    }
+
     // ========================================= CONVERT FUNC =========================================
 
     /*
