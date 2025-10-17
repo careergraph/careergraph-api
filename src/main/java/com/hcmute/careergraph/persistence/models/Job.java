@@ -1,14 +1,19 @@
 package com.hcmute.careergraph.persistence.models;
 
-import com.hcmute.careergraph.enums.EmploymentType;
-import com.hcmute.careergraph.enums.JobCategory;
-import com.hcmute.careergraph.enums.Status;
+import com.hcmute.careergraph.enums.work.EmploymentType;
+import com.hcmute.careergraph.enums.work.ExperienceLevel;
+import com.hcmute.careergraph.enums.work.JobCategory;
+import com.hcmute.careergraph.enums.common.Status;
+import com.hcmute.careergraph.helper.JsonUtils;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.experimental.SuperBuilder;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
+import java.util.List;
 import java.util.Set;
 
 @Entity
@@ -22,24 +27,60 @@ public class Job extends BaseEntity {
     @Column(name = "title")
     private String title;
 
+    /**
+     * Field JSON for converter (UI Job): responsibilities
+     */
+    @Convert(converter = JsonUtils.StringListConverter.class)
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "responsibilities", columnDefinition = "TEXT")
+    private List<String> responsibilities;
+
+    /**
+     * Field JSON for converter (UI Job): qualifications
+     */
+    @Convert(converter = JsonUtils.StringListConverter.class)
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "qualifications", columnDefinition = "TEXT")
+    private List<String> qualifications;
+
+    /**
+     * Field JSON for converter (UI Job): qualifications
+     */
+    @Convert(converter = JsonUtils.StringListConverter.class)
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "benefits", columnDefinition = "TEXT")
+    private List<String> benefits;
+
     @Column(name = "description", columnDefinition = "TEXT")
     private String description;
 
-    @Column(name = "requirements", columnDefinition = "TEXT")
-    private String requirements;
-
-    @Column(name = "benefits", columnDefinition = "TEXT")
-    private String benefits;
-
+    /**
+     * Fields JOB detail
+     */
     @Column(name = "salary_range")
     private String salaryRange;
 
+    @Column(name = "min_experience")
+    private Integer minExperience;
+
+    @Column(name = "max_experience")
+    private Integer maxExperience;
+
+    @Enumerated(EnumType.STRING)
     @Column(name = "experience_level")
-    private String experienceLevel;
+    private ExperienceLevel experienceLevel;
 
-    @Column(name = "work_arrangement")
-    private String workArrangement;
+    @Enumerated(EnumType.STRING)
+    @Column(name = "employment_type")
+    private EmploymentType employmentType;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "job_category")
+    private JobCategory jobCategory;
+
+    /**
+     * Post information for JOB
+     */
     @Column(name = "posted_date")
     private String postedDate;
 
@@ -49,23 +90,47 @@ public class Job extends BaseEntity {
     @Column(name = "number_of_positions")
     private Integer numberOfPositions;
 
-    @Column(name = "work_location")
-    private String workLocation;
+    @Column(name = "contact_email")
+    private String contactEmail;
 
-    @Enumerated(EnumType.STRING)
-    @Column(name = "employment_type")
-    private EmploymentType employmentType;
+    @Column(name = "contact_phone")
+    private String contactPhone;
 
-    @Enumerated(EnumType.STRING)
-    @Column(name = "status")
-    private Status status;
+    @Column(name = "promotion_type")
+    private String promotionType; // "free" or "paid"
 
-    @Column(name = "is_urgent")
-    private Boolean isUrgent;
+    /**
+     * Address for JOB
+     */
+    @Column(name = "city")
+    private String city;
 
-    @Enumerated(EnumType.STRING)
-    @Column(name = "job_category")
-    private JobCategory jobCategory;
+    @Column(name = "district")
+    private String district;
+
+    @Column(name = "address")
+    private String address;
+
+    @Column(name = "remote_job")
+    private boolean remoteJob;
+
+    /**
+     * Stats fields for JOB
+     */
+    @Column(name = "views")
+    private Integer views = 0;
+
+    @Column(name = "applicants")
+    private Integer applicants = 0;
+
+    @Column(name = "saved")
+    private Integer saved = 0;
+
+    @Column(name = "liked")
+    private Integer liked = 0;
+
+    @Column(name = "shared")
+    private Integer shared = 0;
 
     // Many-to-One relationship with Company
     @ManyToOne(fetch = FetchType.LAZY)

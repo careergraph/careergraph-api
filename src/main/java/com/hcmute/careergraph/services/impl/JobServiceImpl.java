@@ -1,7 +1,7 @@
 package com.hcmute.careergraph.services.impl;
 
-import com.hcmute.careergraph.enums.JobCategory;
-import com.hcmute.careergraph.enums.Status;
+import com.hcmute.careergraph.enums.work.JobCategory;
+import com.hcmute.careergraph.enums.common.Status;
 import com.hcmute.careergraph.mapper.JobMapper;
 import com.hcmute.careergraph.persistence.dtos.response.JobDto;
 import com.hcmute.careergraph.persistence.dtos.request.JobRequest;

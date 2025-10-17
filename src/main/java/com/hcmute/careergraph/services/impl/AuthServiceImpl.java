@@ -1,7 +1,7 @@
 package com.hcmute.careergraph.services.impl;
 
-import com.hcmute.careergraph.enums.ErrorType;
-import com.hcmute.careergraph.enums.Role;
+import com.hcmute.careergraph.enums.common.ErrorType;
+import com.hcmute.careergraph.enums.common.Role;
 import com.hcmute.careergraph.exception.AppException;
 import com.hcmute.careergraph.persistence.dtos.request.AuthRequests;
 import com.hcmute.careergraph.persistence.dtos.response.AuthResponses;

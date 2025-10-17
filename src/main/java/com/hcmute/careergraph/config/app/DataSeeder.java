@@ -1,9 +1,10 @@
 package com.hcmute.careergraph.config.app;
 
 import com.github.javafaker.Faker;
-import com.hcmute.careergraph.enums.EmploymentType;
-import com.hcmute.careergraph.enums.JobCategory;
-import com.hcmute.careergraph.enums.Status;
+import com.hcmute.careergraph.enums.work.EmploymentType;
+import com.hcmute.careergraph.enums.work.JobCategory;
+import com.hcmute.careergraph.enums.common.Status;
+import com.hcmute.careergraph.enums.candidate.ContactType;
 import com.hcmute.careergraph.persistence.models.*;
 import com.hcmute.careergraph.repositories.*;
 import lombok.RequiredArgsConstructor;
@@ -65,7 +66,7 @@ public class DataSeeder implements CommandLineRunner {
                         .value(faker.internet().emailAddress())
                         .verified(faker.bool().bool())
                         .isPrimary(c == 0)
-                        .type(com.hcmute.careergraph.enums.ContactType.EMAIL)
+                        .type(ContactType.EMAIL)
                         .party(company)
                         .build();
                 contacts.add(contact);
@@ -118,7 +119,7 @@ public class DataSeeder implements CommandLineRunner {
                         .value(faker.internet().emailAddress())
                         .verified(faker.bool().bool())
                         .isPrimary(c == 0)
-                        .type(com.hcmute.careergraph.enums.ContactType.EMAIL)
+                        .type(ContactType.EMAIL)
                         .party(candidate)
                         .build();
                 contacts.add(contact);

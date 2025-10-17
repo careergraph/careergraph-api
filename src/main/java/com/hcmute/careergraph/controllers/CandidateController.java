@@ -1,6 +1,6 @@
 package com.hcmute.careergraph.controllers;
 
-import com.hcmute.careergraph.enums.FileType;
+import com.hcmute.careergraph.enums.common.FileType;
 import com.hcmute.careergraph.helper.RestResponse;
 import com.hcmute.careergraph.services.CandidateService;
 import lombok.RequiredArgsConstructor;

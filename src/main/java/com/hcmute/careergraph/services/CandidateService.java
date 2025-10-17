@@ -1,6 +1,6 @@
 package com.hcmute.careergraph.services;
 
-import com.hcmute.careergraph.enums.FileType;
+import com.hcmute.careergraph.enums.common.FileType;
 import org.springframework.data.crossstore.ChangeSetPersister;
 import org.springframework.web.multipart.MultipartFile;
 

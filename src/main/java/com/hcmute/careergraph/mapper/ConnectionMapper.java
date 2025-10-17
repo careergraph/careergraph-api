@@ -9,5 +9,6 @@ import org.mapstruct.Mapping;
 public interface ConnectionMapper {
 
     @Mapping(target = "connectionId", source = "connectedCandidateId")
+    @Mapping(target = "candidate", ignore = true)
     ConnectionDto toDto(Connection connection);
 }

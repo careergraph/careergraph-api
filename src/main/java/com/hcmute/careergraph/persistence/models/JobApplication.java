@@ -1,6 +1,6 @@
 package com.hcmute.careergraph.persistence.models;
 
-import com.hcmute.careergraph.enums.Status;
+import com.hcmute.careergraph.enums.common.Status;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.NoArgsConstructor;

@@ -1,6 +1,6 @@
 package com.hcmute.careergraph.persistence.dtos.response;
 
-import com.hcmute.careergraph.enums.ConnectionType;
+import com.hcmute.careergraph.enums.candidate.ConnectionType;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
