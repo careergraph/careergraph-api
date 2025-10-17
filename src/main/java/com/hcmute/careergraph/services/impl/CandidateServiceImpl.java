@@ -1,7 +1,7 @@
 package com.hcmute.careergraph.services.impl;
 
 import com.hcmute.careergraph.helper.SecurityUtils;
-import com.hcmute.careergraph.enums.FileType;
+import com.hcmute.careergraph.enums.common.FileType;
 import com.hcmute.careergraph.helper.StringHelper;
 import com.hcmute.careergraph.mapper.CandidateMapper;
 import com.hcmute.careergraph.persistence.models.Candidate;

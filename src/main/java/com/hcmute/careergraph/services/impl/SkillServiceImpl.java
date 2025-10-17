@@ -1,6 +1,7 @@
 package com.hcmute.careergraph.services.impl;
 
 import com.hcmute.careergraph.mapper.SkillMapper;
+import com.hcmute.careergraph.persistence.dtos.record.SkillLookupResponse;
 import com.hcmute.careergraph.persistence.dtos.response.SkillDto;
 import com.hcmute.careergraph.persistence.dtos.request.SkillRequest;
 import com.hcmute.careergraph.persistence.models.Skill;
@@ -12,6 +13,11 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 @Service
 @Transactional
@@ -109,5 +115,25 @@ public class SkillServiceImpl implements SkillService {
         skill.deactivate();
         skillRepository.save(skill);
         log.info("Skill deactivated successfully with id: {}", id);
+    }
+
+    @Override
+    public List<SkillLookupResponse> lookupSkill(String query) {
+
+        if (query == null) {
+            query = "";
+        }
+        List<Skill> skills = skillRepository.lookupSkill(query);
+
+        List<SkillLookupResponse> result = skills.stream()
+                .map(skill -> {
+                    return SkillLookupResponse.builder()
+                            .id(skill.getId())
+                            .name(skill.getName())
+                            .category(skill.getCategory())
+                            .build();
+                })
+                .collect(Collectors.toList());
+        return result;
     }
 }

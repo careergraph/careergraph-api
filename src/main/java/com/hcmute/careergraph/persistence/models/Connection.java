@@ -1,7 +1,7 @@
 package com.hcmute.careergraph.persistence.models;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
-import com.hcmute.careergraph.enums.ConnectionType;
+import com.hcmute.careergraph.enums.candidate.ConnectionType;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.NoArgsConstructor;

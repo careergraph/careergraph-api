@@ -1,6 +1,6 @@
 package com.hcmute.careergraph.helper;
 
-import com.hcmute.careergraph.enums.Role;
+import com.hcmute.careergraph.enums.common.Role;
 import com.hcmute.careergraph.persistence.models.Account;
 import com.hcmute.careergraph.repositories.AccountRepository;
 import lombok.RequiredArgsConstructor;

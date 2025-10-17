@@ -1,6 +1,6 @@
 package com.hcmute.careergraph.exception;
 
-import com.hcmute.careergraph.enums.ErrorType;
+import com.hcmute.careergraph.enums.common.ErrorType;
 import com.hcmute.careergraph.helper.RestResponse;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
