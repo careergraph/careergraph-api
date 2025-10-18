@@ -12,7 +12,7 @@ import java.time.Duration;
 
 @Service
 @Slf4j
-public class RedisService implements com.hcmute.careergraph.services.RedisService {
+public class RedisServiceImpl implements com.hcmute.careergraph.services.RedisService {
 
     @Autowired
     private ObjectMapper objectMapper;

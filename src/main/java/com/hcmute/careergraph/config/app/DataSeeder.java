@@ -27,7 +27,7 @@ public class DataSeeder implements CommandLineRunner {
     private final Faker faker = new Faker();
 
     @Transactional
-    public void seed() {
+    /*public void seed() {
         if (companyRepository.count() > 0 || candidateRepository.count() > 0 || jobRepository.count() > 0) {
             return;
         }
@@ -210,7 +210,7 @@ public class DataSeeder implements CommandLineRunner {
             applications.add(application);
         }
         applicationRepository.saveAll(applications);
-    }
+    }*/
 
     @Override
     public void run(String... args) {
@@ -233,6 +233,6 @@ public class DataSeeder implements CommandLineRunner {
             return;
         }
 
-        seed();
+        // seed();
     }
 }
