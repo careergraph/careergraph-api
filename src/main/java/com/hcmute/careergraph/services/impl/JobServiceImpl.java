@@ -69,6 +69,11 @@ public class JobServiceImpl implements JobService {
 //    }
 
     @Override
+    public JobDto createJob(JobRequest request) {
+        return null;
+    }
+
+    @Override
     public JobDto getJobById(String id) {
         return null;
     }
