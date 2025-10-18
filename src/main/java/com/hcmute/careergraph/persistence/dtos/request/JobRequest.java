@@ -1,6 +1,6 @@
 package com.hcmute.careergraph.persistence.dtos.request;
 
-import com.hcmute.careergraph.enums.EmploymentType;
+import com.hcmute.careergraph.enums.work.EmploymentType;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import lombok.AllArgsConstructor;

@@ -1,6 +1,6 @@
 package com.hcmute.careergraph.persistence.dtos.response;
 
-import com.hcmute.careergraph.enums.Status;
+import com.hcmute.careergraph.enums.common.Status;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;

@@ -4,6 +4,7 @@ import com.hcmute.careergraph.persistence.dtos.response.CandidateDto;
 import com.hcmute.careergraph.persistence.models.Candidate;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
+import org.mapstruct.MappingTarget;
 
 @Mapper(componentModel = "spring")
 public interface CandidateMapper {
@@ -17,4 +18,5 @@ public interface CandidateMapper {
     @Mapping(target = "skills", ignore = true)
     @Mapping(target = "applications", ignore = true)
     CandidateDto toDto(Candidate candidate);
+
 }

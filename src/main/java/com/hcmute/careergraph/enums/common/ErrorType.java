@@ -1,4 +1,4 @@
-package com.hcmute.careergraph.enums;
+package com.hcmute.careergraph.enums.common;
 
 import lombok.AccessLevel;
 import lombok.Getter;

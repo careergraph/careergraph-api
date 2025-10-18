@@ -1,6 +1,6 @@
 package com.hcmute.careergraph.helper;
 
-import com.hcmute.careergraph.enums.FileType;
+import com.hcmute.careergraph.enums.common.FileType;
 
 public class StringHelper {
 

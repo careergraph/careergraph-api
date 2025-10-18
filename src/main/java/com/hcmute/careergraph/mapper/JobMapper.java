@@ -1,6 +1,5 @@
 package com.hcmute.careergraph.mapper;
 
-import com.hcmute.careergraph.enums.JobCategory;
 import com.hcmute.careergraph.persistence.dtos.response.JobDto;
 import com.hcmute.careergraph.persistence.models.Job;
 import org.mapstruct.Mapper;
