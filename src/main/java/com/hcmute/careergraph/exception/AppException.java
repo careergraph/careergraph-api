@@ -1,6 +1,6 @@
 package com.hcmute.careergraph.exception;
 
-import com.hcmute.careergraph.enums.ErrorType;
+import com.hcmute.careergraph.enums.common.ErrorType;
 import lombok.Getter;
 import lombok.Setter;
 

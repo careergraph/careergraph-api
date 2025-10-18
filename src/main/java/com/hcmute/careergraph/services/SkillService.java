@@ -1,9 +1,13 @@
 package com.hcmute.careergraph.services;
 
+import com.hcmute.careergraph.persistence.dtos.record.SkillLookupResponse;
 import com.hcmute.careergraph.persistence.dtos.response.SkillDto;
 import com.hcmute.careergraph.persistence.dtos.request.SkillRequest;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+
+import java.util.List;
+import java.util.Map;
 
 public interface SkillService {
 
@@ -22,4 +26,6 @@ public interface SkillService {
     void activateSkill(String id);
 
     void deactivateSkill(String id);
+
+    List<SkillLookupResponse> lookupSkill(String query);
 }

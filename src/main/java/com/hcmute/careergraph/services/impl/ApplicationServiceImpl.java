@@ -1,6 +1,6 @@
 package com.hcmute.careergraph.services.impl;
 
-import com.hcmute.careergraph.enums.Status;
+import com.hcmute.careergraph.enums.common.Status;
 import com.hcmute.careergraph.mapper.ApplicationMapper;
 import com.hcmute.careergraph.persistence.dtos.response.ApplicationDto;
 import com.hcmute.careergraph.persistence.dtos.request.ApplicationRequest;

@@ -1,6 +1,7 @@
 package com.hcmute.careergraph.controllers;
 
 import com.hcmute.careergraph.helper.RestResponse;
+import com.hcmute.careergraph.persistence.dtos.record.SkillLookupResponse;
 import com.hcmute.careergraph.persistence.dtos.response.SkillDto;
 import com.hcmute.careergraph.persistence.dtos.request.SkillRequest;
 import com.hcmute.careergraph.services.SkillService;
@@ -10,6 +11,10 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
+
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("skills")
@@ -92,6 +97,16 @@ public class SkillController {
         return RestResponse.<Void>builder()
                 .status(HttpStatus.OK)
                 .message("Skill deactivated successfully")
+                .build();
+    }
+
+    @GetMapping("/lookup")
+    public RestResponse<List<SkillLookupResponse>> lookupSkill(@RequestParam("query") String query) {
+        List<SkillLookupResponse> skills = skillService.lookupSkill(query);
+        return RestResponse.<List<SkillLookupResponse>>builder()
+                .status(HttpStatus.OK)
+                .message("Successfully lookup skill")
+                .data(skills)
                 .build();
     }
 }
