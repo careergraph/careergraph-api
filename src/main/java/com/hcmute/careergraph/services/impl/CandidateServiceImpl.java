@@ -1,13 +1,10 @@
 package com.hcmute.careergraph.services.impl;
 
 import com.hcmute.careergraph.enums.candidate.AddressType;
-import com.hcmute.careergraph.helper.SecurityUtils;
 import com.hcmute.careergraph.enums.common.FileType;
+import com.hcmute.careergraph.helper.SecurityUtils;
 import com.hcmute.careergraph.helper.StringHelper;
-import com.hcmute.careergraph.mapper.CandidateMapper;
 import com.hcmute.careergraph.persistence.dtos.request.CandidateRequest;
-import com.hcmute.careergraph.persistence.dtos.response.CandidateDto;
-import com.hcmute.careergraph.persistence.models.Account;
 import com.hcmute.careergraph.persistence.models.Address;
 import com.hcmute.careergraph.persistence.models.Candidate;
 import com.hcmute.careergraph.repositories.CandidateRepository;
@@ -34,8 +31,6 @@ public class CandidateServiceImpl implements CandidateService {
     private final MinioService minioService;
 
     private final CandidateRepository candidateRepository;
-
-    private final CandidateMapper candidateMapper;
     private final SecurityUtils securityUtils;
 
     @Value("${integration.minio.bucket}")
@@ -91,34 +86,34 @@ public class CandidateServiceImpl implements CandidateService {
         return minioService.getFileUrl(objectKey);
     }
     @Override
-    public CandidateDto getMyProfile(String candidateId) throws ChangeSetPersister.NotFoundException {
-        Candidate candidate = candidateRepository.findById(candidateId).
-                orElseThrow(ChangeSetPersister.NotFoundException::new);
-        CandidateDto candidateDto = candidateMapper.toDto(candidate);
-        Account account = candidate.getAccount();
-        candidateDto.setEmail(account.getEmail());
-        return candidateDto;
-
+    public Candidate getMyProfile(String candidateId) throws ChangeSetPersister.NotFoundException {
+        return candidateRepository.findById(candidateId)
+                .orElseThrow(ChangeSetPersister.NotFoundException::new);
     }
 
     @Override
-    public CandidateDto updateInformation(String candidateId, CandidateRequest.UpdateInformation candidateRequest) throws ChangeSetPersister.NotFoundException {
+    public Candidate updateInformation(String candidateId, CandidateRequest.UpdateInformation candidateRequest) throws ChangeSetPersister.NotFoundException {
         Candidate candidate = candidateRepository.findById(candidateId)
                 .orElseThrow(ChangeSetPersister.NotFoundException::new);
-        candidate.setFirstName(candidateRequest.getName());
-        candidate.setLastName(candidateRequest.getName());
+        candidate.setFirstName(candidateRequest.name());
+        candidate.setLastName(candidateRequest.name());
         Set<Address> addresses = candidate.getAddresses();
-        Address address = addresses.stream().filter(a -> a.getName().equals(AddressType.HOME_ADDRESS)).findFirst().orElse(null);
+        Address address = addresses.stream()
+                .filter(a -> AddressType.HOME_ADDRESS.name().equals(a.getName()))
+                .findFirst()
+                .orElse(null);
         if(address == null){
             address = new Address();
+            address.setName(AddressType.HOME_ADDRESS.name());
+            addresses.add(address);
         }
-        address.setProvince(candidateRequest.getProvince());
-        address.setDistrict(candidateRequest.getDistrict());
+        address.setProvince(candidateRequest.province());
+        address.setDistrict(candidateRequest.district());
         candidate.setAddresses(addresses);
-        candidate.setDateOfBirth(candidateRequest.getDateOfBirth());
-        candidate.setGender(candidateRequest.getGender());
-        candidate.setIsMarried(candidateRequest.getIsMarried());
+        candidate.setDateOfBirth(candidateRequest.dateOfBirth());
+        candidate.setGender(candidateRequest.gender());
+        candidate.setIsMarried(candidateRequest.isMarried());
         candidateRepository.save(candidate);
-        return candidateMapper.toDto(candidate);
+        return candidate;
     }
 }

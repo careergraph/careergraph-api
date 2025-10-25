@@ -1,16 +1,21 @@
 package com.hcmute.careergraph.persistence.dtos.request;
 
-import lombok.Data;
+import lombok.Builder;
 
-public class CandidateRequest {
-    @Data
-    public static class UpdateInformation {
-        private String name;
-        private String phone;
-        private String province;
-        private String district;
-        private String dateOfBirth;
-        private String gender;
-        private Boolean isMarried;
+public final class CandidateRequest {
+
+    private CandidateRequest() {
+    }
+
+    @Builder
+    public record UpdateInformation(
+            String name,
+            String phone,
+            String province,
+            String district,
+            String dateOfBirth,
+            String gender,
+            Boolean isMarried
+    ) {
     }
 }

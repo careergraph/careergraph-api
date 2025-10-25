@@ -1,19 +1,19 @@
 package com.hcmute.careergraph.services;
 
-import com.hcmute.careergraph.persistence.dtos.response.CompanyDto;
 import com.hcmute.careergraph.persistence.dtos.request.CompanyRequest;
+import com.hcmute.careergraph.persistence.models.Company;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 
 public interface CompanyService {
 
-    CompanyDto createCompany(CompanyRequest request);
+    Company createCompany(CompanyRequest request);
 
-    CompanyDto getCompanyById(String id);
+    Company getCompanyById(String id);
 
-    Page<CompanyDto> getAllCompanies(Pageable pageable);
+    Page<Company> getAllCompanies(Pageable pageable);
 
-    CompanyDto updateCompany(String id, CompanyRequest request);
+    Company updateCompany(String id, CompanyRequest request);
 
     void deleteCompany(String id);
 

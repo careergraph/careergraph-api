@@ -1,12 +1,16 @@
 package com.hcmute.careergraph.persistence.dtos.request;
 
-import lombok.Data;
+import lombok.Builder;
 
-public record AddressRequest() {
+public final class AddressRequest {
 
-    @Data
-    public static class AddressUpdate{
-        private String province;
-        private String district;
+    private AddressRequest() {
+    }
+
+    @Builder
+    public record AddressUpdate(
+            String province,
+            String district
+    ) {
     }
 }
