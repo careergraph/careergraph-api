@@ -67,7 +67,8 @@ public class MinioServiceImpl implements MinioService {
                     .build()
             );
         } catch (Exception e) {
-            throw new InternalError("Error generating file URL", e);
+            log.error("GetPresignedObjectUrl error: ", e);
+            return "";
         }
     }
 }
