@@ -10,12 +10,14 @@ import org.mapstruct.MappingTarget;
 public interface CandidateMapper {
 
     @Mapping(target = "candidateId", source = "id")
+    @Mapping(target = "email", source = "account.email")
     @Mapping(target = "contacts", ignore = true)
     @Mapping(target = "addresses", ignore = true)
     @Mapping(target = "connections", ignore = true)
     @Mapping(target = "educations", ignore = true)
     @Mapping(target = "experiences", ignore = true)
     @Mapping(target = "skills", ignore = true)
+    @Mapping(target = "applications", ignore = true)
     @Mapping(target = "applications", ignore = true)
     CandidateDto toDto(Candidate candidate);
 

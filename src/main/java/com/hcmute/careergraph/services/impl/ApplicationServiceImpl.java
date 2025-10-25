@@ -1,8 +1,6 @@
 package com.hcmute.careergraph.services.impl;
 
 import com.hcmute.careergraph.enums.common.Status;
-import com.hcmute.careergraph.mapper.ApplicationMapper;
-import com.hcmute.careergraph.persistence.dtos.response.ApplicationDto;
 import com.hcmute.careergraph.persistence.dtos.request.ApplicationRequest;
 import com.hcmute.careergraph.persistence.models.Application;
 import com.hcmute.careergraph.persistence.models.Candidate;
@@ -30,27 +28,26 @@ public class ApplicationServiceImpl implements ApplicationService {
     private final ApplicationRepository applicationRepository;
     private final CandidateRepository candidateRepository;
     private final JobRepository jobRepository;
-    private final ApplicationMapper applicationMapper;
 
     @Override
-    public ApplicationDto createApplication(ApplicationRequest request) {
+    public Application createApplication(ApplicationRequest request) {
         log.info("Creating new application for candidate: {} to job: {}", 
-                request.getCandidateId(), request.getJobId());
+                request.candidateId(), request.jobId());
         
         // Find candidate and job
-        Candidate candidate = candidateRepository.findById(request.getCandidateId())
-                .orElseThrow(() -> new RuntimeException("Candidate not found with id: " + request.getCandidateId()));
+        Candidate candidate = candidateRepository.findById(request.candidateId())
+                .orElseThrow(() -> new RuntimeException("Candidate not found with id: " + request.candidateId()));
         
-        Job job = jobRepository.findById(request.getJobId())
-                .orElseThrow(() -> new RuntimeException("Job not found with id: " + request.getJobId()));
+        Job job = jobRepository.findById(request.jobId())
+                .orElseThrow(() -> new RuntimeException("Job not found with id: " + request.jobId()));
 
         // Create application entity
         Application application = Application.builder()
-                .coverLetter(request.getCoverLetter())
-                .resumeUrl(request.getResumeUrl())
-                .rating(request.getRating())
-                .notes(request.getNotes())
-                .appliedDate(request.getAppliedDate() != null ? request.getAppliedDate() : 
+                .coverLetter(request.coverLetter())
+                .resumeUrl(request.resumeUrl())
+                .rating(request.rating())
+                .notes(request.notes())
+                .appliedDate(request.appliedDate() != null ? request.appliedDate() : 
                     LocalDateTime.now().format(DateTimeFormatter.ISO_LOCAL_DATE_TIME))
                 .status(Status.ACTIVE)
                 .candidate(candidate)
@@ -59,74 +56,71 @@ public class ApplicationServiceImpl implements ApplicationService {
 
         Application savedApplication = applicationRepository.save(application);
         log.info("Application created successfully with id: {}", savedApplication.getId());
-        
-        return applicationMapper.toDto(savedApplication);
+
+        return savedApplication;
     }
 
     @Override
     @Transactional(readOnly = true)
-    public ApplicationDto getApplicationById(String id) {
+    public Application getApplicationById(String id) {
         log.info("Getting application by id: {}", id);
         Application application = applicationRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Application not found with id: " + id));
-        return applicationMapper.toDto(application);
+        return application;
     }
 
     @Override
     @Transactional(readOnly = true)
-    public Page<ApplicationDto> getAllApplications(Pageable pageable) {
+    public Page<Application> getAllApplications(Pageable pageable) {
         log.info("Getting all applications with pagination");
-        Page<Application> applications = applicationRepository.findAll(pageable);
-        return applications.map(applicationMapper::toDto);
+        return applicationRepository.findAll(pageable);
     }
 
     @Override
     @Transactional(readOnly = true)
-    public Page<ApplicationDto> getApplicationsByCandidate(String candidateId, Pageable pageable) {
+    public Page<Application> getApplicationsByCandidate(String candidateId, Pageable pageable) {
         log.info("Getting applications by candidate id: {}", candidateId);
-        Page<Application> applications = applicationRepository.findByCandidateId(candidateId, pageable);
-        return applications.map(applicationMapper::toDto);
+        return applicationRepository.findByCandidateId(candidateId, pageable);
     }
 
     @Override
     @Transactional(readOnly = true)
-    public Page<ApplicationDto> getApplicationsByJob(String jobId, Pageable pageable) {
+    public Page<Application> getApplicationsByJob(String jobId, Pageable pageable) {
         log.info("Getting applications by job id: {}", jobId);
-        Page<Application> applications = applicationRepository.findByJobId(jobId, pageable);
-        return applications.map(applicationMapper::toDto);
+        return applicationRepository.findByJobId(jobId, pageable);
     }
 
     @Override
-    public ApplicationDto updateApplication(String id, ApplicationRequest request) {
+    public Application updateApplication(String id, ApplicationRequest request) {
         log.info("Updating application with id: {}", id);
         
         Application application = applicationRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Application not found with id: " + id));
 
         // Update fields
-        application.setCoverLetter(request.getCoverLetter());
-        application.setResumeUrl(request.getResumeUrl());
-        application.setRating(request.getRating());
-        application.setNotes(request.getNotes());
+        application.setCoverLetter(request.coverLetter());
+        application.setResumeUrl(request.resumeUrl());
+        application.setRating(request.rating());
+        application.setNotes(request.notes());
 
         // Update candidate if changed
-        if (!application.getCandidate().getId().equals(request.getCandidateId())) {
-            Candidate candidate = candidateRepository.findById(request.getCandidateId())
-                    .orElseThrow(() -> new RuntimeException("Candidate not found with id: " + request.getCandidateId()));
+        if (!application.getCandidate().getId().equals(request.candidateId())) {
+            Candidate candidate = candidateRepository.findById(request.candidateId())
+                    .orElseThrow(() -> new RuntimeException("Candidate not found with id: " + request.candidateId()));
             application.setCandidate(candidate);
         }
 
         // Update job if changed
-        if (!application.getJob().getId().equals(request.getJobId())) {
-            Job job = jobRepository.findById(request.getJobId())
-                    .orElseThrow(() -> new RuntimeException("Job not found with id: " + request.getJobId()));
+        if (!application.getJob().getId().equals(request.jobId())) {
+            Job job = jobRepository.findById(request.jobId())
+                    .orElseThrow(() -> new RuntimeException("Job not found with id: " + request.jobId()));
             application.setJob(job);
         }
 
         Application updatedApplication = applicationRepository.save(application);
         log.info("Application updated successfully with id: {}", updatedApplication.getId());
-        
-        return applicationMapper.toDto(updatedApplication);
+
+        return updatedApplication;
     }
 
     @Override
