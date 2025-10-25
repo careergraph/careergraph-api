@@ -20,6 +20,7 @@ public class SecurityConfig {
             "auth/forgot-password",
             "auth/reset-password",
             "auth/refresh-token",
+            "auth/refresh",
             "auth/confirm-otp",
             "auth/resend-otp",
             "auth/google-login",
