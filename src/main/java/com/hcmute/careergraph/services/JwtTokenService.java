@@ -11,6 +11,10 @@ public interface JwtTokenService {
     boolean isBlacklisted(String jti);
     
     void blacklist(String jti, long ttlSeconds);
+
+    String rotateRefreshToken(Account account, String familyId);
+
+    String generateRefreshTokenWithFamily(Account account);
 }
 
 

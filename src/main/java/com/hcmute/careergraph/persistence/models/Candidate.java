@@ -52,6 +52,9 @@ public class Candidate extends Party {
     @Column(name = "summary", columnDefinition = "TEXT")
     private String summary;
 
+    @Column(name = "is_married")
+    private Boolean isMarried = false;
+
     @Column(name = "resumes")
     private List<String> resumes;
 

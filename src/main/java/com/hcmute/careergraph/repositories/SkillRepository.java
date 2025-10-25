@@ -9,6 +9,8 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
+
+import java.util.List;
 import java.util.Optional;
 
 @Repository
@@ -22,10 +24,10 @@ public interface SkillRepository extends JpaRepository<Skill, String> {
      */
     Page<Skill> findByCategory(String category, Pageable pageable);
 
+    Optional<Skill> findByName(String name);
+
     @Query("""
     SELECT s FROM Skill s WHERE LOWER(s.name) LIKE LOWER(CONCAT('%', :query, '%'))
     """)
     List<Skill> lookupSkill(@Param("query") String query);
-
-    Optional<Skill> findByName(String name);
 }

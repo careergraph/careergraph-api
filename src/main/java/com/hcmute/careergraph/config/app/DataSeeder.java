@@ -86,7 +86,7 @@ public class DataSeeder implements CommandLineRunner {
                         .build();
                 addresses.add(address);
             }
-            company.setAddresses(addresses);
+//            company.setAddresses(addresses);
             companies.add(company);
         }
         companyRepository.saveAll(companies);
@@ -134,12 +134,12 @@ public class DataSeeder implements CommandLineRunner {
                         .province(faker.address().state())
                         .district(faker.address().city())
                         .ward(faker.address().streetName())
-                        .isPrimary(true)
+//                        .isPrimary(true)
                         .party(candidate)
                         .build();
                 addresses.add(address);
             }
-            candidate.setAddresses(addresses);
+//            candidate.setAddresses(addresses);
             candidates.add(candidate);
         }
         candidateRepository.saveAll(candidates);
@@ -149,25 +149,22 @@ public class DataSeeder implements CommandLineRunner {
         Random random = new Random();
         for (int i = 0; i < 80; i++) {
             Company company = companies.get(random.nextInt(companies.size()));
-            Job job = Job.builder()
-                    .title(faker.job().title())
-                    .description(faker.lorem().paragraph())
-                    .requirements(faker.lorem().sentence())
-                    .benefits(faker.lorem().sentence())
-                    .salaryRange(faker.options().option("10-20M", "20-30M", "30-50M"))
-                    .experienceLevel(faker.options().option("Fresher", "Junior", "Senior", "Lead"))
-                    .workArrangement(faker.options().option("Onsite", "Remote", "Hybrid"))
-                    .postedDate(faker.date().past(30, java.util.concurrent.TimeUnit.DAYS).toString())
-                    .expiryDate(faker.date().future(60, java.util.concurrent.TimeUnit.DAYS).toString())
-                    .numberOfPositions(faker.number().numberBetween(1, 10))
-                    .workLocation(faker.address().city())
-                    .employmentType(EmploymentType.values()[random.nextInt(EmploymentType.values().length)])
-                    .status(Status.ACTIVE)
-                    .isUrgent(faker.bool().bool())
-                    .jobCategory(i % 2 == 0 ? JobCategory.ENGINEER : JobCategory.BUSINESS)
-                    .company(company)
-                    .build();
-            jobs.add(job);
+//            Job job = Job.builder()
+//                    .title(faker.job().title())
+//                    .description(faker.lorem().paragraph())
+//                    .salaryRange(faker.options().option("10-20M", "20-30M", "30-50M"))
+//                    .workArrangement(faker.options().option("Onsite", "Remote", "Hybrid"))
+//                    .postedDate(faker.date().past(30, java.util.concurrent.TimeUnit.DAYS).toString())
+//                    .expiryDate(faker.date().future(60, java.util.concurrent.TimeUnit.DAYS).toString())
+//                    .numberOfPositions(faker.number().numberBetween(1, 10))
+//                    .workLocation(faker.address().city())
+//                    .employmentType(EmploymentType.values()[random.nextInt(EmploymentType.values().length)])
+//                    .status(Status.ACTIVE)
+//                    .isUrgent(faker.bool().bool())
+//                    .jobCategory(i % 2 == 0 ? JobCategory.ENGINEER : JobCategory.BUSINESS)
+//                    .company(company)
+//                    .build();
+//            jobs.add(job);
         }
         jobRepository.saveAll(jobs);
 

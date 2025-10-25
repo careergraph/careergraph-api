@@ -23,6 +23,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.security.SecureRandom;
+import java.util.Map;
 import java.util.Optional;
 import com.google.api.client.googleapis.auth.oauth2.GoogleIdToken;
 import com.google.api.client.googleapis.auth.oauth2.GoogleIdTokenVerifier;
@@ -46,7 +47,7 @@ public class AuthServiceImpl implements AuthService {
     private long accessTtl;
 
     @Value("${jwt.refreshable-duration}")
-    private long refreshTtl;
+    private Integer refreshTtl;
 
     @Override
     public void register(AuthRequests.RegisterRequest request) {
@@ -120,7 +121,7 @@ public class AuthServiceImpl implements AuthService {
             throw new AppException(ErrorType.UNAUTHORIZED, "Invalid password");
         }
         String accessToken = jwtTokenService.generateAccessToken(account);
-        String refreshToken = jwtTokenService.generateRefreshToken(account);
+        String refreshToken = jwtTokenService.generateRefreshTokenWithFamily(account);
         return AuthResponses.TokenResponse.builder()
                 .accessToken(accessToken)
                 .refreshToken(refreshToken)
@@ -276,6 +277,48 @@ public class AuthServiceImpl implements AuthService {
         } catch (Exception e) {
             throw new AppException(ErrorType.UNAUTHORIZED, "Failed to verify Google token");
         }
+    }
+
+    @Override
+    public AuthResponses.TokenResponse refreshWithFamily(Jwt jwt) {
+        if (!"refresh".equals(jwt.getClaimAsString("type"))) {
+            throw new AppException(ErrorType.UNAUTHORIZED, "Invalid token type");
+        }
+        String jti = jwt.getId();
+        String fam = jwt.getClaimAsString("fam");
+        String accountId = jwt.getSubject();
+
+        // 2) Kiểm tra Redis (chưa revoke, còn hạn)
+        var meta = redisService.getObject("rt:jti:" + jti, Map.class);
+
+        if (meta == null || Boolean.TRUE.equals(meta.get("revoked"))) {
+            // REUSE / REVOKED: revoke cả family
+            String current = redisService.getObject("rt:fam:current:" + fam, String.class);
+            if (current != null) {
+                // đánh dấu family bị khoá
+                redisService.setObject("rt:fam:blocked:" + fam, "1", refreshTtl);
+            }
+            throw new AppException(ErrorType.UNAUTHORIZED, "Refresh reuse or revoked");
+        }
+        // Check family blocked
+        if (redisService.exists("rt:fam:blocked:" + fam)) {
+            throw new AppException(ErrorType.UNAUTHORIZED, "Family blocked");
+        }
+
+        // 3) Rotate: revoke jti cũ, phát hành refresh mới cùng family
+        redisService.setField("rt:jti:" + jti, "revoked", true);
+
+        Account account = accountRepository.findById(accountId)
+                .orElseThrow(() -> new AppException(ErrorType.NOT_FOUND, "Account not found"));
+        String accessToken = jwtTokenService.generateAccessToken(account);
+        String refreshToken = jwtTokenService.rotateRefreshToken(account, fam);
+
+        return AuthResponses.TokenResponse.builder()
+                .accessToken(accessToken)
+                .refreshToken(refreshToken)
+                .expiresIn(accessTtl)
+                .build();
+
     }
 
     /*============================================ HELPER METHOD ============================================*/

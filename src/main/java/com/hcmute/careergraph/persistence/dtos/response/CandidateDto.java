@@ -16,6 +16,8 @@ public class CandidateDto {
 
     private String candidateId;
 
+    private String email;
+
     private String firstName;
 
     private String lastName;

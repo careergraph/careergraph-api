@@ -17,6 +17,12 @@ public class AuthResponses {
         private String refreshToken;
         private Long expiresIn;
     }
+    @Data
+    @Builder
+    @AllArgsConstructor
+    public static class OnlyTokenResponse {
+        private String accessToken;
+    }
 }
 
 
