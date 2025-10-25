@@ -41,9 +41,18 @@ public class AuthController {
     @Value("${jwt.refreshable-duration}")
     private long refreshTtl;
 
-    @PostMapping("/register")
-    public RestResponse<Void> register(@Valid @RequestBody AuthRequests.RegisterRequest request) {
-        authService.register(request);
+    @PostMapping("/register/candidate")
+    public RestResponse<Void> registerForCandidate(@Valid @RequestBody AuthRequests.RegisterRequest request) {
+        authService.register(request, false);
+        return RestResponse.<Void>builder()
+                .status(HttpStatus.OK)
+                .message("Registered Successfully")
+                .build();
+    }
+
+    @PostMapping("/register/hr")
+    public RestResponse<Void> registerForHR(@Valid @RequestBody AuthRequests.RegisterRequest request) {
+        authService.register(request, true);
         return RestResponse.<Void>builder()
                 .status(HttpStatus.OK)
                 .message("Registered Successfully")
@@ -178,8 +187,6 @@ public class AuthController {
                 .status(HttpStatus.OK)
                 .data(AuthResponses.OnlyTokenResponse.builder().accessToken(token.getAccessToken()).build())
                 .build();
-
-
     }
 
 }

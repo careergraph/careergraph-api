@@ -42,6 +42,8 @@ public class JwtTokenServiceImpl implements JwtTokenService {
                 .subject(account.getId())
                 .claim("email", account.getEmail())
                 .claim("role", account.getRole().name())
+                .claim("candidateId", account.getCandidate() != null ? account.getCandidate().getId() : "")
+                .claim("companyId", account.getCompany() != null ? account.getCompany().getId() : "")
                 .claim("type", "access")
                 .id(UUID.randomUUID().toString())
                 .issuedAt(now)

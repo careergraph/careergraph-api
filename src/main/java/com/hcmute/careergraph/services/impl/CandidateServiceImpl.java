@@ -1,6 +1,6 @@
 package com.hcmute.careergraph.services.impl;
 
-import com.hcmute.careergraph.enums.AddressType;
+import com.hcmute.careergraph.enums.candidate.AddressType;
 import com.hcmute.careergraph.helper.SecurityUtils;
 import com.hcmute.careergraph.enums.common.FileType;
 import com.hcmute.careergraph.helper.StringHelper;
@@ -18,7 +18,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.apache.logging.log4j.util.InternalException;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.crossstore.ChangeSetPersister;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;

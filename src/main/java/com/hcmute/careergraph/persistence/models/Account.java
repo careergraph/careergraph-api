@@ -35,4 +35,8 @@ public class Account extends BaseEntity {
     @OneToOne
     @JoinColumn(name = "candidate_id", referencedColumnName = "id")
     private Candidate candidate;
+
+    @OneToOne
+    @JoinColumn(name = "company_id", referencedColumnName = "id")
+    private Company company;
 }

@@ -6,8 +6,10 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
+import java.util.List;
+
 @Repository
 public interface JobRepository extends JpaRepository<Job, String> {
     
-    Page<Job> findByCompanyId(String companyId, Pageable pageable);
+    List<Job> findByCompanyId(String companyId);
 }

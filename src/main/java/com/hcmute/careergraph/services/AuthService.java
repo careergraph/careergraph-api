@@ -6,7 +6,7 @@ import org.springframework.security.oauth2.jwt.Jwt;
 
 public interface AuthService {
 
-    void register(AuthRequests.RegisterRequest request);
+    void register(AuthRequests.RegisterRequest request, boolean isHR);
 
     void confirmOtp(AuthRequests.ConfirmOtpRequest request);
 

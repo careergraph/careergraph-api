@@ -4,9 +4,9 @@ import lombok.Builder;
 
 @Builder
 public record SkillLookupResponse(String id, String name, String category) {
-    public static record AddressRequest() {
+    public record AddressRequest() {
     }
 
-    public static record ContactRequest() {
+    public record ContactRequest() {
     }
 }
