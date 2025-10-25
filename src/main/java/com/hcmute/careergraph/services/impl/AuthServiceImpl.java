@@ -7,8 +7,10 @@ import com.hcmute.careergraph.persistence.dtos.request.AuthRequests;
 import com.hcmute.careergraph.persistence.dtos.response.AuthResponses;
 import com.hcmute.careergraph.persistence.models.Account;
 import com.hcmute.careergraph.persistence.models.Candidate;
+import com.hcmute.careergraph.persistence.models.Company;
 import com.hcmute.careergraph.repositories.AccountRepository;
 import com.hcmute.careergraph.repositories.CandidateRepository;
+import com.hcmute.careergraph.repositories.CompanyRepository;
 import com.hcmute.careergraph.services.AuthService;
 import com.hcmute.careergraph.services.RedisService;
 import com.hcmute.careergraph.services.JwtTokenService;
@@ -35,6 +37,7 @@ public class AuthServiceImpl implements AuthService {
 
     private final AccountRepository accountRepository;
     private final CandidateRepository candidateRepository;
+    private final CompanyRepository companyRepository;
     private final PasswordEncoder passwordEncoder;
 
     private final JwtTokenService jwtTokenService;
@@ -50,7 +53,7 @@ public class AuthServiceImpl implements AuthService {
     private Integer refreshTtl;
 
     @Override
-    public void register(AuthRequests.RegisterRequest request) {
+    public void register(AuthRequests.RegisterRequest request, boolean isHR) {
         if (accountRepository.existsByEmail(request.getEmail())) {
             throw new AppException(ErrorType.CONFLICT, "Invalid OTP");
         }
@@ -59,17 +62,27 @@ public class AuthServiceImpl implements AuthService {
         Account account = Account.builder()
                 .email(request.getEmail())
                 .passwordHash(passwordEncoder.encode(request.getPassword()))
-                .role(Role.USER)
+                .role(isHR ? Role.HR : Role.USER)
                 .emailVerified(false)
                 .build();
 
-        // Create candidate
-        Candidate candidate = Candidate.builder()
-                .account(account)
-                .build();
-        account.setCandidate(candidate);
+        if (!isHR) {
+            // Create candidate
+            Candidate candidate = Candidate.builder()
+                    .account(account)
+                    .build();
+            account.setCandidate(candidate);
 
-        candidateRepository.save(candidate);
+            candidateRepository.save(candidate);
+        } else {
+            // Create company - for HR
+            Company company = Company.builder()
+                    .account(account)
+                    .build();
+            account.setCompany(company);
+
+            companyRepository.save(company);
+        }
 
         String otp = generateOtp();
         redisService.setObject(otpKey(request.getEmail()), otp, 300);

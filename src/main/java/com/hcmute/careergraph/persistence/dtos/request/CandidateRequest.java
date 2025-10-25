@@ -13,5 +13,4 @@ public class CandidateRequest {
         private String gender;
         private Boolean isMarried;
     }
-
 }

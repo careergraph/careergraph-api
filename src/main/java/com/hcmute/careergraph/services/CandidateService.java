@@ -11,6 +11,8 @@ public interface CandidateService {
     String updateResource(String candidateId, MultipartFile file, FileType fileType) throws ChangeSetPersister.NotFoundException;
 
     String getResource(String candidateId, FileType fileType) throws ChangeSetPersister.NotFoundException;
+
     CandidateDto getMyProfile(String candidateId) throws ChangeSetPersister.NotFoundException;
+
     CandidateDto updateInformation (String candidateId, CandidateRequest.UpdateInformation candidateRequest) throws ChangeSetPersister.NotFoundException;
 }
