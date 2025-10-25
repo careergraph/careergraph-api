@@ -7,6 +7,7 @@ import com.hcmute.careergraph.helper.StringHelper;
 import com.hcmute.careergraph.mapper.CandidateMapper;
 import com.hcmute.careergraph.persistence.dtos.request.CandidateRequest;
 import com.hcmute.careergraph.persistence.dtos.response.CandidateDto;
+import com.hcmute.careergraph.persistence.models.Account;
 import com.hcmute.careergraph.persistence.models.Address;
 import com.hcmute.careergraph.persistence.models.Candidate;
 import com.hcmute.careergraph.repositories.CandidateRepository;
@@ -94,7 +95,10 @@ public class CandidateServiceImpl implements CandidateService {
     public CandidateDto getMyProfile(String candidateId) throws ChangeSetPersister.NotFoundException {
         Candidate candidate = candidateRepository.findById(candidateId).
                 orElseThrow(ChangeSetPersister.NotFoundException::new);
-        return candidateMapper.toDto(candidate);
+        CandidateDto candidateDto = candidateMapper.toDto(candidate);
+        Account account = candidate.getAccount();
+        candidateDto.setEmail(account.getEmail());
+        return candidateDto;
 
     }
 
