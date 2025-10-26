@@ -13,6 +13,8 @@ import com.hcmute.careergraph.repositories.SkillRepository;
 import com.hcmute.careergraph.services.JobService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -41,7 +43,7 @@ public class JobServiceImpl implements JobService {
      */
     @Transactional
     @Override
-    public JobResponse createJob(JobCreationRequest request, String companyId) {
+    public Job createJob(JobCreationRequest request, String companyId) {
         log.info("Creating new job with title: {} for company ID: {}", request.title(), companyId);
 
         // 1. Validate và lấy Company
@@ -68,8 +70,7 @@ public class JobServiceImpl implements JobService {
         Job savedJob = jobRepository.save(job);
         log.info("Job created successfully with ID: {}", savedJob.getId());
 
-        // 5. Map entity -> response và return
-        return jobMapper.toResponse(savedJob);
+        return savedJob;
     }
 
     /**
@@ -81,13 +82,13 @@ public class JobServiceImpl implements JobService {
      */
     @Transactional(readOnly = true)
     @Override
-    public JobResponse getJobById(String jobId) {
+    public Job getJobById(String jobId) {
         log.info("Fetching job with ID: {}", jobId);
 
         Job job = jobRepository.findById(jobId)
                 .orElseThrow(() -> new IllegalArgumentException("Job not found with ID: " + jobId));
 
-        return jobMapper.toResponse(job);
+        return job;
     }
 
     /**
@@ -98,25 +99,19 @@ public class JobServiceImpl implements JobService {
      */
     @Transactional(readOnly = true)
     @Override
-    public List<JobResponse> getJobsByCompany(String companyId) {
+    public Page<Job> getJobsByCompany(String companyId, Pageable pageable) {
         log.info("Fetching all jobs for company ID: {}", companyId);
 
-        List<Job> jobs = jobRepository.findByCompanyId(companyId);
-        return jobMapper.toResponseList(jobs);
+        Page<Job> jobs = jobRepository.findByCompanyId(companyId, pageable);
+        return jobs;
     }
 
-    /**
-     * Lấy tất cả jobs
-     *
-     * @return List JobResponse
-     */
-    @Transactional(readOnly = true)
     @Override
-    public List<JobResponse> getAllJobs() {
+    public Page<Job> getAllJobs(Pageable pageable) {
         log.info("Fetching all jobs");
 
-        List<Job> jobs = jobRepository.findAll();
-        return jobMapper.toResponseList(jobs);
+        Page<Job> jobs = jobRepository.findAll(pageable);
+        return jobs;
     }
 
     /**
@@ -124,7 +119,7 @@ public class JobServiceImpl implements JobService {
      */
     @Transactional
     @Override
-    public JobResponse updateJob(String jobId, JobCreationRequest request, String companyId) {
+    public Job updateJob(String jobId, JobCreationRequest request, String companyId) {
         // TODO: Implement update logic
         throw new UnsupportedOperationException("Update job not implemented yet");
     }
@@ -153,12 +148,12 @@ public class JobServiceImpl implements JobService {
     }
 
     @Override
-    public void activateJob(String jobId) {
+    public void activateJob(String jobId, String companyId) {
 
     }
 
     @Override
-    public void deactivateJob(String jobId) {
+    public void deactivateJob(String jobId, String companyId) {
 
     }
 
@@ -168,7 +163,7 @@ public class JobServiceImpl implements JobService {
     }
 
     @Override
-    public List<JobResponse> getJobsPersonalized(String userId) {
+    public List<Job> getJobsPersonalized(String userId) {
         return List.of();
     }
 }

@@ -3,8 +3,10 @@ package com.hcmute.careergraph.controllers;
 import com.hcmute.careergraph.enums.common.FileType;
 import com.hcmute.careergraph.helper.RestResponse;
 import com.hcmute.careergraph.helper.SecurityUtils;
+import com.hcmute.careergraph.mapper.CandidateMapper;
 import com.hcmute.careergraph.persistence.dtos.request.CandidateRequest;
-import com.hcmute.careergraph.persistence.dtos.response.CandidateDto;
+import com.hcmute.careergraph.persistence.dtos.response.CandidateResponse;
+import com.hcmute.careergraph.persistence.models.Candidate;
 import com.hcmute.careergraph.services.CandidateService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -19,6 +21,7 @@ import org.springframework.web.multipart.MultipartFile;
 public class CandidateController {
 
     private final CandidateService candidateService;
+    private final CandidateMapper candidateMapper;
     private final SecurityUtils securityUtils;
 
     @PostMapping("/{id}/files")
@@ -49,17 +52,21 @@ public class CandidateController {
     }
 
     @GetMapping("/me")
-    public RestResponse<CandidateDto> getMyProfile() throws ChangeSetPersister.NotFoundException {
-        return RestResponse.<CandidateDto>builder()
+    public RestResponse<CandidateResponse> getMyProfile() throws ChangeSetPersister.NotFoundException {
+        Candidate candidate = candidateService.getMyProfile(securityUtils.getCandidateId().get());
+
+        return RestResponse.<CandidateResponse>builder()
                 .status(HttpStatus.OK)
-                .data(candidateService.getMyProfile(securityUtils.getCandidateId().get()))
+                .data(candidateMapper.toResponse(candidate))
                 .build();
     }
     @PostMapping("/update-information")
-    public RestResponse<CandidateDto> updateInformation(@Valid @RequestBody CandidateRequest.UpdateInformation request) throws ChangeSetPersister.NotFoundException{
-        return RestResponse.<CandidateDto>builder()
+    public RestResponse<CandidateResponse> updateInformation(@Valid @RequestBody CandidateRequest.UpdateInformation request) throws ChangeSetPersister.NotFoundException{
+        Candidate candidate = candidateService.updateInformation(securityUtils.getCandidateId().get(), request);
+
+        return RestResponse.<CandidateResponse>builder()
                 .status(HttpStatus.OK)
-                .data(candidateService.updateInformation(securityUtils.getCandidateId().get(), request))
+                .data(candidateMapper.toResponse(candidate))
                 .build();
     }
 }
