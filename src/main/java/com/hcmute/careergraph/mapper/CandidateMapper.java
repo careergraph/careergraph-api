@@ -1,24 +1,47 @@
 package com.hcmute.careergraph.mapper;
 
-import com.hcmute.careergraph.persistence.dtos.response.CandidateDto;
+import com.hcmute.careergraph.persistence.dtos.response.CandidateResponse;
 import com.hcmute.careergraph.persistence.models.Candidate;
-import org.mapstruct.Mapper;
-import org.mapstruct.Mapping;
-import org.mapstruct.MappingTarget;
+import org.springframework.stereotype.Component;
 
-@Mapper(componentModel = "spring")
-public interface CandidateMapper {
+import java.util.List;
 
-    @Mapping(target = "candidateId", source = "id")
-    @Mapping(target = "email", source = "account.email")
-    @Mapping(target = "contacts", ignore = true)
-    @Mapping(target = "addresses", ignore = true)
-    @Mapping(target = "connections", ignore = true)
-    @Mapping(target = "educations", ignore = true)
-    @Mapping(target = "experiences", ignore = true)
-    @Mapping(target = "skills", ignore = true)
-    @Mapping(target = "applications", ignore = true)
-    @Mapping(target = "applications", ignore = true)
-    CandidateDto toDto(Candidate candidate);
+@Component
+public class CandidateMapper {
 
+    public CandidateResponse toResponse(Candidate candidate) {
+        if (candidate == null) {
+            return null;
+        }
+
+        return CandidateResponse.builder()
+                .candidateId(candidate.getId())
+                .email(candidate.getAccount() != null ? candidate.getAccount().getEmail() : null)
+                .firstName(candidate.getFirstName())
+                .lastName(candidate.getLastName())
+                .dateOfBirth(candidate.getDateOfBirth())
+                .gender(candidate.getGender())
+                .currentJobTitle(candidate.getCurrentJobTitle())
+                .currentCompany(candidate.getCurrentCompany())
+                .industry(candidate.getIndustry())
+                .yearsOfExperience(candidate.getYearsOfExperience())
+                .workLocation(candidate.getWorkLocation())
+                .isOpenToWork(candidate.getIsOpenToWork())
+                .summary(candidate.getSummary())
+                .resume(primaryResume(candidate.getResumes()))
+                .tagname(candidate.getTagname())
+                .avatar(candidate.getAvatar())
+                .cover(candidate.getCover())
+                .noOfFollowers(candidate.getNoOfFollowers())
+                .noOfFollowing(candidate.getNoOfFollowing())
+                .noOfConnections(candidate.getNoOfConnections())
+                .build();
+    }
+
+    private String primaryResume(List<String> resumes) {
+        if (resumes == null || resumes.isEmpty()) {
+            return null;
+        }
+        return resumes.get(0);
+    }
 }

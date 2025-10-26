@@ -2,15 +2,16 @@ package com.hcmute.careergraph.controllers;
 
 import com.hcmute.careergraph.helper.RestResponse;
 import com.hcmute.careergraph.helper.SecurityUtils;
+import com.hcmute.careergraph.mapper.JobMapper;
 import com.hcmute.careergraph.persistence.dtos.record.JobCreationRequest;
 import com.hcmute.careergraph.persistence.dtos.record.JobResponse;
-import com.hcmute.careergraph.persistence.dtos.response.JobDto;
-import com.hcmute.careergraph.persistence.dtos.request.JobRequest;
+import com.hcmute.careergraph.persistence.models.Job;
 import com.hcmute.careergraph.services.JobService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
@@ -28,6 +29,7 @@ import java.util.List;
 public class JobController {
 
     private final JobService jobService;
+    private final JobMapper jobMapper;
     private final SecurityUtils securityUtils;
 
     /**
@@ -49,12 +51,12 @@ public class JobController {
         String companyId = extractCompanyId(authentication);
 
         // Delegate to service
-        JobResponse job = jobService.createJob(request, companyId);
+        Job job = jobService.createJob(request, companyId);
 
         return RestResponse.<JobResponse>builder()
                 .status(HttpStatus.CREATED)
                 .message("Job created successfully")
-                .data(job)
+                .data(jobMapper.toResponse(job))
                 .build();
     }
 
@@ -69,12 +71,12 @@ public class JobController {
     public RestResponse<JobResponse> getJobById(@PathVariable String id) {
         log.info("GET /api/v1/jobs/{} - Fetching job", id);
 
-        JobResponse job = jobService.getJobById(id);
+        Job job = jobService.getJobById(id);
 
         return RestResponse.<JobResponse>builder()
                 .status(HttpStatus.OK)
                 .message("Job retrieved successfully")
-                .data(job)
+                .data(jobMapper.toResponse(job))
                 .build();
     }
 
@@ -95,21 +97,16 @@ public class JobController {
 
         Pageable pageable = PageRequest.of(page, size);
 
-        // TODO: Cần update JobService để support pagination
-        List<JobResponse> allJobs = jobService.getAllJobs();
-
-        // Temporary: Convert List to Page (nên implement proper pagination trong service)
-        int start = (int) pageable.getOffset();
-        int end = Math.min((start + pageable.getPageSize()), allJobs.size());
-        List<JobResponse> pageContent = allJobs.subList(start, end);
-        Page<JobResponse> jobs = new org.springframework.data.domain.PageImpl<>(
-                pageContent, pageable, allJobs.size()
-        );
+        Page<Job> jobPage = jobService.getAllJobs(pageable);
+        List<JobResponse> jobResponses = jobPage.stream()
+                .map(job -> jobMapper.toResponse(job))
+                .toList();
+        Page<JobResponse> result = new PageImpl<>(jobResponses, pageable, jobPage.getSize());
 
         return RestResponse.<Page<JobResponse>>builder()
                 .status(HttpStatus.OK)
                 .message("Jobs retrieved successfully")
-                .data(jobs)
+                .data(result)
                 .build();
     }
 
@@ -133,21 +130,17 @@ public class JobController {
 
         Pageable pageable = PageRequest.of(page, size);
 
-        // Get jobs from service
-        List<JobResponse> allJobs = jobService.getJobsByCompany(companyId);
+        Page<Job> jobPage = jobService.getJobsByCompany(companyId, pageable);
+        List<JobResponse> jobs = jobPage.stream()
+                .map(job -> jobMapper.toResponse(job))
+                .toList();
 
-        // Convert to Page
-        int start = (int) pageable.getOffset();
-        int end = Math.min((start + pageable.getPageSize()), allJobs.size());
-        List<JobResponse> pageContent = allJobs.subList(start, end);
-        Page<JobResponse> jobs = new org.springframework.data.domain.PageImpl<>(
-                pageContent, pageable, allJobs.size()
-        );
+        Page result = new PageImpl<>(jobs, pageable, jobPage.getSize());
 
         return RestResponse.<Page<JobResponse>>builder()
                 .status(HttpStatus.OK)
                 .message("Jobs retrieved successfully")
-                .data(jobs)
+                .data(result)
                 .build();
     }
 
@@ -170,12 +163,12 @@ public class JobController {
 
         String companyId = extractCompanyId(authentication);
 
-        JobResponse job = jobService.updateJob(id, request, companyId);
+        Job job = jobService.updateJob(id, request, companyId);
 
         return RestResponse.<JobResponse>builder()
                 .status(HttpStatus.OK)
                 .message("Job updated successfully")
-                .data(job)
+                .data(jobMapper.toResponse(job))
                 .build();
     }
 
@@ -221,8 +214,7 @@ public class JobController {
 
         String companyId = extractCompanyId(authentication);
 
-        // TODO: Cần thêm method activateJob trong JobService
-        // jobService.activateJob(id, companyId);
+        jobService.activateJob(id, companyId);
 
         return RestResponse.<Void>builder()
                 .status(HttpStatus.OK)

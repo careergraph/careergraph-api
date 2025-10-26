@@ -1,8 +1,10 @@
 package com.hcmute.careergraph.controllers;
 
 import com.hcmute.careergraph.helper.RestResponse;
-import com.hcmute.careergraph.persistence.dtos.response.ApplicationDto;
+import com.hcmute.careergraph.mapper.ApplicationMapper;
 import com.hcmute.careergraph.persistence.dtos.request.ApplicationRequest;
+import com.hcmute.careergraph.persistence.dtos.response.ApplicationResponse;
+import com.hcmute.careergraph.persistence.models.Application;
 import com.hcmute.careergraph.services.ApplicationService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -17,64 +19,65 @@ import org.springframework.web.bind.annotation.*;
 public class ApplicationController {
 
     private final ApplicationService applicationService;
+    private final ApplicationMapper applicationMapper;
 
     @PostMapping
-    public RestResponse<ApplicationDto> createApplication(@Valid @RequestBody ApplicationRequest request) {
-        ApplicationDto application = applicationService.createApplication(request);
-        return RestResponse.<ApplicationDto>builder()
+    public RestResponse<ApplicationResponse> createApplication(@Valid @RequestBody ApplicationRequest request) {
+        Application application = applicationService.createApplication(request);
+        return RestResponse.<ApplicationResponse>builder()
                 .status(HttpStatus.CREATED)
                 .message("Application created successfully")
-                .data(application)
+                .data(applicationMapper.toResponse(application))
                 .build();
     }
 
     @GetMapping("/{id}")
-    public RestResponse<ApplicationDto> getApplicationById(@PathVariable String id) {
-        ApplicationDto application = applicationService.getApplicationById(id);
-        return RestResponse.<ApplicationDto>builder()
+    public RestResponse<ApplicationResponse> getApplicationById(@PathVariable String id) {
+        Application application = applicationService.getApplicationById(id);
+        return RestResponse.<ApplicationResponse>builder()
                 .status(HttpStatus.OK)
                 .message("Application retrieved successfully")
-                .data(application)
+                .data(applicationMapper.toResponse(application))
                 .build();
     }
 
     @GetMapping
-    public RestResponse<Page<ApplicationDto>> getAllApplications(Pageable pageable) {
-        Page<ApplicationDto> applications = applicationService.getAllApplications(pageable);
-        return RestResponse.<Page<ApplicationDto>>builder()
+    public RestResponse<Page<ApplicationResponse>> getAllApplications(Pageable pageable) {
+        Page<Application> applications = applicationService.getAllApplications(pageable);
+        return RestResponse.<Page<ApplicationResponse>>builder()
                 .status(HttpStatus.OK)
                 .message("Applications retrieved successfully")
-                .data(applications)
+                .data(applications.map(applicationMapper::toResponse))
                 .build();
     }
 
     @GetMapping("/candidate/{candidateId}")
-    public RestResponse<Page<ApplicationDto>> getApplicationsByCandidate(@PathVariable String candidateId, Pageable pageable) {
-        Page<ApplicationDto> applications = applicationService.getApplicationsByCandidate(candidateId, pageable);
-        return RestResponse.<Page<ApplicationDto>>builder()
+    public RestResponse<Page<ApplicationResponse>> getApplicationsByCandidate(@PathVariable String candidateId, Pageable pageable) {
+        Page<Application> applications = applicationService.getApplicationsByCandidate(candidateId, pageable);
+        return RestResponse.<Page<ApplicationResponse>>builder()
                 .status(HttpStatus.OK)
                 .message("Applications retrieved successfully")
-                .data(applications)
+                .data(applications.map(applicationMapper::toResponse))
                 .build();
     }
 
     @GetMapping("/job/{jobId}")
-    public RestResponse<Page<ApplicationDto>> getApplicationsByJob(@PathVariable String jobId, Pageable pageable) {
-        Page<ApplicationDto> applications = applicationService.getApplicationsByJob(jobId, pageable);
-        return RestResponse.<Page<ApplicationDto>>builder()
+    public RestResponse<Page<ApplicationResponse>> getApplicationsByJob(@PathVariable String jobId, Pageable pageable) {
+        Page<Application> applications = applicationService.getApplicationsByJob(jobId, pageable);
+        return RestResponse.<Page<ApplicationResponse>>builder()
                 .status(HttpStatus.OK)
                 .message("Applications retrieved successfully")
-                .data(applications)
+                .data(applications.map(applicationMapper::toResponse))
                 .build();
     }
 
     @PutMapping("/{id}")
-    public RestResponse<ApplicationDto> updateApplication(@PathVariable String id, @Valid @RequestBody ApplicationRequest request) {
-        ApplicationDto application = applicationService.updateApplication(id, request);
-        return RestResponse.<ApplicationDto>builder()
+    public RestResponse<ApplicationResponse> updateApplication(@PathVariable String id, @Valid @RequestBody ApplicationRequest request) {
+        Application application = applicationService.updateApplication(id, request);
+        return RestResponse.<ApplicationResponse>builder()
                 .status(HttpStatus.OK)
                 .message("Application updated successfully")
-                .data(application)
+                .data(applicationMapper.toResponse(application))
                 .build();
     }
 
