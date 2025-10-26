@@ -1,6 +1,7 @@
 package com.hcmute.careergraph.services;
 
 import com.hcmute.careergraph.persistence.dtos.request.ApplicationRequest;
+import com.hcmute.careergraph.persistence.dtos.request.ApplicationStageUpdateRequest;
 import com.hcmute.careergraph.persistence.models.Application;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -21,5 +22,5 @@ public interface ApplicationService {
 
     void deleteApplication(String id);
 
-    void updateApplicationStatus(String id, String status);
+    Application updateApplicationStage(String id, ApplicationStageUpdateRequest request);
 }

@@ -1,6 +1,6 @@
 package com.hcmute.careergraph.services;
 
-import com.hcmute.careergraph.persistence.dtos.record.JobCreationRequest;
+import com.hcmute.careergraph.persistence.dtos.request.JobCreationRequest;
 import com.hcmute.careergraph.persistence.models.Job;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;

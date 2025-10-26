@@ -1,4 +1,4 @@
-package com.hcmute.careergraph.persistence.dtos.record;
+package com.hcmute.careergraph.persistence.dtos.request;
 
 import lombok.Builder;
 

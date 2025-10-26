@@ -2,8 +2,7 @@ package com.hcmute.careergraph.services.impl;
 
 import com.hcmute.careergraph.enums.common.Status;
 import com.hcmute.careergraph.mapper.JobMapper;
-import com.hcmute.careergraph.persistence.dtos.record.JobCreationRequest;
-import com.hcmute.careergraph.persistence.dtos.record.JobResponse;
+import com.hcmute.careergraph.persistence.dtos.request.JobCreationRequest;
 import com.hcmute.careergraph.persistence.models.Company;
 import com.hcmute.careergraph.persistence.models.Job;
 import com.hcmute.careergraph.persistence.models.Skill;

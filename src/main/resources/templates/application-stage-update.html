@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>Application stage update</title>
+    <style>
+        body { font-family: Arial, sans-serif; color: #333; }
+        .wrapper { max-width: 600px; margin: 0 auto; padding: 24px; border: 1px solid #e5e7eb; border-radius: 8px; }
+        .stage-label { color: #2563eb; font-weight: 600; }
+        .footer { font-size: 12px; color: #6b7280; margin-top: 24px; }
+    </style>
+</head>
+<body>
+<div class="wrapper">
+    <p>Dear <span th:text="${candidateName}">Candidate</span>,</p>
+
+    <p>
+        We wanted to let you know that your application for the
+        <strong th:text="${jobTitle}">position</strong> role at
+        <strong th:text="${companyName}">our company</strong>
+        is now at the
+        <span class="stage-label" th:text="${stageLabel}">current stage</span>.
+    </p>
+
+    <p th:if="${note}" th:text="${note}">Stage update note.</p>
+
+    <p th:if="${terminal}">
+        This stage concludes the recruitment process. Our team will be in touch with any final details shortly.
+    </p>
+    <p th:if="${!terminal}">
+        Our team will keep you updated as the next steps are scheduled. You can always follow your progress by
+        signing in to your candidate dashboard.
+    </p>
+
+    <p>Warm regards,<br/>
+        <span th:text="${companyName}">CareerGraph</span> hiring team</p>
+
+    <div class="footer">
+        <p>
+            Need help? Contact us at <a th:href="${'mailto:' + supportEmail}" th:text="${supportEmail}">support@careergraph.com</a>
+            or visit <a th:href="${helpCenterUrl}" th:text="${helpCenterUrl}">our help center</a>.
+        </p>
+        <p>&copy; <span th:text="${year}">2025</span> <span th:text="${companyName}">CareerGraph</span>. All rights reserved.</p>
+    </div>
+</div>
+</body>
+</html>

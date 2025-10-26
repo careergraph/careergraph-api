@@ -3,6 +3,7 @@ package com.hcmute.careergraph.controllers;
 import com.hcmute.careergraph.helper.RestResponse;
 import com.hcmute.careergraph.mapper.ApplicationMapper;
 import com.hcmute.careergraph.persistence.dtos.request.ApplicationRequest;
+import com.hcmute.careergraph.persistence.dtos.request.ApplicationStageUpdateRequest;
 import com.hcmute.careergraph.persistence.dtos.response.ApplicationResponse;
 import com.hcmute.careergraph.persistence.models.Application;
 import com.hcmute.careergraph.services.ApplicationService;
@@ -90,12 +91,16 @@ public class ApplicationController {
                 .build();
     }
 
-    @PatchMapping("/{id}/status")
-    public RestResponse<Void> updateApplicationStatus(@PathVariable String id, @RequestParam String status) {
-        applicationService.updateApplicationStatus(id, status);
-        return RestResponse.<Void>builder()
+    @PatchMapping("/{id}/stage")
+    public RestResponse<ApplicationResponse> updateApplicationStage(
+            @PathVariable String id,
+            @Valid @RequestBody ApplicationStageUpdateRequest request
+    ) {
+        Application application = applicationService.updateApplicationStage(id, request);
+        return RestResponse.<ApplicationResponse>builder()
                 .status(HttpStatus.OK)
-                .message("Application status updated successfully")
+                .message("Application stage updated successfully")
+                .data(applicationMapper.toResponse(application))
                 .build();
     }
 }
