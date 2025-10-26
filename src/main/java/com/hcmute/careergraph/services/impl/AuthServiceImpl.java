@@ -1,14 +1,16 @@
 package com.hcmute.careergraph.services.impl;
 
-import com.hcmute.careergraph.enums.ErrorType;
-import com.hcmute.careergraph.enums.Role;
+import com.hcmute.careergraph.enums.common.ErrorType;
+import com.hcmute.careergraph.enums.common.Role;
 import com.hcmute.careergraph.exception.AppException;
 import com.hcmute.careergraph.persistence.dtos.request.AuthRequests;
 import com.hcmute.careergraph.persistence.dtos.response.AuthResponses;
 import com.hcmute.careergraph.persistence.models.Account;
 import com.hcmute.careergraph.persistence.models.Candidate;
+import com.hcmute.careergraph.persistence.models.Company;
 import com.hcmute.careergraph.repositories.AccountRepository;
 import com.hcmute.careergraph.repositories.CandidateRepository;
+import com.hcmute.careergraph.repositories.CompanyRepository;
 import com.hcmute.careergraph.services.AuthService;
 import com.hcmute.careergraph.services.RedisService;
 import com.hcmute.careergraph.services.JwtTokenService;
@@ -23,6 +25,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.security.SecureRandom;
+import java.util.Map;
 import java.util.Optional;
 import com.google.api.client.googleapis.auth.oauth2.GoogleIdToken;
 import com.google.api.client.googleapis.auth.oauth2.GoogleIdTokenVerifier;
@@ -34,6 +37,7 @@ public class AuthServiceImpl implements AuthService {
 
     private final AccountRepository accountRepository;
     private final CandidateRepository candidateRepository;
+    private final CompanyRepository companyRepository;
     private final PasswordEncoder passwordEncoder;
 
     private final JwtTokenService jwtTokenService;
@@ -46,10 +50,10 @@ public class AuthServiceImpl implements AuthService {
     private long accessTtl;
 
     @Value("${jwt.refreshable-duration}")
-    private long refreshTtl;
+    private Integer refreshTtl;
 
     @Override
-    public void register(AuthRequests.RegisterRequest request) {
+    public void register(AuthRequests.RegisterRequest request, boolean isHR) {
         if (accountRepository.existsByEmail(request.getEmail())) {
             throw new AppException(ErrorType.CONFLICT, "Invalid OTP");
         }
@@ -58,17 +62,27 @@ public class AuthServiceImpl implements AuthService {
         Account account = Account.builder()
                 .email(request.getEmail())
                 .passwordHash(passwordEncoder.encode(request.getPassword()))
-                .role(Role.USER)
+                .role(isHR ? Role.HR : Role.USER)
                 .emailVerified(false)
                 .build();
 
-        // Create candidate
-        Candidate candidate = Candidate.builder()
-                .account(account)
-                .build();
-        account.setCandidate(candidate);
+        if (!isHR) {
+            // Create candidate
+            Candidate candidate = Candidate.builder()
+                    .account(account)
+                    .build();
+            account.setCandidate(candidate);
 
-        candidateRepository.save(candidate);
+            candidateRepository.save(candidate);
+        } else {
+            // Create company - for HR
+            Company company = Company.builder()
+                    .account(account)
+                    .build();
+            account.setCompany(company);
+
+            companyRepository.save(company);
+        }
 
         String otp = generateOtp();
         redisService.setObject(otpKey(request.getEmail()), otp, 300);
@@ -120,7 +134,7 @@ public class AuthServiceImpl implements AuthService {
             throw new AppException(ErrorType.UNAUTHORIZED, "Invalid password");
         }
         String accessToken = jwtTokenService.generateAccessToken(account);
-        String refreshToken = jwtTokenService.generateRefreshToken(account);
+        String refreshToken = jwtTokenService.generateRefreshTokenWithFamily(account);
         return AuthResponses.TokenResponse.builder()
                 .accessToken(accessToken)
                 .refreshToken(refreshToken)
@@ -276,6 +290,48 @@ public class AuthServiceImpl implements AuthService {
         } catch (Exception e) {
             throw new AppException(ErrorType.UNAUTHORIZED, "Failed to verify Google token");
         }
+    }
+
+    @Override
+    public AuthResponses.TokenResponse refreshWithFamily(Jwt jwt) {
+        if (!"refresh".equals(jwt.getClaimAsString("type"))) {
+            throw new AppException(ErrorType.UNAUTHORIZED, "Invalid token type");
+        }
+        String jti = jwt.getId();
+        String fam = jwt.getClaimAsString("fam");
+        String accountId = jwt.getSubject();
+
+        // 2) Kiểm tra Redis (chưa revoke, còn hạn)
+        var meta = redisService.getObject("rt:jti:" + jti, Map.class);
+
+        if (meta == null || Boolean.TRUE.equals(meta.get("revoked"))) {
+            // REUSE / REVOKED: revoke cả family
+            String current = redisService.getObject("rt:fam:current:" + fam, String.class);
+            if (current != null) {
+                // đánh dấu family bị khoá
+                redisService.setObject("rt:fam:blocked:" + fam, "1", refreshTtl);
+            }
+            throw new AppException(ErrorType.UNAUTHORIZED, "Refresh reuse or revoked");
+        }
+        // Check family blocked
+        if (redisService.exists("rt:fam:blocked:" + fam)) {
+            throw new AppException(ErrorType.UNAUTHORIZED, "Family blocked");
+        }
+
+        // 3) Rotate: revoke jti cũ, phát hành refresh mới cùng family
+        redisService.setField("rt:jti:" + jti, "revoked", true);
+
+        Account account = accountRepository.findById(accountId)
+                .orElseThrow(() -> new AppException(ErrorType.NOT_FOUND, "Account not found"));
+        String accessToken = jwtTokenService.generateAccessToken(account);
+        String refreshToken = jwtTokenService.rotateRefreshToken(account, fam);
+
+        return AuthResponses.TokenResponse.builder()
+                .accessToken(accessToken)
+                .refreshToken(refreshToken)
+                .expiresIn(accessTtl)
+                .build();
+
     }
 
     /*============================================ HELPER METHOD ============================================*/

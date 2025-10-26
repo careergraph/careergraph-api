@@ -31,8 +31,5 @@ public class Skill extends BaseEntity {
     @OneToMany(mappedBy = "skill", cascade = CascadeType.ALL, orphanRemoval = true)
     private Set<CandidateSkill> candidateSkills;
 
-    // One-to-Many relationship with JobSkill
-    @OneToMany(mappedBy = "skill", cascade = CascadeType.ALL, orphanRemoval = true)
-    private Set<JobSkill> jobSkills;
 }
 

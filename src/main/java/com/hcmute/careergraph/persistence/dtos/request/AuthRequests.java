@@ -12,9 +12,14 @@ public class AuthRequests {
         @Email
         @NotBlank
         private String email;
+
         @NotBlank
         @Size(min = 8, max = 100)
         private String password;
+
+        private String firstName;
+
+        private String lastName;
     }
 
     @Data
@@ -22,6 +27,7 @@ public class AuthRequests {
         @Email
         @NotBlank
         private String email;
+
         @NotBlank
         private String otp;
     }
@@ -31,6 +37,7 @@ public class AuthRequests {
         @Email
         @NotBlank
         private String email;
+
         @NotBlank
         private String password;
     }
@@ -47,8 +54,10 @@ public class AuthRequests {
         @Email
         @NotBlank
         private String email;
+
         @NotBlank
         private String otp;
+
         @NotBlank
         @Size(min = 8, max = 100)
         private String newPassword;

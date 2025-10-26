@@ -1,6 +1,6 @@
 package com.hcmute.careergraph.helper;
 
-import com.hcmute.careergraph.enums.Role;
+import com.hcmute.careergraph.enums.common.Role;
 import com.hcmute.careergraph.persistence.models.Account;
 import com.hcmute.careergraph.repositories.AccountRepository;
 import lombok.RequiredArgsConstructor;
@@ -65,6 +65,12 @@ public class SecurityUtils {
    }
 
    public Optional<String> getCandidateId() {
+      return getCurrentAccount()
+              .map(Account::getCandidate)
+              .map(c -> c.getId());
+   }
+
+   public Optional<String> getCompanyId() {
       return getCurrentAccount()
               .map(Account::getCandidate)
               .map(c -> c.getId());

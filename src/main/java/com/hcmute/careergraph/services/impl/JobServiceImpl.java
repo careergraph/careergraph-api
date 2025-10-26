@@ -1,10 +1,8 @@
 package com.hcmute.careergraph.services.impl;
 
-import com.hcmute.careergraph.enums.JobCategory;
-import com.hcmute.careergraph.enums.Status;
+import com.hcmute.careergraph.enums.common.Status;
 import com.hcmute.careergraph.mapper.JobMapper;
-import com.hcmute.careergraph.persistence.dtos.response.JobDto;
-import com.hcmute.careergraph.persistence.dtos.request.JobRequest;
+import com.hcmute.careergraph.persistence.dtos.request.JobCreationRequest;
 import com.hcmute.careergraph.persistence.models.Company;
 import com.hcmute.careergraph.persistence.models.Job;
 import com.hcmute.careergraph.repositories.CompanyRepository;
@@ -13,14 +11,10 @@ import com.hcmute.careergraph.services.JobService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 
@@ -34,238 +28,124 @@ public class JobServiceImpl implements JobService {
     private final CompanyRepository companyRepository;
     private final JobMapper jobMapper;
 
+    /**
+     * Tạo job mới
+     *
+     * @param request JobCreationRequest từ client
+     * @param companyId ID của công ty đăng job (lấy từ authenticated user)
+     * @return JobResponse chứa thông tin job vừa tạo
+     * @throws IllegalArgumentException nếu company không tồn tại
+     */
+    @Transactional
     @Override
-    public JobDto createJob(JobRequest request) {
-        log.info("Creating new job with title: {}", request.getTitle());
-        
-        // Find company
-        Company company = companyRepository.findById(request.getCompanyId())
-                .orElseThrow(() -> new RuntimeException("Company not found with id: " + request.getCompanyId()));
+    public Job createJob(JobCreationRequest request, String companyId) {
+        log.info("Creating new job with title: {} for company ID: {}", request.title(), companyId);
 
-        // Create job entity
-        Job job = Job.builder()
-                .title(request.getTitle())
-                .description(request.getDescription())
-                .requirements(request.getRequirements())
-                .benefits(request.getBenefits())
-                .salaryRange(request.getSalaryRange())
-                .experienceLevel(request.getExperienceLevel())
-                .workArrangement(request.getWorkArrangement())
-                .postedDate(request.getPostedDate() != null ? request.getPostedDate() : 
-                    LocalDateTime.now().format(DateTimeFormatter.ISO_LOCAL_DATE_TIME))
-                .expiryDate(request.getExpiryDate())
-                .numberOfPositions(request.getNumberOfPositions())
-                .workLocation(request.getWorkLocation())
-                .employmentType(request.getEmploymentType())
-                .status(Status.ACTIVE)
-                .isUrgent(request.getIsUrgent() != null ? request.getIsUrgent() : false)
-                .company(company)
-                .build();
+        // 1. Validate và lấy Company
+        Company company = companyRepository.findById(companyId)
+                .orElseThrow(() -> new IllegalArgumentException("Company not found with ID: " + companyId));
 
+        // 3. Map request -> entity
+        Job job = jobMapper.toEntity(request, company);
+
+        // 4. Lưu vào database
         Job savedJob = jobRepository.save(job);
-        log.info("Job created successfully with id: {}", savedJob.getId());
+        log.info("Job created successfully with ID: {}", savedJob.getId());
 
-        return convertToDto(job, false);
+        return savedJob;
     }
 
-    @Override
+    /**
+     * Lấy thông tin chi tiết job theo ID
+     *
+     * @param jobId ID của job cần lấy
+     * @return JobResponse
+     * @throws IllegalArgumentException nếu job không tồn tại
+     */
     @Transactional(readOnly = true)
-    public JobDto getJobById(String id) {
-        log.info("Getting job by id: {}", id);
+    @Override
+    public Job getJobById(String jobId) {
+        log.info("Fetching job with ID: {}", jobId);
 
-        Job job = jobRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Job not found with id: " + id));
+        Job job = jobRepository.findById(jobId)
+                .orElseThrow(() -> new IllegalArgumentException("Job not found with ID: " + jobId));
 
-        return convertToDto(job, true);
+        return job;
     }
 
-    @Override
+    /**
+     * Lấy tất cả jobs của một company
+     *
+     * @param companyId ID của company
+     * @return List JobResponse
+     */
     @Transactional(readOnly = true)
-    public Page<JobDto> getAllJobs(Pageable pageable) {
-        log.info("Getting all jobs with pagination");
-        Page<Job> jobPage = jobRepository.findAll(pageable);
+    @Override
+    public Page<Job> getJobsByCompany(String companyId, Pageable pageable) {
+        log.info("Fetching all jobs for company ID: {}", companyId);
 
-        List<JobDto> jobDtos = convertToDto(jobPage, false);
-
-        return new PageImpl<>(jobDtos, pageable, jobDtos.size());
+        Page<Job> jobs = jobRepository.findByCompanyId(companyId, pageable);
+        return jobs;
     }
 
     @Override
-    @Transactional(readOnly = true)
-    public Page<JobDto> getJobsByCompany(String companyId, Pageable pageable) {
-        log.info("Getting jobs by company id: {}", companyId);
-        Page<Job> jobPage = jobRepository.findByCompanyId(companyId, pageable);
+    public Page<Job> getAllJobs(Pageable pageable) {
+        log.info("Fetching all jobs");
 
-        List<JobDto> jobDtos = convertToDto(jobPage, false);
-
-        return new PageImpl<>(jobDtos, pageable, jobDtos.size());
+        Page<Job> jobs = jobRepository.findAll(pageable);
+        return jobs;
     }
 
+    /**
+     * Update job
+     */
+    @Transactional
     @Override
-    public JobDto updateJob(String id, JobRequest request) {
-        log.info("Updating job with id: {}", id);
-        
-        Job job = jobRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Job not found with id: " + id));
+    public Job updateJob(String jobId, JobCreationRequest request, String companyId) {
+        // TODO: Implement update logic
+        throw new UnsupportedOperationException("Update job not implemented yet");
+    }
 
-        // Update fields
-        job.setTitle(request.getTitle());
-        job.setDescription(request.getDescription());
-        job.setRequirements(request.getRequirements());
-        job.setBenefits(request.getBenefits());
-        job.setSalaryRange(request.getSalaryRange());
-        job.setExperienceLevel(request.getExperienceLevel());
-        job.setWorkArrangement(request.getWorkArrangement());
-        job.setExpiryDate(request.getExpiryDate());
-        job.setNumberOfPositions(request.getNumberOfPositions());
-        job.setWorkLocation(request.getWorkLocation());
-        job.setEmploymentType(request.getEmploymentType());
-        job.setIsUrgent(request.getIsUrgent());
+    /**
+     * Delete job (soft delete - chuyển status sang CLOSED)
+     */
+    @Transactional
+    @Override
+    public void deleteJob(String jobId, String companyId) {
+        log.info("Deleting job with ID: {} for company ID: {}", jobId, companyId);
 
-        // Update company if changed
-        if (!job.getCompany().getId().equals(request.getCompanyId())) {
-            Company company = companyRepository.findById(request.getCompanyId())
-                    .orElseThrow(() -> new RuntimeException("Company not found with id: " + request.getCompanyId()));
-            job.setCompany(company);
+        Job job = jobRepository.findById(jobId)
+                .orElseThrow(() -> new IllegalArgumentException("Job not found with ID: " + jobId));
+
+        // Validate job thuộc về company
+        if (!job.getCompany().getId().equals(companyId)) {
+            throw new IllegalArgumentException("Job does not belong to this company");
         }
 
-        Job updatedJob = jobRepository.save(job);
-        log.info("Job updated successfully with id: {}", updatedJob.getId());
+        // Soft delete: chuyển status sang CLOSED
+        job.setStatus(Status.CLOSED);
+        jobRepository.save(job);
 
-        return convertToDto(job, false);
+        log.info("Job deleted successfully with ID: {}", jobId);
     }
 
     @Override
-    public void deleteJob(String id) {
-        log.info("Deleting job with id: {}", id);
-        Job job = jobRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Job not found with id: " + id));
-        job.softDelete();
-        jobRepository.save(job);
-        log.info("Job soft deleted successfully with id: {}", id);
+    public void activateJob(String jobId, String companyId) {
+
     }
 
     @Override
-    public void activateJob(String id) {
-        log.info("Activating job with id: {}", id);
-        Job job = jobRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Job not found with id: " + id));
-        job.activate();
-        jobRepository.save(job);
-        log.info("Job activated successfully with id: {}", id);
-    }
+    public void deactivateJob(String jobId, String companyId) {
 
-    @Override
-    public void deactivateJob(String id) {
-        log.info("Deactivating job with id: {}", id);
-        Job job = jobRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Job not found with id: " + id));
-        job.deactivate();
-        jobRepository.save(job);
-        log.info("Job deactivated successfully with id: {}", id);
     }
 
     @Override
     public List<HashMap<String, Object>> getJobCategories() {
-
-        List<HashMap<String, Object>> result = new ArrayList<>();
-        List<JobCategory> jobCategories = List.of(JobCategory.values());
-        jobCategories.stream().map(category -> {
-            HashMap<String, Object> tmp = new HashMap<>();
-            tmp.put("type", category.name());
-            tmp.put("name", category.getDisplayName());
-            tmp.put("description", category.getDescription());
-
-            result.add(tmp);
-            return tmp;
-        }).toList();
-
-        return result;
+        return List.of();
     }
 
-    // ========================================= CONVERT FUNC =========================================
-
-    /*
-    * Convert DTO from JobPage to JobList
-    * */
-    private List<JobDto> convertToDto(Page<Job> jobPage, boolean isDetail) {
-        List<JobDto> result = jobPage.stream()
-                .filter(job -> job.getStatus() == Status.ACTIVE)
-                .map(job -> {
-                    JobDto tmp = jobMapper.toDto(job);
-
-                    // Build category
-                    HashMap<String, Object> jobCategory = new HashMap<>();
-                    jobCategory.put("type", job.getJobCategory().name());
-                    jobCategory.put("name", job.getJobCategory().getDisplayName());
-                    jobCategory.put("description", job.getJobCategory().getDescription());
-                    tmp.setJobCategory(jobCategory);
-
-                    // Build detail
-                    if (isDetail) {
-                        putDetail(tmp);
-                    }
-
-                    return tmp;
-                })
-                .toList();
-
-        return result;
-    }
-
-    /*
-    * Convert DTO from list
-    * */
-    private List<JobDto> convertToDto(List<Job> jobs, boolean isDetail) {
-        List<JobDto> result = jobs.stream()
-                .filter(job -> job.getStatus() == Status.ACTIVE)
-                .map(job -> {
-                    JobDto tmp = jobMapper.toDto(job);
-
-                    // Build category
-                    HashMap<String, Object> jobCategory = new HashMap<>();
-                    jobCategory.put("type", job.getJobCategory().name());
-                    jobCategory.put("name", job.getJobCategory().getDisplayName());
-                    jobCategory.put("description", job.getJobCategory().getDescription());
-                    tmp.setJobCategory(jobCategory);
-
-                    // Build detail
-                    if (isDetail) {
-                        putDetail(tmp);
-                    }
-
-                    return tmp;
-                })
-                .toList();
-
-        return result;
-    }
-
-    /*
-    * Convert DTO from single record
-    * */
-    private JobDto convertToDto(Job job, boolean isDetail) {
-        JobDto result = jobMapper.toDto(job);
-
-        // Build category
-        HashMap<String, Object> jobCategory = new HashMap<>();
-        jobCategory.put("type", job.getJobCategory().name());
-        jobCategory.put("name", job.getJobCategory().getDisplayName());
-        jobCategory.put("description", job.getJobCategory().getDescription());
-        result.setJobCategory(jobCategory);
-
-        // Build detail
-        if (isDetail) {
-            putDetail(result);
-        }
-
-        return result;
-    }
-
-    /*
-    * Convert detail
-    * */
-    private void putDetail(JobDto jobDto) {
-        // TODO: application and required skill
+    @Override
+    public List<Job> getJobsPersonalized(String userId) {
+        return List.of();
     }
 }

@@ -2,10 +2,11 @@ package com.hcmute.careergraph.services;
 
 import com.hcmute.careergraph.persistence.dtos.request.AuthRequests;
 import com.hcmute.careergraph.persistence.dtos.response.AuthResponses;
+import org.springframework.security.oauth2.jwt.Jwt;
 
 public interface AuthService {
 
-    void register(AuthRequests.RegisterRequest request);
+    void register(AuthRequests.RegisterRequest request, boolean isHR);
 
     void confirmOtp(AuthRequests.ConfirmOtpRequest request);
 
@@ -22,6 +23,8 @@ public interface AuthService {
     void resetPassword(AuthRequests.ResetPasswordRequest request);
 
     AuthResponses.TokenResponse googleLogin(AuthRequests.GoogleLoginRequest request);
+
+    AuthResponses.TokenResponse refreshWithFamily(Jwt jwt);
 }
 
 
