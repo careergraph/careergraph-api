@@ -1,4 +1,4 @@
-package com.hcmute.careergraph.persistence.dtos.record;
+package com.hcmute.careergraph.persistence.dtos.request;
 
 import com.hcmute.careergraph.enums.work.EducationType;
 import com.hcmute.careergraph.enums.work.EmploymentType;
