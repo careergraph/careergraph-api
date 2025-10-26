@@ -1,7 +1,7 @@
 package com.hcmute.careergraph.services;
 
-import com.hcmute.careergraph.persistence.dtos.response.JobDto;
-import com.hcmute.careergraph.persistence.dtos.request.JobRequest;
+import com.hcmute.careergraph.persistence.dtos.request.JobCreationRequest;
+import com.hcmute.careergraph.persistence.models.Job;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 
@@ -10,21 +10,23 @@ import java.util.List;
 
 public interface JobService {
 
-    JobDto createJob(JobRequest request);
+    Job createJob(JobCreationRequest request, String companyId);
 
-    JobDto getJobById(String id);
+    Job getJobById(String jobId);
 
-    Page<JobDto> getAllJobs(Pageable pageable);
+    Page<Job> getJobsByCompany(String companyId, Pageable pageable);
 
-    Page<JobDto> getJobsByCompany(String companyId, Pageable pageable);
+    Page<Job> getAllJobs(Pageable pageable);
 
-    JobDto updateJob(String id, JobRequest request);
+    Job updateJob(String jobId, JobCreationRequest request, String companyId);
 
-    void deleteJob(String id);
+    void deleteJob(String jobId, String companyId);
 
-    void activateJob(String id);
+    void activateJob(String jobId, String companyId);
 
-    void deactivateJob(String id);
+    void deactivateJob(String jobId, String companyId);
 
     List<HashMap<String, Object>> getJobCategories();
+
+    List<Job> getJobsPersonalized(String userId);
 }

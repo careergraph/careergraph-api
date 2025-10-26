@@ -1,7 +1,7 @@
 package com.hcmute.careergraph.persistence.models;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
-import com.hcmute.careergraph.enums.Status;
+import com.hcmute.careergraph.enums.common.Status;
 import jakarta.persistence.*;
 import lombok.Builder;
 import lombok.Getter;
@@ -14,6 +14,7 @@ import org.springframework.data.annotation.LastModifiedBy;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 
 import java.time.LocalDateTime;
+import java.util.Date;
 
 @Getter
 @Setter
@@ -53,6 +54,12 @@ public abstract class BaseEntity {
     public void prePersist() {
         if (this.status == null) {
             this.status = Status.ACTIVE;
+        }
+        if (this.createdDate == null) {
+            this.createdDate = LocalDateTime.now();
+        }
+        if (this.lastModifiedDate == null) {
+            this.lastModifiedDate = LocalDateTime.now();
         }
     }
 

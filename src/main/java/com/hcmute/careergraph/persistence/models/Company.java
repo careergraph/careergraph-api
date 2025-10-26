@@ -33,6 +33,10 @@ public class Company extends Party {
     @Column(name = "year_founded")
     private Integer yearFounded;
 
+    // Account
+    @OneToOne(mappedBy = "company", cascade = CascadeType.ALL, orphanRemoval = true)
+    private Account account;
+
     // One-to-Many relationship with Job
     @OneToMany(mappedBy = "company", cascade = CascadeType.ALL, orphanRemoval = true)
     private Set<Job> jobs;

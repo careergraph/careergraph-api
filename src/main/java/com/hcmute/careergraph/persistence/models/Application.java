@@ -1,12 +1,16 @@
 package com.hcmute.careergraph.persistence.models;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
-import com.hcmute.careergraph.enums.Status;
+import com.hcmute.careergraph.enums.application.ApplicationStage;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.experimental.SuperBuilder;
+
+import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 
 @Entity
 @Table(name = "applications")
@@ -33,8 +37,19 @@ public class Application extends BaseEntity {
     private String appliedDate;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "status")
-    private Status status;
+    @Column(name = "current_stage", nullable = false, length = 40)
+    private ApplicationStage currentStage;
+
+    @Column(name = "stage_changed_at")
+    private LocalDateTime stageChangedAt;
+
+    @Column(name = "current_stage_note", columnDefinition = "TEXT")
+    private String currentStageNote;
+
+    @OneToMany(mappedBy = "application", cascade = CascadeType.ALL, orphanRemoval = true)
+    @OrderBy("changedAt ASC")
+    @lombok.Builder.Default
+    private List<ApplicationStageHistory> stageHistory = new ArrayList<>();
 
     // Many-to-One relationship with Candidate
     @ManyToOne(fetch = FetchType.LAZY)
@@ -45,5 +60,13 @@ public class Application extends BaseEntity {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "job_id")
     private Job job;
+
+    public void addStageHistory(ApplicationStageHistory historyEntry) {
+        if (historyEntry == null) {
+            return;
+        }
+        historyEntry.setApplication(this);
+        stageHistory.add(historyEntry);
+    }
 }
 

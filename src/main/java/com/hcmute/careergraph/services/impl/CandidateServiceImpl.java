@@ -1,9 +1,11 @@
 package com.hcmute.careergraph.services.impl;
 
+import com.hcmute.careergraph.enums.candidate.AddressType;
+import com.hcmute.careergraph.enums.common.FileType;
 import com.hcmute.careergraph.helper.SecurityUtils;
-import com.hcmute.careergraph.enums.FileType;
 import com.hcmute.careergraph.helper.StringHelper;
-import com.hcmute.careergraph.mapper.CandidateMapper;
+import com.hcmute.careergraph.persistence.dtos.request.CandidateRequest;
+import com.hcmute.careergraph.persistence.models.Address;
 import com.hcmute.careergraph.persistence.models.Candidate;
 import com.hcmute.careergraph.repositories.CandidateRepository;
 import com.hcmute.careergraph.services.CandidateService;
@@ -18,6 +20,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
+import java.util.Set;
 
 @Service
 @Transactional
@@ -28,8 +31,6 @@ public class CandidateServiceImpl implements CandidateService {
     private final MinioService minioService;
 
     private final CandidateRepository candidateRepository;
-
-    private final CandidateMapper candidateMapper;
     private final SecurityUtils securityUtils;
 
     @Value("${integration.minio.bucket}")
@@ -83,5 +84,36 @@ public class CandidateServiceImpl implements CandidateService {
             throw new ChangeSetPersister.NotFoundException();
 
         return minioService.getFileUrl(objectKey);
+    }
+    @Override
+    public Candidate getMyProfile(String candidateId) throws ChangeSetPersister.NotFoundException {
+        return candidateRepository.findById(candidateId)
+                .orElseThrow(ChangeSetPersister.NotFoundException::new);
+    }
+
+    @Override
+    public Candidate updateInformation(String candidateId, CandidateRequest.UpdateInformation candidateRequest) throws ChangeSetPersister.NotFoundException {
+        Candidate candidate = candidateRepository.findById(candidateId)
+                .orElseThrow(ChangeSetPersister.NotFoundException::new);
+        candidate.setFirstName(candidateRequest.name());
+        candidate.setLastName(candidateRequest.name());
+        Set<Address> addresses = candidate.getAddresses();
+        Address address = addresses.stream()
+                .filter(a -> AddressType.HOME_ADDRESS.name().equals(a.getName()))
+                .findFirst()
+                .orElse(null);
+        if(address == null){
+            address = new Address();
+            address.setName(AddressType.HOME_ADDRESS.name());
+            addresses.add(address);
+        }
+        address.setProvince(candidateRequest.province());
+        address.setDistrict(candidateRequest.district());
+        candidate.setAddresses(addresses);
+        candidate.setDateOfBirth(candidateRequest.dateOfBirth());
+        candidate.setGender(candidateRequest.gender());
+        candidate.setIsMarried(candidateRequest.isMarried());
+        candidateRepository.save(candidate);
+        return candidate;
     }
 }

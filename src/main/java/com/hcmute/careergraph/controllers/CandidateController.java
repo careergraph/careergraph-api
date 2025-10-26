@@ -1,8 +1,14 @@
 package com.hcmute.careergraph.controllers;
 
-import com.hcmute.careergraph.enums.FileType;
+import com.hcmute.careergraph.enums.common.FileType;
 import com.hcmute.careergraph.helper.RestResponse;
+import com.hcmute.careergraph.helper.SecurityUtils;
+import com.hcmute.careergraph.mapper.CandidateMapper;
+import com.hcmute.careergraph.persistence.dtos.request.CandidateRequest;
+import com.hcmute.careergraph.persistence.dtos.response.CandidateResponse;
+import com.hcmute.careergraph.persistence.models.Candidate;
 import com.hcmute.careergraph.services.CandidateService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.crossstore.ChangeSetPersister;
 import org.springframework.http.HttpStatus;
@@ -15,6 +21,8 @@ import org.springframework.web.multipart.MultipartFile;
 public class CandidateController {
 
     private final CandidateService candidateService;
+    private final CandidateMapper candidateMapper;
+    private final SecurityUtils securityUtils;
 
     @PostMapping("/{id}/files")
     public RestResponse<String> uploadFile(
@@ -40,6 +48,25 @@ public class CandidateController {
                 .status(HttpStatus.OK)
                 .message("Get resource successfully")
                 .data(url)
+                .build();
+    }
+
+    @GetMapping("/me")
+    public RestResponse<CandidateResponse> getMyProfile() throws ChangeSetPersister.NotFoundException {
+        Candidate candidate = candidateService.getMyProfile(securityUtils.getCandidateId().get());
+
+        return RestResponse.<CandidateResponse>builder()
+                .status(HttpStatus.OK)
+                .data(candidateMapper.toResponse(candidate))
+                .build();
+    }
+    @PostMapping("/update-information")
+    public RestResponse<CandidateResponse> updateInformation(@Valid @RequestBody CandidateRequest.UpdateInformation request) throws ChangeSetPersister.NotFoundException{
+        Candidate candidate = candidateService.updateInformation(securityUtils.getCandidateId().get(), request);
+
+        return RestResponse.<CandidateResponse>builder()
+                .status(HttpStatus.OK)
+                .data(candidateMapper.toResponse(candidate))
                 .build();
     }
 }
