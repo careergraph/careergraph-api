@@ -5,10 +5,8 @@ import com.hcmute.careergraph.mapper.JobMapper;
 import com.hcmute.careergraph.persistence.dtos.request.JobCreationRequest;
 import com.hcmute.careergraph.persistence.models.Company;
 import com.hcmute.careergraph.persistence.models.Job;
-import com.hcmute.careergraph.persistence.models.Skill;
 import com.hcmute.careergraph.repositories.CompanyRepository;
 import com.hcmute.careergraph.repositories.JobRepository;
-import com.hcmute.careergraph.repositories.SkillRepository;
 import com.hcmute.careergraph.services.JobService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -17,7 +15,6 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 
@@ -28,7 +25,6 @@ import java.util.List;
 public class JobServiceImpl implements JobService {
 
     private final JobRepository jobRepository;
-    private final SkillRepository skillRepository;
     private final CompanyRepository companyRepository;
     private final JobMapper jobMapper;
 
@@ -38,7 +34,7 @@ public class JobServiceImpl implements JobService {
      * @param request JobCreationRequest từ client
      * @param companyId ID của công ty đăng job (lấy từ authenticated user)
      * @return JobResponse chứa thông tin job vừa tạo
-     * @throws IllegalArgumentException nếu company không tồn tại hoặc skills không hợp lệ
+     * @throws IllegalArgumentException nếu company không tồn tại
      */
     @Transactional
     @Override
@@ -49,21 +45,8 @@ public class JobServiceImpl implements JobService {
         Company company = companyRepository.findById(companyId)
                 .orElseThrow(() -> new IllegalArgumentException("Company not found with ID: " + companyId));
 
-        // 2. Lấy danh sách Skills nếu có
-        List<Skill> skills = new ArrayList<>();
-        if (request.skillIds() != null && !request.skillIds().isEmpty()) {
-            skills = skillRepository.findAllById(request.skillIds());
-
-            // Validate tất cả skill IDs đều tồn tại
-            if (skills.size() != request.skillIds().size()) {
-                log.warn("Some skill IDs not found. Requested: {}, Found: {}",
-                        request.skillIds().size(), skills.size());
-                // throw new IllegalArgumentException("One or more skill IDs are invalid");
-            }
-        }
-
         // 3. Map request -> entity
-        Job job = jobMapper.toEntity(request, skills, company);
+        Job job = jobMapper.toEntity(request, company);
 
         // 4. Lưu vào database
         Job savedJob = jobRepository.save(job);

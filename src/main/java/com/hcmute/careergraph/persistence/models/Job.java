@@ -165,24 +165,9 @@ public class Job extends BaseEntity {
     @JoinColumn(name = "company_id")
     private Company company;
 
-    // One-to-Many relationship with JobSkill
-    @OneToMany(mappedBy = "job", cascade = CascadeType.ALL, orphanRemoval = true)
-    private Set<JobSkill> requiredSkills = new HashSet<>();
-
     // One-to-Many relationship with Application
     @OneToMany(mappedBy = "job", cascade = CascadeType.ALL, orphanRemoval = true)
     private Set<Application> applications = new HashSet<>();
-
-    // Helper methods for managing skills
-    public void addSkill(JobSkill skill) {
-        requiredSkills.add(skill);
-        skill.setJob(this);
-    }
-
-    public void removeSkill(JobSkill skill) {
-        requiredSkills.remove(skill);
-        skill.setJob(null);
-    }
 
     @Override
     public void prePersist() {

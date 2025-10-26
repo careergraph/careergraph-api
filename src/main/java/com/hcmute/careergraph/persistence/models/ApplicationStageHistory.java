@@ -1,7 +1,9 @@
-Khpackage com.hcmute.careergraph.persistence.models;
+package com.hcmute.careergraph.persistence.models;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.hcmute.careergraph.enums.application.ApplicationStage;
+import com.hcmute.careergraph.persistence.models.Application;
+import com.hcmute.careergraph.persistence.models.BaseEntity;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -40,8 +42,10 @@ public class ApplicationStageHistory extends BaseEntity {
     @Column(name = "changed_at", nullable = false)
     private LocalDateTime changedAt;
 
-    @PrePersist
-    public void onPersist() {
+    @Override
+    public void prePersist() {
+        super.prePersist();
+
         if (changedAt == null) {
             changedAt = LocalDateTime.now();
         }
