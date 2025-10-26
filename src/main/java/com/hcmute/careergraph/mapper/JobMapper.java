@@ -5,8 +5,6 @@ import com.hcmute.careergraph.persistence.dtos.request.JobCreationRequest;
 import com.hcmute.careergraph.persistence.dtos.response.JobResponse;
 import com.hcmute.careergraph.persistence.models.Company;
 import com.hcmute.careergraph.persistence.models.Job;
-import com.hcmute.careergraph.persistence.models.JobSkill;
-import com.hcmute.careergraph.persistence.models.Skill;
 import org.springframework.stereotype.Component;
 
 import java.time.LocalDate;
@@ -22,11 +20,10 @@ public class JobMapper {
      * Sử dụng khi tạo job mới
      *
      * @param request DTO từ client
-     * @param skills List Skill entities để tạo JobSkill relationships
      * @param company Company entity (lấy từ authenticated user hoặc context)
      * @return Job entity chưa lưu vào DB
      */
-    public Job toEntity(JobCreationRequest request, List<Skill> skills, Company company) {
+    public Job toEntity(JobCreationRequest request, Company company) {
         Job job = new Job();
 
         // Basic Information
@@ -81,16 +78,6 @@ public class JobMapper {
         // Company relationship
         job.setCompany(company);
 
-        // Skills - Create JobSkill relationships
-        if (skills != null && !skills.isEmpty()) {
-            for (Skill skill : skills) {
-                JobSkill jobSkill = new JobSkill();
-                jobSkill.setJob(job);
-                jobSkill.setSkill(skill);
-                job.addSkill(jobSkill);
-            }
-        }
-
         return job;
     }
 
@@ -104,17 +91,6 @@ public class JobMapper {
     public JobResponse toResponse(Job job) {
         if (job == null) {
             return null;
-        }
-
-        // Convert skills
-        List<JobResponse.SkillLookupResponse> skillResponses = Collections.emptyList();
-        if (job.getRequiredSkills() != null && !job.getRequiredSkills().isEmpty()) {
-            skillResponses = job.getRequiredSkills().stream()
-                    .map(jobSkill -> JobResponse.SkillLookupResponse.builder()
-                            .id(jobSkill.getSkill().getId())
-                            .name(jobSkill.getSkill().getName())
-                            .build())
-                    .collect(Collectors.toList());
         }
 
         return JobResponse.builder()
@@ -150,7 +126,7 @@ public class JobMapper {
                 .remoteJob(job.isRemoteJob())
 
                 // Skills
-                .skills(skillResponses)
+                .skills(Collections.emptyList())
 
                 // Compensation & Contact
                 .salaryRange(job.getSalaryRange())

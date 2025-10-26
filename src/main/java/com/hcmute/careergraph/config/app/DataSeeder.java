@@ -23,7 +23,6 @@ public class DataSeeder implements CommandLineRunner {
     private final SkillRepository skillRepository;
     private final JobRepository jobRepository;
     private final ApplicationRepository applicationRepository;
-    private final JobSkillRepository jobSkillRepository;
     private final Faker faker = new Faker();
 
     @Transactional
