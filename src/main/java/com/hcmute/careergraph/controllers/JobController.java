@@ -16,7 +16,6 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.Authentication;
-import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.HashMap;
@@ -48,7 +47,7 @@ public class JobController {
         log.info("POST /api/v1/jobs - Creating job: {}", request.title());
 
         // Extract company ID from authenticated user
-        String companyId = extractCompanyId(authentication);
+        String companyId = securityUtils.extractCompanyId(authentication);
 
         // Delegate to service
         Job job = jobService.createJob(request, companyId);
@@ -161,7 +160,7 @@ public class JobController {
     ) {
         log.info("PUT /api/v1/jobs/{} - Updating job", id);
 
-        String companyId = extractCompanyId(authentication);
+        String companyId = securityUtils.extractCompanyId(authentication);
 
         Job job = jobService.updateJob(id, request, companyId);
 
@@ -187,7 +186,7 @@ public class JobController {
     ) {
         log.info("DELETE /api/v1/jobs/{} - Deleting job", id);
 
-        String companyId = extractCompanyId(authentication);
+        String companyId = securityUtils.extractCompanyId(authentication);
 
         jobService.deleteJob(id, companyId);
 
@@ -212,7 +211,7 @@ public class JobController {
     ) {
         log.info("PATCH /api/v1/jobs/{}/activate - Activating job", id);
 
-        String companyId = extractCompanyId(authentication);
+        String companyId = securityUtils.extractCompanyId(authentication);
 
         jobService.activateJob(id, companyId);
 
@@ -237,7 +236,7 @@ public class JobController {
     ) {
         log.info("PATCH /api/v1/jobs/{}/deactivate - Deactivating job", id);
 
-        String companyId = extractCompanyId(authentication);
+        String companyId = securityUtils.extractCompanyId(authentication);
 
         // TODO: Cần thêm method deactivateJob trong JobService
         // jobService.deactivateJob(id, companyId);
@@ -297,39 +296,5 @@ public class JobController {
                 .message("Jobs retrieved successfully")
                 .data(null) // TODO: Replace with actual data
                 .build();
-    }
-
-    /**
-     * Helper method: Extract company ID từ Authentication
-     *
-     * @param authentication Spring Security Authentication
-     * @return Company ID
-     */
-    private String extractCompanyId(Authentication authentication) {
-
-        // Extract from JWT claims
-        JwtAuthenticationToken jwt = (JwtAuthenticationToken) authentication;
-        if (jwt != null) {
-            return jwt.getToken().getClaimAsString("companyId");
-        }
-        log.error("Not found jwt token");
-        return null;
-    }
-
-    /**
-     * Helper method: Extract candidate ID từ Authentication
-     * Dùng cho personalized jobs
-     *
-     * @param authentication Spring Security Authentication
-     * @return Candidate ID
-     */
-    private String extractCandidateId(Authentication authentication) {
-        // Extract from JWT claims
-        JwtAuthenticationToken jwt = (JwtAuthenticationToken) authentication;
-        if (jwt != null) {
-            return jwt.getToken().getClaimAsString("candidateId");
-        }
-        log.error("Not found jwt token");
-        return null;
     }
 }
