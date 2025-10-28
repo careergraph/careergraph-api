@@ -1,12 +1,14 @@
 package com.hcmute.careergraph.services.impl;
 
 import com.hcmute.careergraph.enums.candidate.AddressType;
+import com.hcmute.careergraph.enums.candidate.ContactType;
 import com.hcmute.careergraph.enums.common.FileType;
 import com.hcmute.careergraph.helper.SecurityUtils;
 import com.hcmute.careergraph.helper.StringHelper;
 import com.hcmute.careergraph.persistence.dtos.request.CandidateRequest;
 import com.hcmute.careergraph.persistence.models.Address;
 import com.hcmute.careergraph.persistence.models.Candidate;
+import com.hcmute.careergraph.persistence.models.Contact;
 import com.hcmute.careergraph.repositories.CandidateRepository;
 import com.hcmute.careergraph.services.CandidateService;
 import com.hcmute.careergraph.services.MinioService;
@@ -19,6 +21,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
@@ -92,27 +95,59 @@ public class CandidateServiceImpl implements CandidateService {
     }
 
     @Override
-    public Candidate updateInformation(String candidateId, CandidateRequest.UpdateInformation candidateRequest) throws ChangeSetPersister.NotFoundException {
+    public Candidate updateInformation(String candidateId, CandidateRequest.UpdateInformationRequest candidateRequest) throws ChangeSetPersister.NotFoundException {
         Candidate candidate = candidateRepository.findById(candidateId)
                 .orElseThrow(ChangeSetPersister.NotFoundException::new);
-        candidate.setFirstName(candidateRequest.name());
-        candidate.setLastName(candidateRequest.name());
-        Set<Address> addresses = candidate.getAddresses();
-        Address address = addresses.stream()
-                .filter(a -> AddressType.HOME_ADDRESS.name().equals(a.getName()))
-                .findFirst()
-                .orElse(null);
-        if(address == null){
-            address = new Address();
-            address.setName(AddressType.HOME_ADDRESS.name());
-            addresses.add(address);
-        }
-        address.setProvince(candidateRequest.province());
-        address.setDistrict(candidateRequest.district());
-        candidate.setAddresses(addresses);
+        // ----- Basic fields -----
+        candidate.setFirstName(candidateRequest.firstName());
+        candidate.setLastName(candidateRequest.lastName());
         candidate.setDateOfBirth(candidateRequest.dateOfBirth());
         candidate.setGender(candidateRequest.gender());
         candidate.setIsMarried(candidateRequest.isMarried());
+
+        Set<Address> addresses = candidate.getAddresses();
+        Address homeAddress = addresses.stream()
+                .filter(a -> AddressType.HOME_ADDRESS.name().equals(a.getName()))
+                .findFirst()
+                .orElse(null);
+
+        if(homeAddress == null){
+            homeAddress = new Address();
+            homeAddress.setName(AddressType.HOME_ADDRESS.name());
+            homeAddress.setParty(candidate);
+            addresses.add(homeAddress);
+        }
+
+        CandidateRequest.AddressDTO adr = candidateRequest.address();
+        if (adr != null) {
+            homeAddress.setCountry(adr.country());
+            homeAddress.setProvince(adr.province());
+            homeAddress.setDistrict(adr.district());
+            homeAddress.setWard(adr.ward());
+            homeAddress.setIsPrimary(Boolean.TRUE.equals(adr.isPrimary()));
+        }
+
+
+        Set<Contact> contacts = candidate.getContacts();
+
+        CandidateRequest.ContactDTO contactReq = candidateRequest.contact();
+        if (contactReq != null && "PHONE".equalsIgnoreCase(contactReq.type())) {
+            Contact primaryPhone = contacts.stream()
+                    .filter(c -> c.getType() == ContactType.PHONE && Boolean.TRUE.equals(c.getIsPrimary()))
+                    .findFirst()
+                    .orElse(null);
+
+            if (primaryPhone == null) {
+                primaryPhone = new Contact();
+                primaryPhone.setParty(candidate);
+                primaryPhone.setType(ContactType.PHONE);
+                contacts.add(primaryPhone);
+            }
+
+            primaryPhone.setValue(contactReq.value());
+            primaryPhone.setIsPrimary(Boolean.TRUE.equals(contactReq.isPrimary()));
+            // giữ verified như cũ, đừng tự set true ở đây trừ khi BE cho phép
+        }
         candidateRepository.save(candidate);
         return candidate;
     }

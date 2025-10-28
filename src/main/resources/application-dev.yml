@@ -49,6 +49,10 @@ spring:
         min-idle: 0
         max-wait: -1ms
       shutdown-timeout: 100ms
+  servlet:
+    multipart:
+      max-file-size: 5MB        # Giới hạn cho mỗi file
+      max-request-size: 10MB
 
 integration:  # When deploy -> Update into application.yml from docker-compose
   minio:

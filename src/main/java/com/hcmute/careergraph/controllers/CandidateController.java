@@ -5,6 +5,7 @@ import com.hcmute.careergraph.helper.RestResponse;
 import com.hcmute.careergraph.helper.SecurityUtils;
 import com.hcmute.careergraph.mapper.CandidateMapper;
 import com.hcmute.careergraph.persistence.dtos.request.CandidateRequest;
+import com.hcmute.careergraph.persistence.dtos.response.CandidateClientResponse;
 import com.hcmute.careergraph.persistence.dtos.response.CandidateResponse;
 import com.hcmute.careergraph.persistence.models.Candidate;
 import com.hcmute.careergraph.services.CandidateService;
@@ -52,21 +53,32 @@ public class CandidateController {
     }
 
     @GetMapping("/me")
-    public RestResponse<CandidateResponse> getMyProfile() throws ChangeSetPersister.NotFoundException {
+    public RestResponse<CandidateClientResponse.CandidateProfileResponse> getMyProfile() throws ChangeSetPersister.NotFoundException {
         Candidate candidate = candidateService.getMyProfile(securityUtils.getCandidateId().get());
 
-        return RestResponse.<CandidateResponse>builder()
+        return RestResponse.<CandidateClientResponse.CandidateProfileResponse>builder()
                 .status(HttpStatus.OK)
-                .data(candidateMapper.toResponse(candidate))
+                .data(candidateMapper.toProfileResponse(candidate))
                 .build();
     }
     @PostMapping("/update-information")
-    public RestResponse<CandidateResponse> updateInformation(@Valid @RequestBody CandidateRequest.UpdateInformation request) throws ChangeSetPersister.NotFoundException{
+    public RestResponse<CandidateClientResponse.CandidateProfileResponse> updateInformation(@Valid @RequestBody CandidateRequest.UpdateInformationRequest request) throws ChangeSetPersister.NotFoundException{
         Candidate candidate = candidateService.updateInformation(securityUtils.getCandidateId().get(), request);
 
-        return RestResponse.<CandidateResponse>builder()
+        return RestResponse.<CandidateClientResponse.CandidateProfileResponse>builder()
                 .status(HttpStatus.OK)
-                .data(candidateMapper.toResponse(candidate))
+                .data(candidateMapper.toProfileResponse(candidate))
+                .build();
+    }
+
+
+    @PostMapping("/update-job-criteria")
+    public RestResponse<CandidateClientResponse.CandidateProfileResponse> updateJobCriteria(@Valid @RequestBody CandidateRequest.UpdateInformationRequest request) throws ChangeSetPersister.NotFoundException{
+        Candidate candidate = candidateService.updateJobCriteria(securityUtils.getCandidateId().get(), request);
+
+        return RestResponse.<CandidateClientResponse.CandidateProfileResponse>builder()
+                .status(HttpStatus.OK)
+                .data(candidateMapper.toProfileResponse(candidate))
                 .build();
     }
 }
