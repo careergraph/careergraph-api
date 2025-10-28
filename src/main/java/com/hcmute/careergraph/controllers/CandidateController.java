@@ -54,8 +54,8 @@ public class CandidateController {
     }
 
     @GetMapping("/me")
-    public RestResponse<CandidateClientResponse.CandidateProfileResponse> getMyProfile() throws ChangeSetPersister.NotFoundException {
-        Candidate candidate = candidateService.getMyProfile(securityUtils.getCandidateId().get());
+    public RestResponse<CandidateClientResponse.CandidateProfileResponse> getMyProfile(Authentication authentication) throws ChangeSetPersister.NotFoundException {
+        Candidate candidate = candidateService.getMyProfile(securityUtils.extractCandidateId(authentication));
 
         return RestResponse.<CandidateClientResponse.CandidateProfileResponse>builder()
                 .status(HttpStatus.OK)
@@ -74,8 +74,11 @@ public class CandidateController {
 
 
     @PostMapping("/update-job-criteria")
-    public RestResponse<CandidateClientResponse.CandidateProfileResponse> updateJobCriteria(@Valid @RequestBody CandidateRequest.UpdateInformationRequest request) throws ChangeSetPersister.NotFoundException{
-        Candidate candidate = candidateService.updateJobCriteria(securityUtils.getCandidateId().get(), request);
+    public RestResponse<CandidateClientResponse.CandidateProfileResponse> updateJobCriteria(
+            @Valid @RequestBody CandidateRequest.UpdateInformationRequest request,
+            Authentication authentication) throws ChangeSetPersister.NotFoundException{
+        Candidate candidate = candidateService
+                .updateJobCriteria(securityUtils.extractCandidateId(authentication), request);
 
         return RestResponse.<CandidateClientResponse.CandidateProfileResponse>builder()
                 .status(HttpStatus.OK)
