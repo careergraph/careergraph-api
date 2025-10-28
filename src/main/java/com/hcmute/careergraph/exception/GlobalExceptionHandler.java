@@ -7,6 +7,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.ExceptionHandler;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
 
 import java.nio.file.AccessDeniedException;
 
@@ -44,6 +45,16 @@ public class GlobalExceptionHandler {
                 .body(RestResponse.builder()
                         .status(HttpStatus.UNAUTHORIZED)
                         .message(exception.getMessage())
+                        .build());
+    }
+
+    @ExceptionHandler(MaxUploadSizeExceededException.class)
+    public ResponseEntity<RestResponse<String>> handleMaxSizeException(MaxUploadSizeExceededException ex) {
+        return ResponseEntity
+                .status(HttpStatus.PAYLOAD_TOO_LARGE)
+                .body(RestResponse.<String>builder()
+                        .status(HttpStatus.PAYLOAD_TOO_LARGE)
+                        .message("Kích thước file vượt quá giới hạn cho phép (tối đa 5MB)")
                         .build());
     }
 }

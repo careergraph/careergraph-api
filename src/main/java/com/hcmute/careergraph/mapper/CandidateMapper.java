@@ -1,10 +1,17 @@
 package com.hcmute.careergraph.mapper;
 
+import com.hcmute.careergraph.enums.candidate.AddressType;
+import com.hcmute.careergraph.enums.candidate.ContactType;
+import com.hcmute.careergraph.persistence.dtos.response.CandidateClientResponse;
 import com.hcmute.careergraph.persistence.dtos.response.CandidateResponse;
+import com.hcmute.careergraph.persistence.models.Address;
 import com.hcmute.careergraph.persistence.models.Candidate;
+import com.hcmute.careergraph.persistence.models.Contact;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
+import java.util.Optional;
+import java.util.Set;
 
 @Component
 public class CandidateMapper {
@@ -43,5 +50,166 @@ public class CandidateMapper {
             return null;
         }
         return resumes.get(0);
+    }
+
+
+
+    public CandidateClientResponse.CandidateProfileResponse toProfileResponse(Candidate candidate) {
+        if (candidate == null) {
+            return null;
+        }
+        // ----- lấy email -----
+        // Ưu tiên từ Account nếu có, fallback qua Contact type EMAIL primary (nếu bạn muốn)
+        String email = null;
+        if (candidate.getAccount() != null && candidate.getAccount().getEmail() != null) {
+            email = candidate.getAccount().getEmail();
+        } else {
+            email = findPrimaryEmail(candidate).orElse(null);
+        }
+
+        // ----- contact chính (ví dụ số điện thoại) -----
+        CandidateClientResponse.ContactDTO primaryContactDto = findPrimaryPhone(candidate)
+                .map(this::mapContactToDTO)
+                .orElse(null);
+
+        // ----- địa chỉ chính (HOME_ADDRESS hoặc isPrimary == true) -----
+        CandidateClientResponse.AddressDTO primaryAddressDto = findPrimaryAddress(candidate)
+                .map(this::mapAddressToDTO)
+                .orElse(null);
+
+        return CandidateClientResponse.CandidateProfileResponse.builder()
+                .candidateId(candidate.getId())                 // giả sử Party/Candidate có getId()
+                .firstName(candidate.getFirstName())
+                .lastName(candidate.getLastName())
+                .email(email)
+                .gender(candidate.getGender())
+                .dateOfBirth(candidate.getDateOfBirth())
+                .isMarried(candidate.getIsMarried())
+                .primaryContact(primaryContactDto)
+                .primaryAddress(primaryAddressDto)
+                .build();
+    }
+
+    // -------------------------------
+    // Helpers
+    // -------------------------------
+
+    /**
+     * Ưu tiên contact type PHONE và isPrimary = true.
+     * Nếu có nhiều, chọn verified=true trước. Nếu vẫn nhiều, lấy thằng tạo sớm nhất/ bất kỳ.
+     */
+    private Optional<Contact> findPrimaryPhone(Candidate candidate) {
+        Set<Contact> contacts = getContactsSafe(candidate);
+
+        return contacts.stream()
+                .filter(c -> c.getType() == ContactType.PHONE) // enum ContactType.PHONE
+                .sorted((a, b) -> {
+                    // sort để ưu tiên primary trước, verified trước
+                    int primaryCompare = boolDesc(a.getIsPrimary()).compareTo(boolDesc(b.getIsPrimary()));
+                    if (primaryCompare != 0) return primaryCompare;
+
+                    int verifiedCompare = boolDesc(a.getVerified()).compareTo(boolDesc(b.getVerified()));
+                    if (verifiedCompare != 0) return verifiedCompare;
+
+                    // fallback: có thể so sánh createdAt nếu BaseEntity có trường đó
+                    // hoặc cứ return 0
+                    return 0;
+                })
+                .findFirst();
+    }
+
+    /**
+     * Nếu bạn muốn fallback email qua Contact type EMAIL.
+     */
+    private Optional<String> findPrimaryEmail(Candidate candidate) {
+        Set<Contact> contacts = getContactsSafe(candidate);
+
+        return contacts.stream()
+                .filter(c -> c.getType() == ContactType.EMAIL)
+                .sorted((a, b) -> {
+                    int primaryCompare = boolDesc(a.getIsPrimary()).compareTo(boolDesc(b.getIsPrimary()));
+                    if (primaryCompare != 0) return primaryCompare;
+
+                    int verifiedCompare = boolDesc(a.getVerified()).compareTo(boolDesc(b.getVerified()));
+                    if (verifiedCompare != 0) return verifiedCompare;
+
+                    return 0;
+                })
+                .map(Contact::getValue)
+                .findFirst();
+    }
+
+    /**
+     * Ưu tiên:
+     * - Address.name == HOME_ADDRESS
+     * - nếu không có, thì address.isPrimary == true
+     * - nếu vẫn nhiều, lấy cái đầu.
+     */
+    private Optional<Address> findPrimaryAddress(Candidate candidate) {
+        Set<Address> addresses = getAddressesSafe(candidate);
+
+        // 1. tìm HOME_ADDRESS trước
+        Optional<Address> homeAddress = addresses.stream()
+                .filter(a -> AddressType.HOME_ADDRESS.name().equalsIgnoreCase(a.getName()))
+                .findFirst();
+        if (homeAddress.isPresent()) return homeAddress;
+
+        // 2. fallback: isPrimary == true
+        Optional<Address> primaryAddr = addresses.stream()
+                .filter(a -> Boolean.TRUE.equals(a.getIsPrimary()))
+                .findFirst();
+        if (primaryAddr.isPresent()) return primaryAddr;
+
+        // 3. fallback: first whatever
+        return addresses.stream().findFirst();
+    }
+
+    private CandidateClientResponse.ContactDTO mapContactToDTO(Contact contact) {
+        if (contact == null) return null;
+        return CandidateClientResponse.ContactDTO.builder()
+                .type(contact.getType() != null ? contact.getType().name() : null)
+                .value(contact.getValue())
+                .verified(contact.getVerified())
+                .isPrimary(contact.getIsPrimary())
+                .build();
+    }
+
+    private CandidateClientResponse.AddressDTO mapAddressToDTO(Address address) {
+        if (address == null) return null;
+        return CandidateClientResponse.AddressDTO.builder()
+                .country(address.getCountry())
+                .province(address.getProvince())
+                .district(address.getDistrict())
+                .ward(address.getWard())
+                .isPrimary(address.getIsPrimary())
+                .build();
+    }
+
+    // -------------------------------
+    // Small utils
+    // -------------------------------
+
+    // Lấy contacts từ Candidate -> Party
+    private Set<Contact> getContactsSafe(Candidate candidate) {
+        // giả định Candidate kế thừa Party nên có getContacts()
+        // nếu Party là lớp cha với field contacts thì gọi candidate.getContacts()
+        // nếu tên khác thì đổi ở đây
+        if (candidate.getContacts() == null) {
+            return Set.of();
+        }
+        return candidate.getContacts();
+    }
+
+    private Set<Address> getAddressesSafe(Candidate candidate) {
+        if (candidate.getAddresses() == null) {
+            return Set.of();
+        }
+        return candidate.getAddresses();
+    }
+
+    // sort helper: true > false
+    private Integer boolDesc(Boolean b) {
+        // true -> 1, false/null -> 0
+        return Boolean.TRUE.equals(b) ? 1 : 0;
     }
 }

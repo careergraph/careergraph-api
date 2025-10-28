@@ -14,5 +14,9 @@ public interface CandidateService {
 
     Candidate getMyProfile(String candidateId) throws ChangeSetPersister.NotFoundException;
 
-    Candidate updateInformation (String candidateId, CandidateRequest.UpdateInformation candidateRequest) throws ChangeSetPersister.NotFoundException;
+    Candidate updateInformation (String candidateId, CandidateRequest.UpdateInformationRequest candidateRequest) throws ChangeSetPersister.NotFoundException;
+
+    Candidate updateJobCriteria (String candidateId, CandidateRequest.UpdateInformationRequest candidateRequest) throws ChangeSetPersister.NotFoundException;
+
+
 }
