@@ -19,7 +19,6 @@ import java.util.HashMap;
 import java.util.List;
 
 @Service
-@Transactional
 @RequiredArgsConstructor
 @Slf4j
 public class JobServiceImpl implements JobService {
