@@ -1,9 +1,11 @@
 package com.hcmute.careergraph.controllers;
 
+import com.hcmute.careergraph.exception.BadRequestException;
 import com.hcmute.careergraph.helper.RestResponse;
 import com.hcmute.careergraph.helper.SecurityUtils;
 import com.hcmute.careergraph.mapper.JobMapper;
 import com.hcmute.careergraph.persistence.dtos.request.JobCreationRequest;
+import com.hcmute.careergraph.persistence.dtos.request.JobFilterRequest;
 import com.hcmute.careergraph.persistence.dtos.response.JobResponse;
 import com.hcmute.careergraph.persistence.models.Job;
 import com.hcmute.careergraph.services.JobService;
@@ -20,6 +22,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("jobs")
@@ -321,6 +324,72 @@ public class JobController {
                 .status(HttpStatus.OK)
                 .message("Jobs retrieved successfully")
                 .data(null) // TODO: Replace with actual data
+                .build();
+    }
+
+    /**
+     * GET /api/v1/jobs/lookup
+     * Lấy danh sách jobs được theo query truyền vào
+     * Lấy dựa trên company ID
+     *
+     * @param authentication Authentication để lấy candidate info
+     * @param query Query truyền vào để truy vấn
+     * @return RestResponse<Map<String, String>>
+     */
+    @GetMapping("/lookup")
+    public RestResponse<Map<String, String>> lookup(@RequestParam(required = false) String query,
+                                                    Authentication authentication) {
+        log.info("GET /api/v1/jobs/lookup - Fetching lookup jobs");
+
+        String companyId = securityUtils.extractCompanyId(authentication);
+        if (companyId == null) {
+            throw new BadRequestException("Company ID is not null");
+        }
+
+        Map<String, String> jobs = jobService.lookup(companyId, query);
+
+        return RestResponse.<Map<String, String>>builder()
+                .status(HttpStatus.OK)
+                .message("Jobs retrieved successfully")
+                .data(jobs)
+                .build();
+    }
+
+    /**
+     * POST /api/v1/jobs/search
+     * Lấy danh sách jobs được theo query truyền vào và filter
+     * Lấy dựa trên company ID
+     *
+     * @param authentication Authentication để lấy candidate info
+     * @param query Query truyền vào để truy vấn
+     * @return RestResponse<Page<JobResponse>>
+     */
+    @PostMapping("/search")
+    public RestResponse<Page<JobResponse>> search(
+            @RequestBody JobFilterRequest filter,
+            @RequestParam(name = "page", defaultValue = "0") Integer page,
+            @RequestParam(name = "size", defaultValue = "10") Integer size,
+            @RequestParam(required = false) String query,
+            Authentication authentication) {
+        log.info("POST /api/v1/jobs/search - Fetching lookup jobs");
+
+        String companyId = securityUtils.extractCompanyId(authentication);
+        if (companyId == null) {
+            throw new BadRequestException("Company ID is not null");
+        }
+
+        Pageable pageable = PageRequest.of(page, size);
+
+        Page<Job> jobPage = jobService.search(filter, companyId, query, pageable);
+        List<JobResponse> jobResponses = jobPage.stream()
+                .map(job -> jobMapper.toResponse(job))
+                .toList();
+        Page<JobResponse> result = new PageImpl<>(jobResponses, pageable, jobPage.getSize());
+
+        return RestResponse.<Page<JobResponse>>builder()
+                .status(HttpStatus.OK)
+                .message("Jobs retrieved successfully")
+                .data(result)
                 .build();
     }
 }

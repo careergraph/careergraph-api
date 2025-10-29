@@ -1,10 +1,10 @@
 package com.hcmute.careergraph.persistence.dtos.response;
 
 import com.hcmute.careergraph.enums.common.Status;
-import com.hcmute.careergraph.enums.work.EducationType;
-import com.hcmute.careergraph.enums.work.EmploymentType;
-import com.hcmute.careergraph.enums.work.ExperienceLevel;
-import com.hcmute.careergraph.enums.work.JobCategory;
+import com.hcmute.careergraph.enums.job.EducationType;
+import com.hcmute.careergraph.enums.job.EmploymentType;
+import com.hcmute.careergraph.enums.job.ExperienceLevel;
+import com.hcmute.careergraph.enums.job.JobCategory;
 import lombok.Builder;
 
 import java.util.List;
