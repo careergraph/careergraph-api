@@ -172,6 +172,32 @@ public class JobController {
     }
 
     /**
+     * PUT /api/v1/jobs/{id}/publish
+     * Cập nhật job from DRAFT to ACTIVE
+     *
+     * @param id Job ID
+     * @param authentication Authentication để lấy company ID
+     * @return RestResponse<JobResponse>
+     */
+    @PutMapping("/{id}/publish")
+    public RestResponse<JobResponse> publishJob(
+            @PathVariable String id,
+            Authentication authentication
+    ) {
+        log.info("PUT /api/v1/jobs/{} - Updating job", id);
+
+        String companyId = securityUtils.extractCompanyId(authentication);
+
+        Job job = jobService.publishJob(id, companyId);
+
+        return RestResponse.<JobResponse>builder()
+                .status(HttpStatus.OK)
+                .message("Job publish successfully")
+                .data(jobMapper.toResponse(job))
+                .build();
+    }
+
+    /**
      * DELETE /api/v1/jobs/{id}
      * Xóa job (soft delete)
      *

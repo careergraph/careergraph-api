@@ -22,6 +22,7 @@ public class CompanyMapper {
 
         return CompanyResponse.builder()
                 .companyId(company.getId())
+                .name(company.getName())
                 .tagname(company.getTagname())
                 .avatar(company.getAvatar())
                 .cover(company.getCover())

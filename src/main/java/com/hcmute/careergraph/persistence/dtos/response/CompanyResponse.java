@@ -8,6 +8,7 @@ import java.util.Set;
 public record CompanyResponse(
         String companyId,
         String tagname,
+        String name,
         String avatar,
         String cover,
         int noOfFollowers,

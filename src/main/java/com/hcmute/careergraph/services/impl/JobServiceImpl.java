@@ -1,6 +1,8 @@
 package com.hcmute.careergraph.services.impl;
 
 import com.hcmute.careergraph.enums.common.Status;
+import com.hcmute.careergraph.exception.BadRequestException;
+import com.hcmute.careergraph.exception.NotFoundException;
 import com.hcmute.careergraph.mapper.JobMapper;
 import com.hcmute.careergraph.persistence.dtos.request.JobCreationRequest;
 import com.hcmute.careergraph.persistence.models.Company;
@@ -17,6 +19,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.HashMap;
 import java.util.List;
+import java.util.Optional;
 
 @Service
 @RequiredArgsConstructor
@@ -103,6 +106,33 @@ public class JobServiceImpl implements JobService {
     public Job updateJob(String jobId, JobCreationRequest request, String companyId) {
         // TODO: Implement update logic
         throw new UnsupportedOperationException("Update job not implemented yet");
+    }
+
+    /**
+     * Publish job
+     *
+     * @param jobId: ID of job
+     * @param companyId: ID of company
+     * @return Job entity
+     */
+    @Override
+    public Job publishJob(String jobId, String companyId) {
+        log.info("Publish job with ID: {}", jobId);
+
+        if (jobId == null || companyId == null) {
+            throw new BadRequestException("JobID or CompanyID is not null");
+        }
+
+        Optional<Job> job = jobRepository.findByIdAndCompanyId(jobId, companyId);
+        if (job.isEmpty()) {
+            throw new NotFoundException("Job not found with ID: " + jobId);
+        }
+
+        // Update job
+        job.get().setStatus(Status.ACTIVE);
+        jobRepository.save(job.get());
+
+        return job.get();
     }
 
     /**

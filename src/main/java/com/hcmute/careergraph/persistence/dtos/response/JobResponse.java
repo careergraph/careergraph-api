@@ -67,10 +67,7 @@ public record JobResponse(
 
         // Mapping field 'type' cho UI (UI dùng 'type' thay vì 'employmentType')
         // Sẽ được set = employmentType trong mapper
-        EmploymentType type,
-
-        // UI dùng 'jobFunction' - Map từ jobCategory
-        JobCategory jobFunction
+        EmploymentType type
 ) {
     /**
      * Nested DTO cho Skill lookup
