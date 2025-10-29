@@ -1,10 +1,13 @@
 package com.hcmute.careergraph.services.impl;
 
 import com.hcmute.careergraph.enums.common.Status;
+import com.hcmute.careergraph.enums.job.EmploymentType;
+import com.hcmute.careergraph.enums.job.JobCategory;
 import com.hcmute.careergraph.exception.BadRequestException;
 import com.hcmute.careergraph.exception.NotFoundException;
 import com.hcmute.careergraph.mapper.JobMapper;
 import com.hcmute.careergraph.persistence.dtos.request.JobCreationRequest;
+import com.hcmute.careergraph.persistence.dtos.request.JobFilterRequest;
 import com.hcmute.careergraph.persistence.models.Company;
 import com.hcmute.careergraph.persistence.models.Job;
 import com.hcmute.careergraph.repositories.CompanyRepository;
@@ -19,6 +22,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 @Service
@@ -176,5 +180,49 @@ public class JobServiceImpl implements JobService {
     @Override
     public List<Job> getJobsPersonalized(String userId) {
         return List.of();
+    }
+
+    /**
+     * Hàm lấy ra job theo query và company ID
+     *
+     * @param query Dữ liệu tìm kiếm
+     * @param companyId ID của company
+     * @return Map<ID, Job>
+     */
+    @Override
+    public Map<String, String> lookup(String companyId, String query) {
+
+        Map<String, String> jobs = jobRepository.lookup(companyId, query);
+
+        if (jobs == null) {
+            return Map.of();
+        }
+
+        return jobs;
+    }
+
+    /**
+     * Hàm search job theo filter và company ID
+     *
+     * @param filter Dữ liệu tìm kiếm
+     * @param query Data tim kiem
+     * @param companyId ID của company
+     * @return Map<ID, Job>
+     */
+    @Override
+    public Page<Job> search(JobFilterRequest filter, String companyId, String query, Pageable pageable) {
+
+        // Get params from filter
+
+        List<Status> statuses = filter.getStatuses();
+        List<JobCategory> jobCategories = filter.getJobCategories();
+        List<EmploymentType> employmentTypes = filter.getEmploymentTypes();
+
+        // Extract search query
+        String searchQuery = (query != null && !query.trim().isEmpty()) ? "%" + query + "%" : "";
+
+        Page<Job> jobs = jobRepository.search(companyId, statuses, jobCategories, employmentTypes, query, pageable);
+
+        return jobs;
     }
 }
