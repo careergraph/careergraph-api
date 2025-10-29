@@ -151,4 +151,9 @@ public class CandidateServiceImpl implements CandidateService {
         candidateRepository.save(candidate);
         return candidate;
     }
+
+    @Override
+    public Candidate updateJobCriteria(String candidateId, CandidateRequest.UpdateInformationRequest candidateRequest) throws ChangeSetPersister.NotFoundException {
+        return null;
+    }
 }

@@ -172,6 +172,7 @@ public class Job extends BaseEntity {
     @Override
     public void prePersist() {
         super.prePersist();
+        super.setStatus(Status.DRAFT);
 
         if (postedDate == null) {
             postedDate = LocalDate.now().toString();

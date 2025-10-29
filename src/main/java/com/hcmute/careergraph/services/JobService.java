@@ -20,6 +20,8 @@ public interface JobService {
 
     Job updateJob(String jobId, JobCreationRequest request, String companyId);
 
+    Job publishJob(String jobId, String companyId);
+
     void deleteJob(String jobId, String companyId);
 
     void activateJob(String jobId, String companyId);
