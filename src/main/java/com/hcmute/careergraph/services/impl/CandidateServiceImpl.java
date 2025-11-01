@@ -62,7 +62,7 @@ public class CandidateServiceImpl implements CandidateService {
         }
         candidateRepository.save(candidate);
 
-        return objectName;
+        return minioService.getFileUrl(objectName);
     }
 
     @Override
@@ -107,13 +107,15 @@ public class CandidateServiceImpl implements CandidateService {
 
         Set<Address> addresses = candidate.getAddresses();
         Address homeAddress = addresses.stream()
-                .filter(a -> AddressType.HOME_ADDRESS.name().equals(a.getName()))
+                .filter(a -> a != null && a.getAddressType() != null)
+                .filter(a -> AddressType.HOME_ADDRESS.name().equals(a.getAddressType().name()))
                 .findFirst()
                 .orElse(null);
 
         if(homeAddress == null){
             homeAddress = new Address();
             homeAddress.setName(AddressType.HOME_ADDRESS.name());
+            homeAddress.setAddressType(AddressType.HOME_ADDRESS);
             homeAddress.setParty(candidate);
             addresses.add(homeAddress);
         }
@@ -133,14 +135,14 @@ public class CandidateServiceImpl implements CandidateService {
         CandidateRequest.ContactDTO contactReq = candidateRequest.contact();
         if (contactReq != null && "PHONE".equalsIgnoreCase(contactReq.type())) {
             Contact primaryPhone = contacts.stream()
-                    .filter(c -> c.getType() == ContactType.PHONE && Boolean.TRUE.equals(c.getIsPrimary()))
+                    .filter(c -> c.getContactType() == ContactType.PHONE && Boolean.TRUE.equals(c.getIsPrimary()))
                     .findFirst()
                     .orElse(null);
 
             if (primaryPhone == null) {
                 primaryPhone = new Contact();
                 primaryPhone.setParty(candidate);
-                primaryPhone.setType(ContactType.PHONE);
+                primaryPhone.setContactType(ContactType.PHONE);
                 contacts.add(primaryPhone);
             }
 
@@ -151,4 +153,31 @@ public class CandidateServiceImpl implements CandidateService {
         candidateRepository.save(candidate);
         return candidate;
     }
+
+    @Override
+    public Candidate updateJobFindCriteriaInfo(String candidateId, CandidateRequest.UpdateJobCriteriaRequest candidateRequest) throws ChangeSetPersister.NotFoundException {
+
+        Candidate candidate = candidateRepository.findById(candidateId)
+                .orElseThrow(ChangeSetPersister.NotFoundException::new);
+
+        candidate.setDesiredPosition(candidateRequest.desiredPosition());
+        candidate.setIndustries(candidateRequest.industries());
+        candidate.setWorkTypes(candidateRequest.workTypes());
+        candidate.setSalaryExpectationMin(candidateRequest.salaryExpectationMin());
+        candidate.setSalaryExpectationMax(candidateRequest.salaryExpectationMax());
+        candidate.setLocations(candidateRequest.locations());
+        return candidateRepository.save(candidate);
+    }
+
+    @Override
+    public Candidate updateGeneralInfo(String candidateId, CandidateRequest.UpdateGeneralInfo candidateRequest) throws ChangeSetPersister.NotFoundException {
+        Candidate candidate = candidateRepository.findById(candidateId)
+                .orElseThrow(ChangeSetPersister.NotFoundException::new);
+        candidate.setYearsOfExperience(candidateRequest.yearsOfExperience());
+        candidate.setEducationLevel(candidateRequest.educationLevel());
+        candidate.setCurrentPosition(candidate.getCurrentPosition());
+        return candidateRepository.save(candidate);
+    }
+
+
 }
