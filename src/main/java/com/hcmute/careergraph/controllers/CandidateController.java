@@ -54,12 +54,12 @@ public class CandidateController {
     }
 
     @GetMapping("/me")
-    public RestResponse<CandidateClientResponse.CandidateProfileResponse> getMyProfile(Authentication authentication) throws ChangeSetPersister.NotFoundException {
-        Candidate candidate = candidateService.getMyProfile(securityUtils.extractCandidateId(authentication));
+    public RestResponse<CandidateResponse> getMyProfile() throws ChangeSetPersister.NotFoundException {
+        Candidate candidate = candidateService.getMyProfile(securityUtils.getCandidateId().get());
 
-        return RestResponse.<CandidateClientResponse.CandidateProfileResponse>builder()
+        return RestResponse.<CandidateResponse>builder()
                 .status(HttpStatus.OK)
-                .data(candidateMapper.toProfileResponse(candidate))
+                .data(candidateMapper.toResponse(candidate))
                 .build();
     }
     @PostMapping("/update-information")
@@ -73,16 +73,34 @@ public class CandidateController {
     }
 
 
-    @PostMapping("/update-job-criteria")
-    public RestResponse<CandidateClientResponse.CandidateProfileResponse> updateJobCriteria(
-            @Valid @RequestBody CandidateRequest.UpdateInformationRequest request,
-            Authentication authentication) throws ChangeSetPersister.NotFoundException{
-        Candidate candidate = candidateService
-                .updateJobCriteria(securityUtils.extractCandidateId(authentication), request);
+    @PostMapping("/update-job-find-criteria")
+    public RestResponse<CandidateClientResponse.CandidateJobCriteriaResponse> updateJobFindCriteriaInfo(@Valid @RequestBody CandidateRequest.UpdateJobCriteriaRequest request) throws ChangeSetPersister.NotFoundException{
+        Candidate candidate = candidateService.updateJobFindCriteriaInfo(securityUtils.getCandidateId().get(), request);
 
-        return RestResponse.<CandidateClientResponse.CandidateProfileResponse>builder()
+        return RestResponse.<CandidateClientResponse.CandidateJobCriteriaResponse>builder()
                 .status(HttpStatus.OK)
-                .data(candidateMapper.toProfileResponse(candidate))
+                .data(candidateMapper.toJobCriteriaResponse(candidate))
+                .build();
+    }
+
+
+    @GetMapping("/general-info")
+    public RestResponse<CandidateClientResponse.GeneralInfoResponse> getGeneralInfo() throws ChangeSetPersister.NotFoundException{
+        Candidate candidate = candidateService.getMyProfile(securityUtils.getCandidateId().get());
+
+        return RestResponse.<CandidateClientResponse.GeneralInfoResponse>builder()
+                .status(HttpStatus.OK)
+                .data(candidateMapper.toGeneralInfoResponse(candidate))
+                .build();
+    }
+
+    @PostMapping("/update-general-info")
+    public RestResponse<CandidateResponse> getGeneralInfo(@Valid @RequestBody CandidateRequest.UpdateGeneralInfo request) throws ChangeSetPersister.NotFoundException{
+        Candidate candidate = candidateService.updateGeneralInfo(securityUtils.getCandidateId().get(), request);
+
+        return RestResponse.<CandidateResponse>builder()
+                .status(HttpStatus.OK)
+                .data(candidateMapper.toResponse(candidate))
                 .build();
     }
 }

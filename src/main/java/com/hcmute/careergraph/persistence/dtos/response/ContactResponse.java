@@ -9,7 +9,7 @@ public record ContactResponse(
         String value,
         Boolean verified,
         Boolean isPrimary,
-        ContactType type,
+        ContactType contactType,
         String partyId
 ) {
 }

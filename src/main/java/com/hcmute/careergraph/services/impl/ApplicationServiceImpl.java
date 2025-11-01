@@ -280,7 +280,7 @@ public class ApplicationServiceImpl implements ApplicationService {
         }
 
         return candidate.getContacts().stream()
-                .filter(contact -> contact.getType() == ContactType.EMAIL)
+                .filter(contact -> contact.getContactType() == ContactType.EMAIL)
                 .sorted(Comparator.comparing(contact -> Boolean.TRUE.equals(contact.getIsPrimary()) ? 0 : 1))
                 .map(Contact::getValue)
                 .filter(StringUtils::hasText)

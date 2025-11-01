@@ -2,6 +2,8 @@ package com.hcmute.careergraph.persistence.dtos.request;
 
 import lombok.Builder;
 
+import java.util.List;
+
 // CandidateRequest.java
 public final class CandidateRequest {
 
@@ -39,6 +41,26 @@ public final class CandidateRequest {
             String district,   // "Quận 1"
             String ward,       // "Phường Bến Nghé"
             Boolean isPrimary  // true nếu địa chỉ chính
+    ) {
+    }
+
+
+    @Builder
+    public record UpdateJobCriteriaRequest(
+            String desiredPosition,
+            List<String> industries,
+            List<String> locations,
+            Integer  salaryExpectationMin,
+            Integer  salaryExpectationMax,
+            List<String> workTypes
+    ) {
+    }
+
+    @Builder
+    public record UpdateGeneralInfo(
+            Integer yearsOfExperience,
+            String educationLevel,
+            String currentPosition
     ) {
     }
 }

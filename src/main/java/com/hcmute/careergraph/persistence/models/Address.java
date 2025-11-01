@@ -1,6 +1,7 @@
 package com.hcmute.careergraph.persistence.models;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.hcmute.careergraph.enums.candidate.AddressType;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -33,6 +34,10 @@ public class Address extends BaseEntity {
 
     @Column(name = "is_primary")
     private Boolean isPrimary;
+
+    @Column(name = "address_type")
+    @Enumerated(EnumType.STRING)
+    private AddressType  addressType;
 
     // Quan hệ với Party
     @ManyToOne(fetch = FetchType.LAZY)
