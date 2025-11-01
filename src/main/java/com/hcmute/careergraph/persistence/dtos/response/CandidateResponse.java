@@ -2,6 +2,7 @@ package com.hcmute.careergraph.persistence.dtos.response;
 
 import lombok.Builder;
 
+import java.util.List;
 import java.util.Set;
 
 @Builder
@@ -23,9 +24,17 @@ public record CandidateResponse(
         String tagname,
         String avatar,
         String cover,
+        String currentPosition,
+        String educationLevel,
         int noOfFollowers,
         int noOfFollowing,
         int noOfConnections,
+        String desiredPosition,
+        List<String> industries,
+        List<String> locations,
+        Integer salaryExpectationMin,
+        Integer salaryExpectationMax,
+        List<String> workTypes,
         Set<ContactResponse> contacts,
         Set<AddressResponse> addresses,
         Set<ConnectionResponse> connections,
@@ -42,5 +51,8 @@ public record CandidateResponse(
         experiences = experiences != null ? experiences : Set.of();
         skills = skills != null ? skills : Set.of();
         applications = applications != null ? applications : Set.of();
+        industries = industries != null ? industries: List.of();
+        locations = locations != null ? locations : List.of();
+        workTypes  = workTypes != null ? workTypes: List.of();
     }
 }

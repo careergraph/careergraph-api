@@ -2,6 +2,9 @@ package com.hcmute.careergraph.persistence.dtos.response;
 
 import lombok.Builder;
 
+import java.util.List;
+import java.util.Set;
+
 // CandidateResponse.java
 public final class CandidateClientResponse {
 
@@ -20,13 +23,11 @@ public final class CandidateClientResponse {
             Boolean isMarried,
 
             // Contact chính (ví dụ phone)
-            ContactDTO primaryContact,
+            Set<ContactResponse> contacts,
 
             // Địa chỉ chính
-            AddressDTO primaryAddress
+            Set<AddressResponse> addresses
 
-            // (Optional) avatarUrl nếu bạn muốn embed luôn
-            // String avatarUrl
     ) {}
 
     @Builder
@@ -45,4 +46,25 @@ public final class CandidateClientResponse {
             String ward,
             Boolean isPrimary
     ) {}
+
+    @Builder
+    public record CandidateJobCriteriaResponse(
+            // 1. Thông tin cơ bản của ứng viên
+            String desiredPosition,
+            List<String> industries,
+            List<String> locations,        // "MALE" | "FEMALE" | ...
+            Integer  salaryExpectationMin,
+            Integer  salaryExpectationMax,
+
+            List<String> workTypes
+    ) {
+    }
+
+    @Builder
+    public record GeneralInfoResponse(
+            Integer yearsOfExperience,
+            String educationLevel,
+            String currentPosition
+    ) {
+    }
 }
