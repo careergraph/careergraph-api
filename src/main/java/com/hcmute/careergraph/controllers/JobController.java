@@ -1,9 +1,11 @@
 package com.hcmute.careergraph.controllers;
 
+import com.hcmute.careergraph.exception.BadRequestException;
 import com.hcmute.careergraph.helper.RestResponse;
 import com.hcmute.careergraph.helper.SecurityUtils;
 import com.hcmute.careergraph.mapper.JobMapper;
 import com.hcmute.careergraph.persistence.dtos.request.JobCreationRequest;
+import com.hcmute.careergraph.persistence.dtos.request.JobFilterRequest;
 import com.hcmute.careergraph.persistence.dtos.response.JobResponse;
 import com.hcmute.careergraph.persistence.models.Job;
 import com.hcmute.careergraph.services.JobService;
@@ -16,11 +18,11 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.Authentication;
-import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("jobs")
@@ -48,7 +50,7 @@ public class JobController {
         log.info("POST /api/v1/jobs - Creating job: {}", request.title());
 
         // Extract company ID from authenticated user
-        String companyId = extractCompanyId(authentication);
+        String companyId = securityUtils.extractCompanyId(authentication);
 
         // Delegate to service
         Job job = jobService.createJob(request, companyId);
@@ -161,13 +163,39 @@ public class JobController {
     ) {
         log.info("PUT /api/v1/jobs/{} - Updating job", id);
 
-        String companyId = extractCompanyId(authentication);
+        String companyId = securityUtils.extractCompanyId(authentication);
 
         Job job = jobService.updateJob(id, request, companyId);
 
         return RestResponse.<JobResponse>builder()
                 .status(HttpStatus.OK)
                 .message("Job updated successfully")
+                .data(jobMapper.toResponse(job))
+                .build();
+    }
+
+    /**
+     * PUT /api/v1/jobs/{id}/publish
+     * Cập nhật job from DRAFT to ACTIVE
+     *
+     * @param id Job ID
+     * @param authentication Authentication để lấy company ID
+     * @return RestResponse<JobResponse>
+     */
+    @PutMapping("/{id}/publish")
+    public RestResponse<JobResponse> publishJob(
+            @PathVariable String id,
+            Authentication authentication
+    ) {
+        log.info("PUT /api/v1/jobs/{} - Updating job", id);
+
+        String companyId = securityUtils.extractCompanyId(authentication);
+
+        Job job = jobService.publishJob(id, companyId);
+
+        return RestResponse.<JobResponse>builder()
+                .status(HttpStatus.OK)
+                .message("Job publish successfully")
                 .data(jobMapper.toResponse(job))
                 .build();
     }
@@ -187,7 +215,7 @@ public class JobController {
     ) {
         log.info("DELETE /api/v1/jobs/{} - Deleting job", id);
 
-        String companyId = extractCompanyId(authentication);
+        String companyId = securityUtils.extractCompanyId(authentication);
 
         jobService.deleteJob(id, companyId);
 
@@ -212,7 +240,7 @@ public class JobController {
     ) {
         log.info("PATCH /api/v1/jobs/{}/activate - Activating job", id);
 
-        String companyId = extractCompanyId(authentication);
+        String companyId = securityUtils.extractCompanyId(authentication);
 
         jobService.activateJob(id, companyId);
 
@@ -237,7 +265,7 @@ public class JobController {
     ) {
         log.info("PATCH /api/v1/jobs/{}/deactivate - Deactivating job", id);
 
-        String companyId = extractCompanyId(authentication);
+        String companyId = securityUtils.extractCompanyId(authentication);
 
         // TODO: Cần thêm method deactivateJob trong JobService
         // jobService.deactivateJob(id, companyId);
@@ -300,36 +328,68 @@ public class JobController {
     }
 
     /**
-     * Helper method: Extract company ID từ Authentication
+     * GET /api/v1/jobs/lookup
+     * Lấy danh sách jobs được theo query truyền vào
+     * Lấy dựa trên company ID
      *
-     * @param authentication Spring Security Authentication
-     * @return Company ID
+     * @param authentication Authentication để lấy candidate info
+     * @param query Query truyền vào để truy vấn
+     * @return RestResponse<Map<String, String>>
      */
-    private String extractCompanyId(Authentication authentication) {
+    @GetMapping("/lookup")
+    public RestResponse<Map<String, String>> lookup(@RequestParam(required = false) String query,
+                                                    Authentication authentication) {
+        log.info("GET /api/v1/jobs/lookup - Fetching lookup jobs");
 
-        // Extract from JWT claims
-        JwtAuthenticationToken jwt = (JwtAuthenticationToken) authentication;
-        if (jwt != null) {
-            return jwt.getToken().getClaimAsString("companyId");
+        String companyId = securityUtils.extractCompanyId(authentication);
+        if (companyId == null) {
+            throw new BadRequestException("Company ID is not null");
         }
-        log.error("Not found jwt token");
-        return null;
+
+        Map<String, String> jobs = jobService.lookup(companyId, query);
+
+        return RestResponse.<Map<String, String>>builder()
+                .status(HttpStatus.OK)
+                .message("Jobs retrieved successfully")
+                .data(jobs)
+                .build();
     }
 
     /**
-     * Helper method: Extract candidate ID từ Authentication
-     * Dùng cho personalized jobs
+     * POST /api/v1/jobs/search
+     * Lấy danh sách jobs được theo query truyền vào và filter
+     * Lấy dựa trên company ID
      *
-     * @param authentication Spring Security Authentication
-     * @return Candidate ID
+     * @param authentication Authentication để lấy candidate info
+     * @param query Query truyền vào để truy vấn
+     * @return RestResponse<Page<JobResponse>>
      */
-    private String extractCandidateId(Authentication authentication) {
-        // Extract from JWT claims
-        JwtAuthenticationToken jwt = (JwtAuthenticationToken) authentication;
-        if (jwt != null) {
-            return jwt.getToken().getClaimAsString("candidateId");
+    @PostMapping("/search")
+    public RestResponse<Page<JobResponse>> search(
+            @RequestBody JobFilterRequest filter,
+            @RequestParam(name = "page", defaultValue = "0") Integer page,
+            @RequestParam(name = "size", defaultValue = "10") Integer size,
+            @RequestParam(required = false) String query,
+            Authentication authentication) {
+        log.info("POST /api/v1/jobs/search - Fetching lookup jobs");
+
+        String companyId = securityUtils.extractCompanyId(authentication);
+        if (companyId == null) {
+            throw new BadRequestException("Company ID is not null");
         }
-        log.error("Not found jwt token");
-        return null;
+
+        Pageable pageable = PageRequest.of(page, size);
+
+        Page<Job> jobPage = jobService.search(filter, companyId, query, pageable);
+        List<JobResponse> jobResponses = jobPage.stream()
+                .map(job -> jobMapper.toResponse(job))
+                .toList();
+        Page<JobResponse> result = new PageImpl<>(jobResponses, pageable, jobPage.getSize());
+
+        return RestResponse.<Page<JobResponse>>builder()
+                .status(HttpStatus.OK)
+                .message("Jobs retrieved successfully")
+                .data(result)
+                .build();
     }
 }

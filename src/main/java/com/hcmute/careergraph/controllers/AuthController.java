@@ -79,7 +79,6 @@ public class AuthController {
     @PostMapping("/login")
     public RestResponse<AuthResponses.OnlyTokenResponse> login(@Valid @RequestBody AuthRequests.LoginRequest request, HttpServletResponse resp) {
         var tokens = authService.login(request);
-        System.out.println("tokens: " + tokens);
         ResponseCookie cookie = ResponseCookie.from(REFRESH_COOKIE, tokens.getRefreshToken())
                 .httpOnly(true)
                 .secure(cookieSecure)
@@ -106,7 +105,6 @@ public class AuthController {
                 : authHeader;
         authService.logout(token);
 
-        System.out.println("token: " + token);
         ResponseCookie expiredCookie = ResponseCookie.from(REFRESH_COOKIE, "")
                 .httpOnly(true)
                 .secure(cookieSecure)
@@ -161,7 +159,6 @@ public class AuthController {
     @PostMapping("/refresh")
     public RestResponse<AuthResponses.OnlyTokenResponse> refresh(@CookieValue(name= REFRESH_COOKIE, required = false) String refreshCookie,
                                    HttpServletRequest request, HttpServletResponse response) {
-        System.out.println("vao refresh: " + refreshCookie);
         if(refreshCookie == null || refreshCookie.isBlank()) {
             return RestResponse.<AuthResponses.OnlyTokenResponse>builder()
                     .status(HttpStatus.UNAUTHORIZED)

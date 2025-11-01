@@ -13,6 +13,7 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.crossstore.ChangeSetPersister;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -71,16 +72,6 @@ public class CandidateController {
                 .build();
     }
 
-
-    @GetMapping("/job-find-criteria-info")
-    public RestResponse<CandidateClientResponse.CandidateJobCriteriaResponse> jobFindCriteriaInfo() throws ChangeSetPersister.NotFoundException{
-        Candidate candidate = candidateService.getMyProfile(securityUtils.getCandidateId().get());
-
-        return RestResponse.<CandidateClientResponse.CandidateJobCriteriaResponse>builder()
-                .status(HttpStatus.OK)
-                .data(candidateMapper.toJobCriteriaResponse(candidate))
-                .build();
-    }
 
     @PostMapping("/update-job-find-criteria")
     public RestResponse<CandidateClientResponse.CandidateJobCriteriaResponse> updateJobFindCriteriaInfo(@Valid @RequestBody CandidateRequest.UpdateJobCriteriaRequest request) throws ChangeSetPersister.NotFoundException{

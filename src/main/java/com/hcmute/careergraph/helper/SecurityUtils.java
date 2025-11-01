@@ -10,6 +10,7 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 import org.springframework.stereotype.Component;
 
 import java.util.Optional;
@@ -74,5 +75,37 @@ public class SecurityUtils {
       return getCurrentAccount()
               .map(Account::getCandidate)
               .map(c -> c.getId());
+   }
+
+   /**
+    * Helper method: Extract company ID từ Authentication
+    *
+    * @param authentication Spring Security Authentication
+    * @return Company ID
+    */
+   public String extractCompanyId(Authentication authentication) {
+
+      // Extract from JWT claims
+      JwtAuthenticationToken jwt = (JwtAuthenticationToken) authentication;
+      if (jwt != null) {
+         return jwt.getToken().getClaimAsString("companyId");
+      }
+      return null;
+   }
+
+   /**
+    * Helper method: Extract candidate ID từ Authentication
+    * Dùng cho personalized jobs
+    *
+    * @param authentication Spring Security Authentication
+    * @return Candidate ID
+    */
+   public String extractCandidateId(Authentication authentication) {
+      // Extract from JWT claims
+      JwtAuthenticationToken jwt = (JwtAuthenticationToken) authentication;
+      if (jwt != null) {
+         return jwt.getToken().getClaimAsString("candidateId");
+      }
+      return null;
    }
 }
