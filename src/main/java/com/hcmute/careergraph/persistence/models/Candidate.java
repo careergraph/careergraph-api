@@ -69,9 +69,10 @@ public class Candidate extends Party {
     @Column(name = "salary_expectation_max")
     private Integer salaryExpectationMax;
 
-    @Column(name = "resumes")
+    @Convert(converter = JsonUtils.StringListConverter.class)
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "resumes", columnDefinition = "TEXT")
     private List<String> resumes;
-
 
     @Column(name="education_level")
     private String educationLevel;
