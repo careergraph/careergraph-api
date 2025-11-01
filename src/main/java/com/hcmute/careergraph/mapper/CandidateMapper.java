@@ -7,6 +7,7 @@ import com.hcmute.careergraph.persistence.dtos.response.CandidateResponse;
 import com.hcmute.careergraph.persistence.models.Address;
 import com.hcmute.careergraph.persistence.models.Candidate;
 import com.hcmute.careergraph.persistence.models.Contact;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
@@ -15,6 +16,11 @@ import java.util.Set;
 
 @Component
 public class CandidateMapper {
+
+    @Autowired
+    private AddressMaper addressMaper;
+    @Autowired
+    private ContactMapper contactMapper;
 
     public CandidateResponse toResponse(Candidate candidate) {
         if (candidate == null) {
@@ -42,7 +48,30 @@ public class CandidateMapper {
                 .noOfFollowers(candidate.getNoOfFollowers())
                 .noOfFollowing(candidate.getNoOfFollowing())
                 .noOfConnections(candidate.getNoOfConnections())
+                .currentPosition(candidate.getCurrentPosition())
+                .yearsOfExperience(candidate.getYearsOfExperience())
+                .educationLevel(candidate.getEducationLevel())
+                .desiredPosition(candidate.getDesiredPosition())
+                .industries(
+                        candidate.getIndustries() != null
+                                ? candidate.getIndustries()
+                                : List.of())
+                .locations(
+                        candidate.getLocations() != null
+                                ? candidate.getLocations()
+                                : List.of())
+                .salaryExpectationMax(candidate.getSalaryExpectationMax())
+                .salaryExpectationMin(candidate.getSalaryExpectationMin())
+                .workTypes(
+                        candidate.getWorkTypes() != null
+                                ? candidate.getWorkTypes()
+                                : List.of()
+                )
+                .addresses(addressMaper.toResponses(candidate.getAddresses()))
+                .contacts(contactMapper.toResponses(candidate.getContacts()))
                 .build();
+
+
     }
 
     private String primaryResume(List<String> resumes) {
@@ -52,43 +81,45 @@ public class CandidateMapper {
         return resumes.get(0);
     }
 
-
-
-    public CandidateClientResponse.CandidateProfileResponse toProfileResponse(Candidate candidate) {
+    public CandidateClientResponse.CandidateJobCriteriaResponse toJobCriteriaResponse(Candidate candidate) {
         if (candidate == null) {
             return null;
         }
-        // ----- lấy email -----
-        // Ưu tiên từ Account nếu có, fallback qua Contact type EMAIL primary (nếu bạn muốn)
-        String email = null;
-        if (candidate.getAccount() != null && candidate.getAccount().getEmail() != null) {
-            email = candidate.getAccount().getEmail();
-        } else {
-            email = findPrimaryEmail(candidate).orElse(null);
-        }
-
-        // ----- contact chính (ví dụ số điện thoại) -----
-        CandidateClientResponse.ContactDTO primaryContactDto = findPrimaryPhone(candidate)
-                .map(this::mapContactToDTO)
-                .orElse(null);
-
-        // ----- địa chỉ chính (HOME_ADDRESS hoặc isPrimary == true) -----
-        CandidateClientResponse.AddressDTO primaryAddressDto = findPrimaryAddress(candidate)
-                .map(this::mapAddressToDTO)
-                .orElse(null);
-
-        return CandidateClientResponse.CandidateProfileResponse.builder()
-                .candidateId(candidate.getId())                 // giả sử Party/Candidate có getId()
-                .firstName(candidate.getFirstName())
-                .lastName(candidate.getLastName())
-                .email(email)
-                .gender(candidate.getGender())
-                .dateOfBirth(candidate.getDateOfBirth())
-                .isMarried(candidate.getIsMarried())
-                .primaryContact(primaryContactDto)
-                .primaryAddress(primaryAddressDto)
+        return CandidateClientResponse.CandidateJobCriteriaResponse.builder()
+                .desiredPosition(candidate.getDesiredPosition())
+                .industries(
+                        candidate.getIndustries() != null
+                        ? candidate.getIndustries()
+                        : List.of())
+                .locations(
+                        candidate.getLocations() != null
+                        ? candidate.getLocations()
+                        : List.of())
+                .salaryExpectationMax(candidate.getSalaryExpectationMax())
+                .salaryExpectationMin(candidate.getSalaryExpectationMin())
+                .workTypes(
+                        candidate.getWorkTypes() != null
+                                ? candidate.getWorkTypes()
+                                : List.of()
+                )
                 .build();
     }
+
+
+    public CandidateClientResponse.GeneralInfoResponse toGeneralInfoResponse(Candidate candidate) {
+        if (candidate == null) {
+            return null;
+        }
+        return CandidateClientResponse.GeneralInfoResponse.builder()
+                .currentPosition(candidate.getCurrentPosition())
+                .yearsOfExperience(candidate.getYearsOfExperience())
+                .educationLevel(candidate.getEducationLevel())
+                .build();
+    }
+
+
+
+
 
     // -------------------------------
     // Helpers
@@ -102,7 +133,7 @@ public class CandidateMapper {
         Set<Contact> contacts = getContactsSafe(candidate);
 
         return contacts.stream()
-                .filter(c -> c.getType() == ContactType.PHONE) // enum ContactType.PHONE
+                .filter(c -> c.getContactType() == ContactType.PHONE) // enum ContactType.PHONE
                 .sorted((a, b) -> {
                     // sort để ưu tiên primary trước, verified trước
                     int primaryCompare = boolDesc(a.getIsPrimary()).compareTo(boolDesc(b.getIsPrimary()));
@@ -125,7 +156,7 @@ public class CandidateMapper {
         Set<Contact> contacts = getContactsSafe(candidate);
 
         return contacts.stream()
-                .filter(c -> c.getType() == ContactType.EMAIL)
+                .filter(c -> c.getContactType() == ContactType.EMAIL)
                 .sorted((a, b) -> {
                     int primaryCompare = boolDesc(a.getIsPrimary()).compareTo(boolDesc(b.getIsPrimary()));
                     if (primaryCompare != 0) return primaryCompare;
@@ -167,7 +198,7 @@ public class CandidateMapper {
     private CandidateClientResponse.ContactDTO mapContactToDTO(Contact contact) {
         if (contact == null) return null;
         return CandidateClientResponse.ContactDTO.builder()
-                .type(contact.getType() != null ? contact.getType().name() : null)
+                .type(contact.getContactType() != null ? contact.getContactType().name() : null)
                 .value(contact.getValue())
                 .verified(contact.getVerified())
                 .isPrimary(contact.getIsPrimary())
@@ -211,5 +242,41 @@ public class CandidateMapper {
     private Integer boolDesc(Boolean b) {
         // true -> 1, false/null -> 0
         return Boolean.TRUE.equals(b) ? 1 : 0;
+    }
+
+    public CandidateClientResponse.CandidateProfileResponse toProfileResponse(Candidate candidate) {
+        if (candidate == null) {
+            return null;
+        }
+        // ----- lấy email -----
+        // Ưu tiên từ Account nếu có, fallback qua Contact type EMAIL primary (nếu bạn muốn)
+        String email = null;
+        if (candidate.getAccount() != null && candidate.getAccount().getEmail() != null) {
+            email = candidate.getAccount().getEmail();
+        } else {
+            email = findPrimaryEmail(candidate).orElse(null);
+        }
+
+        // ----- contact chính (ví dụ số điện thoại) -----
+        CandidateClientResponse.ContactDTO primaryContactDto = findPrimaryPhone(candidate)
+                .map(this::mapContactToDTO)
+                .orElse(null);
+
+        // ----- địa chỉ chính (HOME_ADDRESS hoặc isPrimary == true) -----
+        CandidateClientResponse.AddressDTO primaryAddressDto = findPrimaryAddress(candidate)
+                .map(this::mapAddressToDTO)
+                .orElse(null);
+
+        return CandidateClientResponse.CandidateProfileResponse.builder()
+                .candidateId(candidate.getId())                 // giả sử Party/Candidate có getId()
+                .firstName(candidate.getFirstName())
+                .lastName(candidate.getLastName())
+                .email(email)
+                .gender(candidate.getGender())
+                .dateOfBirth(candidate.getDateOfBirth())
+                .isMarried(candidate.getIsMarried())
+                .addresses(addressMaper.toResponses(candidate.getAddresses()))
+                .contacts(contactMapper.toResponses(candidate.getContacts()))
+                .build();
     }
 }

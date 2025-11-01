@@ -1,5 +1,6 @@
 package com.hcmute.careergraph.persistence.dtos.response;
 
+import com.hcmute.careergraph.enums.candidate.AddressType;
 import lombok.Builder;
 
 @Builder
@@ -11,6 +12,7 @@ public record AddressResponse(
         String district,
         String ward,
         Boolean isPrimary,
-        String partyId
+        String partyId,
+        AddressType addressType
 ) {
 }
