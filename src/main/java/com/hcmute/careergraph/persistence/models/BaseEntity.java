@@ -47,14 +47,10 @@ public abstract class BaseEntity {
 
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false, length = 20, columnDefinition = "varchar(20) default 'ACTIVE'")
-    @Builder.Default
-    private Status status = Status.ACTIVE;
+    private Status status;
 
     @PrePersist
     public void prePersist() {
-        if (this.status == null) {
-            this.status = Status.ACTIVE;
-        }
         if (this.createdDate == null) {
             this.createdDate = LocalDateTime.now();
         }

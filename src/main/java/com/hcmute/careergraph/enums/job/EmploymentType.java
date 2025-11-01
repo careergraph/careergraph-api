@@ -1,4 +1,4 @@
-package com.hcmute.careergraph.enums.work;
+package com.hcmute.careergraph.enums.job;
 
 public enum EmploymentType {
     FULL_TIME("Full-time"),

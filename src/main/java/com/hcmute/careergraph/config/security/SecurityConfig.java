@@ -16,6 +16,7 @@ public class SecurityConfig {
 
     private final String[] PUBLIC_ENDPOINTS = {
             "auth/**",
+            "jobs/**"
     };
 
     @Autowired
