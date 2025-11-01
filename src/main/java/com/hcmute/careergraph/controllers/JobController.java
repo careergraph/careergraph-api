@@ -337,7 +337,7 @@ public class JobController {
      * @param authentication Authentication để lấy candidate info
      * @return RestResponse<Page<JobResponse>>
      */
-    @GetMapping("/personalized")
+    @GetMapping("/category")
     public RestResponse<Page<JobResponse>> getJobsByCategory(
             @RequestParam(name = "category", defaultValue = "") JobCategory jobCategory,
             @RequestParam(name = "page", defaultValue = "0") Integer page,
