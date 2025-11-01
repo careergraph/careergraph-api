@@ -1,5 +1,6 @@
 package com.hcmute.careergraph.services;
 
+import com.hcmute.careergraph.enums.job.JobCategory;
 import com.hcmute.careergraph.persistence.dtos.request.JobCreationRequest;
 import com.hcmute.careergraph.persistence.dtos.request.JobFilterRequest;
 import com.hcmute.careergraph.persistence.models.Job;
@@ -18,6 +19,8 @@ public interface JobService {
 
     Page<Job> getJobsByCompany(String companyId, Pageable pageable);
 
+    Page<Job> getJobByCategory(JobCategory jobCategory, Pageable pageable);
+
     Page<Job> getAllJobs(Pageable pageable);
 
     Job updateJob(String jobId, JobCreationRequest request, String companyId);
@@ -29,8 +32,6 @@ public interface JobService {
     void activateJob(String jobId, String companyId);
 
     void deactivateJob(String jobId, String companyId);
-
-    List<HashMap<String, Object>> getJobCategories();
 
     List<Job> getJobsPersonalized(String userId);
 

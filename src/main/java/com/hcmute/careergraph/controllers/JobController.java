@@ -1,5 +1,6 @@
 package com.hcmute.careergraph.controllers;
 
+import com.hcmute.careergraph.enums.job.JobCategory;
 import com.hcmute.careergraph.exception.BadRequestException;
 import com.hcmute.careergraph.helper.RestResponse;
 import com.hcmute.careergraph.helper.SecurityUtils;
@@ -328,6 +329,34 @@ public class JobController {
     }
 
     /**
+     * GET /api/v1/jobs/category
+     * Lấy danh sách jobs theo category of all company
+     *
+     * @param page Page number
+     * @param size Page size
+     * @param authentication Authentication để lấy candidate info
+     * @return RestResponse<Page<JobResponse>>
+     */
+    @GetMapping("/personalized")
+    public RestResponse<Page<JobResponse>> getJobsByCategory(
+            @RequestParam(name = "category", defaultValue = "") JobCategory jobCategory,
+            @RequestParam(name = "page", defaultValue = "0") Integer page,
+            @RequestParam(name = "size", defaultValue = "10") Integer size,
+            Authentication authentication
+    ) {
+
+        Pageable pageable = PageRequest.of(page, size);
+
+        Page<Job> jobPage = jobService.getJobByCategory(jobCategory, pageable);
+
+        return RestResponse.<Page<JobResponse>>builder()
+                .status(HttpStatus.OK)
+                .message("Jobs retrieved successfully")
+                .data(mapToJobResponsePage(jobPage, pageable))
+                .build();
+    }
+
+    /**
      * GET /api/v1/jobs/lookup
      * Lấy danh sách jobs được theo query truyền vào
      * Lấy dựa trên company ID
@@ -381,15 +410,19 @@ public class JobController {
         Pageable pageable = PageRequest.of(page, size);
 
         Page<Job> jobPage = jobService.search(filter, companyId, query, pageable);
-        List<JobResponse> jobResponses = jobPage.stream()
-                .map(job -> jobMapper.toResponse(job))
-                .toList();
-        Page<JobResponse> result = new PageImpl<>(jobResponses, pageable, jobPage.getSize());
 
         return RestResponse.<Page<JobResponse>>builder()
                 .status(HttpStatus.OK)
                 .message("Jobs retrieved successfully")
-                .data(result)
+                .data(mapToJobResponsePage(jobPage, pageable))
                 .build();
+    }
+
+    // Helper method to map to response page
+    private Page<JobResponse> mapToJobResponsePage(Page<Job> jobPage, Pageable pageable) {
+        List<JobResponse> jobResponses = jobPage.stream()
+                .map(job -> jobMapper.toResponse(job))
+                .toList();
+        return new PageImpl<>(jobResponses, pageable, jobPage.getSize());
     }
 }

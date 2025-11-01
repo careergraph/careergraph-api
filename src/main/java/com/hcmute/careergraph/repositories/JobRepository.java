@@ -11,6 +11,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -21,6 +22,8 @@ public interface JobRepository extends JpaRepository<Job, String> {
     List<Job> findByCompanyId(String companyId);
 
     Page<Job> findByCompanyId(String companyId, Pageable pageable);
+
+    Page<Job> findByJobCategory(JobCategory jobCategory, Pageable pageable);
 
     @Query("""
         SELECT j.id, j.title
@@ -42,7 +45,10 @@ public interface JobRepository extends JpaRepository<Job, String> {
             AND (:statuses IS NULL OR j.status IN :statuses)
             AND (:categories IS NULL OR j.jobCategory IN :categories)
             AND (:types IS NULL OR j.employmentType IN :types)
-            AND (:query IS NULL OR j.title LIKE :query)
+            AND (
+                :query IS NULL OR
+                lower(j.title) LIKE lower(concat('%', :query, '%')) OR
+                lower(j.description) LIKE lower(concat('%', :query, '%')))
     """)
     Page<Job> search(
             @Param("companyId") String companyId,
@@ -52,5 +58,4 @@ public interface JobRepository extends JpaRepository<Job, String> {
             @Param("query") String query,
             Pageable pageable
     );
-
 }
