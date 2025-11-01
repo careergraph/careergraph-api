@@ -20,10 +20,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
+import java.util.*;
 
 @Service
 @RequiredArgsConstructor
@@ -40,7 +37,7 @@ public class JobServiceImpl implements JobService {
      * @param request JobCreationRequest từ client
      * @param companyId ID của công ty đăng job (lấy từ authenticated user)
      * @return JobResponse chứa thông tin job vừa tạo
-     * @throws IllegalArgumentException nếu company không tồn tại
+     * @throws NotFoundException nếu company không tồn tại
      */
     @Transactional
     @Override
@@ -49,7 +46,7 @@ public class JobServiceImpl implements JobService {
 
         // 1. Validate và lấy Company
         Company company = companyRepository.findById(companyId)
-                .orElseThrow(() -> new IllegalArgumentException("Company not found with ID: " + companyId));
+                .orElseThrow(() -> new NotFoundException("Company not found with ID: " + companyId));
 
         // 3. Map request -> entity
         Job job = jobMapper.toEntity(request, company);
@@ -94,6 +91,7 @@ public class JobServiceImpl implements JobService {
         return jobs;
     }
 
+    @Transactional(readOnly = true)
     @Override
     public Page<Job> getAllJobs(Pageable pageable) {
         log.info("Fetching all jobs");
@@ -162,21 +160,30 @@ public class JobServiceImpl implements JobService {
         log.info("Job deleted successfully with ID: {}", jobId);
     }
 
+    @Transactional
     @Override
     public void activateJob(String jobId, String companyId) {
 
     }
 
+    @Transactional
     @Override
     public void deactivateJob(String jobId, String companyId) {
 
     }
 
+    @Transactional(readOnly = true)
     @Override
-    public List<HashMap<String, Object>> getJobCategories() {
-        return List.of();
+    public Page<Job> getJobByCategory(JobCategory jobCategory, Pageable pageable) {
+
+        if (jobCategory == null) {
+            return Page.empty();
+        }
+
+        return jobRepository.findByJobCategory(jobCategory, pageable);
     }
 
+    @Transactional(readOnly = true)
     @Override
     public List<Job> getJobsPersonalized(String userId) {
         return List.of();
@@ -189,6 +196,7 @@ public class JobServiceImpl implements JobService {
      * @param companyId ID của company
      * @return Map<ID, Job>
      */
+    @Transactional(readOnly = true)
     @Override
     public Map<String, String> lookup(String companyId, String query) {
 
@@ -209,17 +217,14 @@ public class JobServiceImpl implements JobService {
      * @param companyId ID của company
      * @return Map<ID, Job>
      */
+    @Transactional(readOnly = true)
     @Override
     public Page<Job> search(JobFilterRequest filter, String companyId, String query, Pageable pageable) {
 
         // Get params from filter
-
         List<Status> statuses = filter.getStatuses();
         List<JobCategory> jobCategories = filter.getJobCategories();
         List<EmploymentType> employmentTypes = filter.getEmploymentTypes();
-
-        // Extract search query
-        String searchQuery = (query != null && !query.trim().isEmpty()) ? "%" + query + "%" : "";
 
         Page<Job> jobs = jobRepository.search(companyId, statuses, jobCategories, employmentTypes, query, pageable);
 
