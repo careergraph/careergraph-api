@@ -11,7 +11,11 @@ import org.springframework.http.HttpStatus;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+
+import java.util.HashMap;
+import java.util.List;
 
 @RestController
 @RequestMapping("company")
@@ -30,5 +34,14 @@ public class CompanyController {
                 .status(HttpStatus.OK)
                 .data(companyMapper.toResponse(company))
                 .build();
+    }
+
+    @GetMapping("/lookup")
+    public RestResponse<List<HashMap<String,String>>> lookup(@RequestParam(required = false)String query) {
+        return RestResponse.<List<HashMap<String, String>>>builder()
+                .status(HttpStatus.OK)
+                .data(companyService.lookup(query))
+                .build();
+
     }
 }
