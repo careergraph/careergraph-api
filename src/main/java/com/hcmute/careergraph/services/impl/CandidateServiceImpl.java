@@ -4,24 +4,21 @@ import com.hcmute.careergraph.enums.candidate.AddressType;
 import com.hcmute.careergraph.enums.candidate.ContactType;
 import com.hcmute.careergraph.enums.common.FileType;
 import com.hcmute.careergraph.helper.SecurityUtils;
-import com.hcmute.careergraph.helper.StringHelper;
 import com.hcmute.careergraph.persistence.dtos.request.CandidateRequest;
 import com.hcmute.careergraph.persistence.models.Address;
 import com.hcmute.careergraph.persistence.models.Candidate;
 import com.hcmute.careergraph.persistence.models.Contact;
 import com.hcmute.careergraph.repositories.CandidateRepository;
 import com.hcmute.careergraph.services.CandidateService;
-import com.hcmute.careergraph.services.MinioService;
+import com.hcmute.careergraph.services.S3StorageService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.logging.log4j.util.InternalException;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.crossstore.ChangeSetPersister;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
-import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
@@ -31,13 +28,10 @@ import java.util.Set;
 @Slf4j
 public class CandidateServiceImpl implements CandidateService {
 
-    private final MinioService minioService;
+    private final S3StorageService storageService;
 
     private final CandidateRepository candidateRepository;
     private final SecurityUtils securityUtils;
-
-    @Value("${integration.minio.bucket}")
-    private String bucketName;
 
     @Override
     public String updateResource(String candidateId, MultipartFile file, FileType fileType) {
@@ -49,20 +43,33 @@ public class CandidateServiceImpl implements CandidateService {
         if (!securityUtils.getCandidateId().get().equals(candidateId)) {
             throw new InternalException("You do not have permission to update this candidate");
         }
-
-        // Update minio
-        String objectName = StringHelper.buildObjectName(candidateId, fileType, file.getOriginalFilename());
-        minioService.uploadFile(objectName, file);
-
-        // Update DB
-        switch (fileType) {
-            case AVATAR -> candidate.setAvatar(objectName);
-            case COVER  -> candidate.setCover(objectName);
-            case RESUME -> candidate.setResumes(List.of(objectName));
+        S3StorageService.StoredFile storedFile;
+        try {
+            storedFile = storageService.uploadCandidateFile(candidateId, fileType, file);
+        } catch (Exception e) {
+            throw new InternalException("Unable to upload candidate resource");
         }
+
+        String objectKey = storedFile.key();
+
+        if (fileType == FileType.RESUME) {
+            List<String> resumes = candidate.getResumes();
+            if (resumes == null) {
+                resumes = new java.util.ArrayList<>();
+            }
+            resumes.add(objectKey);
+            candidate.setResumes(resumes);
+        }
+        if (fileType == FileType.AVATAR) {
+            candidate.setAvatar(objectKey);
+        }
+        if (fileType == FileType.COVER) {
+            candidate.setCover(objectKey);
+        }
+
         candidateRepository.save(candidate);
 
-        return minioService.getFileUrl(objectName);
+        return storedFile.url();
     }
 
     @Override
@@ -80,13 +87,19 @@ public class CandidateServiceImpl implements CandidateService {
         String objectKey = switch (fileType) {
             case AVATAR -> candidate.getAvatar();
             case COVER  -> candidate.getCover();
-            case RESUME -> candidate.getResumes().get(0);
+            case RESUME -> {
+                List<String> resumes = candidate.getResumes();
+                if (resumes == null || resumes.isEmpty()) {
+                    throw new ChangeSetPersister.NotFoundException();
+                }
+                yield resumes.getFirst();
+            }
         };
 
         if (objectKey == null)
             throw new ChangeSetPersister.NotFoundException();
 
-        return minioService.getFileUrl(objectKey);
+        return storageService.getFileUrl(objectKey);
     }
     @Override
     public Candidate getMyProfile(String candidateId) throws ChangeSetPersister.NotFoundException {
