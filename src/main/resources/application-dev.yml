@@ -1,8 +1,8 @@
 spring:
   datasource:
-    url: jdbc:postgresql://localhost:5432/careergraph
-    username: postgres
-    password: postgres
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/careergraph}
+    username: ${SPRING_DATASOURCE_USERNAME:postgres}
+    password: ${SPRING_DATASOURCE_PASSWORD:postgres}
     driver-class-name: org.postgresql.Driver
     hikari:
       maximum-pool-size: 20
@@ -25,11 +25,11 @@ spring:
       hibernate.jdbc.time_zone: UTC
 
   redis:
-    host: localhost
-    port: 6379
+    host: ${SPRING_REDIS_HOST:localhost}
+    port: ${SPRING_REDIS_PORT:6379}
     timeout: 2000ms
     database: 0
-    password:
+    password: ${SPRING_REDIS_PASSWORD:}
     lettuce:
       pool:
         max-active: 8
@@ -44,8 +44,8 @@ spring:
 
 integration:
   s3:
-    endpoint: ${INTEGRATION_S3_ENDPOINT:https://s3.us-east-005.backblazeb2.com}
-    accessKey: ${INTEGRATION_S3_ACCESS_KEY:0051ab9557af4e50000000001}
-    secretKey: ${INTEGRATION_S3_SECRET_KEY:K005MflAlezZQmpSPEev9LHpTYvN0vU}
-    bucket: ${INTEGRATION_S3_BUCKET:careergraph-files}
-    region: ${INTEGRATION_S3_REGION:us-east-005}
+    endpoint: ${INTEGRATION_S3_ENDPOINT:}
+    accessKey: ${INTEGRATION_S3_ACCESS_KEY:}
+    secretKey: ${INTEGRATION_S3_SECRET_KEY:}
+    bucket: ${INTEGRATION_S3_BUCKET:}
+    region: ${INTEGRATION_S3_REGION:}
