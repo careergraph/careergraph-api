@@ -1,0 +1,77 @@
+spring:
+  datasource:
+    url: jdbc:postgresql://ep-orange-block-adzbr3pn-pooler.c-2.us-east-1.aws.neon.tech:5432/careergraph?sslmode=require&channel_binding=require
+    username: neondb_owner
+    password: npg_9zips3WrwKxU
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      maximum-pool-size: 20
+      minimum-idle: 5
+      connection-timeout: 30000
+      idle-timeout: 600000  # 10m
+      max-lifetime: 1800000 # 30m
+      auto-commit: true
+      data-source-properties:
+        TimeZone: Asia/Ho_Chi_Minh
+
+  jpa:
+    database-platform: org.hibernate.dialect.PostgreSQLDialect
+    show-sql: false          # Không log SQL ở prod
+    hibernate:
+      ddl-auto: update
+      format_sql: false
+    properties:
+      hibernate.jdbc.time_zone: UTC
+
+  redis:
+    host: tops-spider-26014.upstash.io
+    port: 6379
+    password: AWWeAAIncDIzNzE4ZmFiOWFkOTI0ZTg4YWE5NDlkMWMzMjgxOGMyZnAyMjYwMTQ
+    ssl: true
+    timeout: 2000ms
+    database: 0
+    lettuce:
+      pool:
+        max-active: 16
+        max-idle: 8
+        min-idle: 0
+        max-wait: -1ms
+      shutdown-timeout: 100ms
+
+  servlet:
+    multipart:
+      max-file-size: 10MB
+      max-request-size: 20MB
+
+integration:
+  s3:
+    endpoint: https://s3.us-east-005.backblazeb2.com
+    accessKey: 0051ab9557af4e50000000001
+    secretKey: K005MflAlezZQmpSPEev9LHpTYvN0vU
+    bucket: careergraph-files
+    region: us-east-005
+
+cloudinary:
+  cloud_name: dyimxnbb8
+  api_key: 828882965973278
+  api_secret: dsNG5xuNz08714z3N6Eew0vaK9s
+
+server:
+  port: 8080
+  servlet:
+    context-path: /careergraph
+
+logging:
+  level:
+    root: INFO
+    org.springframework.web: WARN
+    org.hibernate: WARN
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: never
