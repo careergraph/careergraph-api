@@ -34,12 +34,6 @@
 	</properties>
 	<dependencies>
 
-		<!-- Neo4j -->
-		<dependency>
-			<groupId>org.springframework.boot</groupId>
-			<artifactId>spring-boot-starter-data-neo4j</artifactId>
-		</dependency>
-
 		<!-- Validation -->
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
@@ -141,13 +135,6 @@
 			<version>2.3.0</version>
 		</dependency>
 
-		<!-- MinIO -->
-		<dependency>
-			<groupId>io.minio</groupId>
-			<artifactId>minio</artifactId>
-			<version>8.5.12</version>
-		</dependency>
-
 		<!-- Google OAuth / ID token verification -->
 		<dependency>
 			<groupId>com.google.api-client</groupId>
@@ -177,6 +164,13 @@
 			<groupId>com.github.javafaker</groupId>
 			<artifactId>javafaker</artifactId>
 			<version>1.0.2</version>
+		</dependency>
+
+		<!-- S3 (Back Blaze) -->
+		<dependency>
+			<groupId>com.amazonaws</groupId>
+			<artifactId>aws-java-sdk-s3</artifactId>
+			<version>1.12.701</version>
 		</dependency>
 
 		<dependency>

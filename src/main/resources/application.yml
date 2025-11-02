@@ -1,11 +1,13 @@
 server:
-  port: 8080
+  port: ${SERVER_PORT:8080}
   servlet:
-    context-path: /careergraph/api/v1
+    context-path: ${SERVER_SERVLET_CONTEXT_PATH:/careergraph/api/v1}
 
 spring:
+  config:
+    import: optional:file:.env[.properties]
   profiles:
-    active: dev
+    active: ${SPRING_PROFILES_ACTIVE:dev}
 
 logging:
   level:
@@ -14,14 +16,14 @@ logging:
     org.springframework.transaction: DEBUG
 
 jwt:
-  signer-key: "ThL7qUN45V6bqcS8kDFtsvAnDvtCx8Oagwk3o51sVv51UJF/3fg2NNXo51km3CAlLY4y8iJT3kD0VWE7IJ5W9A=="
-  valid-duration: 3600         # 1h
-  refreshable-duration: 36000  # 10h
+  signer-key: ${JWT_SIGNER_KEY:}
+  valid-duration: ${JWT_VALID_DURATION:3600}
+  refreshable-duration: ${JWT_REFRESHABLE_DURATION:36000}
 
 google:
   oauth:
-    client-id: "407408718192.apps.googleusercontent.com"
-    client-secret: "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"
+    client-id: ${GOOGLE_OAUTH_CLIENT_ID:}
+    client-secret: ${GOOGLE_OAUTH_CLIENT_SECRET:}
 
 springdoc:
   api-docs:
@@ -36,8 +38,8 @@ springdoc:
   paths-to-match: /api/**
 
 swagger:
-  username: admin
-  password: Password1!
+  username: ${SWAGGER_USERNAME:}
+  password: ${SWAGGER_PASSWORD:}
 
 support:
-  email: congquynguyen296@gmail.com
+  email: ${SUPPORT_EMAIL:}

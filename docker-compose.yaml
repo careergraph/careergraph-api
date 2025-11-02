@@ -1,75 +1,88 @@
+#version: '3.8'
+#
+#services:
+#  # PostgreSQL Database
+#  postgres:
+#    image: postgres:13
+#    container_name: careergraph-postgres
+#    environment:
+#      POSTGRES_USER: postgres
+#      POSTGRES_PASSWORD: postgres
+#      POSTGRES_DB: careergraph
+#      TZ: Asia/Ho_Chi_Minh
+#      PGTZ: Asia/Ho_Chi_Minh
+#    ports:
+#      - "5432:5432"
+#    volumes:
+#      - postgres_data:/var/lib/postgresql/data
+#      - ./init-scripts:/docker-entrypoint-initdb.d
+#    networks:
+#      - careergraph-network
+#    healthcheck:
+#      test: ["CMD-SHELL", "pg_isready -U postgres -d careergraph"]
+#      interval: 10s
+#      timeout: 10s
+#      retries: 5
+#
+#  # Redis Cache
+#  redis:
+#    image: redis:latest
+#    container_name: careergraph-redis
+#    ports:
+#      - "6379:6379"
+#    volumes:
+#      - redis_data:/data
+#    networks:
+#      - careergraph-network
+#    healthcheck:
+#      test: ["CMD", "redis-cli", "ping"]
+#      timeout: 10s
+#      retries: 5
+#      interval: 10s
+#    command: redis-server --appendonly yes
+#
+#  # MinIO Object Storage
+#  minio:
+#    image: bitnami/minio:latest
+#    container_name: careergraph-minio
+#    environment:
+#      MINIO_ROOT_USER: minioadmin
+#      MINIO_ROOT_PASSWORD: minioadmin
+#    ports:
+#      - "9000:9000"
+#      - "9001:9001"
+#    volumes:
+#      - minio_data:/bitnami/minio/data
+#      - minio_config:/opt/bitnami/minio/config
+#    networks:
+#      - careergraph-network
+#    command: minio server /bitnami/minio/data --console-address ":9001"
+#
+## Volumes for data persistence
+#volumes:
+#  postgres_data:
+#    driver: local
+#  redis_data:
+#    driver: local
+#  minio_data:
+#    driver: local
+#  minio_config:
+#    driver: local
+#
+## Network for service communication
+#networks:
+#  careergraph-network:
+#    driver: bridge
+
+# ============================ NEW COMPOSE
 version: '3.8'
 
 services:
-  # PostgreSQL Database
-  postgres:
-    image: postgres:13
-    container_name: careergraph-postgres
-    environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: careergraph
-      TZ: Asia/Ho_Chi_Minh
-      PGTZ: Asia/Ho_Chi_Minh
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: careergraph-api
     ports:
-      - "5432:5432"
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-      - ./init-scripts:/docker-entrypoint-initdb.d
-    networks:
-      - careergraph-network
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres -d careergraph"]
-      interval: 10s
-      timeout: 10s
-      retries: 5
-
-  # Redis Cache
-  redis:
-    image: redis:latest
-    container_name: careergraph-redis
-    ports:
-      - "6379:6379"
-    volumes:
-      - redis_data:/data
-    networks:
-      - careergraph-network
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      timeout: 10s
-      retries: 5
-      interval: 10s
-    command: redis-server --appendonly yes
-
-  # MinIO Object Storage
-  minio:
-    image: bitnami/minio:latest
-    container_name: careergraph-minio
-    environment:
-      MINIO_ROOT_USER: minioadmin
-      MINIO_ROOT_PASSWORD: minioadmin
-    ports:
-      - "9000:9000"
-      - "9001:9001"
-    volumes:
-      - minio_data:/bitnami/minio/data
-      - minio_config:/opt/bitnami/minio/config
-    networks:
-      - careergraph-network
-    command: minio server /bitnami/minio/data --console-address ":9001"
-
-# Volumes for data persistence
-volumes:
-  postgres_data:
-    driver: local
-  redis_data:
-    driver: local
-  minio_data:
-    driver: local
-  minio_config:
-    driver: local
-
-# Network for service communication
-networks:
-  careergraph-network:
-    driver: bridge
+      - "8080:8080"
+    restart: unless-stopped
