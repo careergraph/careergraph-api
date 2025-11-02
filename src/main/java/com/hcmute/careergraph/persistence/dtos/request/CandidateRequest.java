@@ -1,8 +1,16 @@
 package com.hcmute.careergraph.persistence.dtos.request;
 
+import com.hcmute.careergraph.persistence.dtos.response.CandidateExperienceResponse;
+import com.hcmute.careergraph.persistence.models.Candidate;
+import com.hcmute.careergraph.persistence.models.Company;
+import jakarta.persistence.Column;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
 import lombok.Builder;
 
 import java.util.List;
+import java.util.Set;
 
 // CandidateRequest.java
 public final class CandidateRequest {
@@ -61,6 +69,20 @@ public final class CandidateRequest {
             Integer yearsOfExperience,
             String educationLevel,
             String currentPosition
+    ) {
+    }
+
+    @Builder
+    public record CandidateExperienceRequest(
+            String startDate,
+            String endDate,
+            Integer salary,
+            String jobTitle,
+            Boolean isCurrent,
+            String description,
+            String candidateId,
+            String companyId,
+            String companyName
     ) {
     }
 }

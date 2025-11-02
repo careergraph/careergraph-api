@@ -4,6 +4,7 @@ import lombok.Builder;
 
 @Builder
 public record CandidateExperienceResponse(
+        String id,
         String startDate,
         String endDate,
         Integer salary,
@@ -11,6 +12,7 @@ public record CandidateExperienceResponse(
         Boolean isCurrent,
         String description,
         String candidateId,
-        String companyId
+        String companyId,
+        String companyName
 ) {
 }

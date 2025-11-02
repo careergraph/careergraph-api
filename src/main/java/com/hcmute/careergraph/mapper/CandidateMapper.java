@@ -21,6 +21,10 @@ public class CandidateMapper {
     private AddressMaper addressMaper;
     @Autowired
     private ContactMapper contactMapper;
+    @Autowired
+    private CandidateSkillMapper candidateSkillMapper;
+    @Autowired
+    private CandidateExperienceMapper candidateExperienceMapper;
 
     public CandidateResponse toResponse(Candidate candidate) {
         if (candidate == null) {
@@ -69,6 +73,8 @@ public class CandidateMapper {
                 )
                 .addresses(addressMaper.toResponses(candidate.getAddresses()))
                 .contacts(contactMapper.toResponses(candidate.getContacts()))
+                .skills(candidateSkillMapper.toResponses(candidate.getSkills()))
+                .experiences(candidateExperienceMapper.toResponses(candidate.getExperiences()))
                 .build();
 
 

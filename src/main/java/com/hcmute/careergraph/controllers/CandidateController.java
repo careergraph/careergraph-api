@@ -3,9 +3,11 @@ package com.hcmute.careergraph.controllers;
 import com.hcmute.careergraph.enums.common.FileType;
 import com.hcmute.careergraph.helper.RestResponse;
 import com.hcmute.careergraph.helper.SecurityUtils;
+import com.hcmute.careergraph.mapper.CandidateExperienceMapper;
 import com.hcmute.careergraph.mapper.CandidateMapper;
 import com.hcmute.careergraph.persistence.dtos.request.CandidateRequest;
 import com.hcmute.careergraph.persistence.dtos.response.CandidateClientResponse;
+import com.hcmute.careergraph.persistence.dtos.response.CandidateExperienceResponse;
 import com.hcmute.careergraph.persistence.dtos.response.CandidateResponse;
 import com.hcmute.careergraph.persistence.models.Candidate;
 import com.hcmute.careergraph.services.CandidateService;
@@ -17,6 +19,9 @@ import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.util.List;
+import java.util.Set;
+
 @RestController
 @RequestMapping("candidates")
 @RequiredArgsConstructor
@@ -25,6 +30,7 @@ public class CandidateController {
     private final CandidateService candidateService;
     private final CandidateMapper candidateMapper;
     private final SecurityUtils securityUtils;
+    private final CandidateExperienceMapper candidateExperienceMapper;
 
     @PostMapping("/{id}/files")
     public RestResponse<String> uploadFile(
@@ -83,24 +89,39 @@ public class CandidateController {
                 .build();
     }
 
-
-    @GetMapping("/general-info")
-    public RestResponse<CandidateClientResponse.GeneralInfoResponse> getGeneralInfo() throws ChangeSetPersister.NotFoundException{
-        Candidate candidate = candidateService.getMyProfile(securityUtils.getCandidateId().get());
-
-        return RestResponse.<CandidateClientResponse.GeneralInfoResponse>builder()
-                .status(HttpStatus.OK)
-                .data(candidateMapper.toGeneralInfoResponse(candidate))
-                .build();
-    }
-
     @PostMapping("/update-general-info")
-    public RestResponse<CandidateResponse> getGeneralInfo(@Valid @RequestBody CandidateRequest.UpdateGeneralInfo request) throws ChangeSetPersister.NotFoundException{
+    public RestResponse<CandidateResponse> updateGeneralInfo(@Valid @RequestBody CandidateRequest.UpdateGeneralInfo request) throws ChangeSetPersister.NotFoundException{
         Candidate candidate = candidateService.updateGeneralInfo(securityUtils.getCandidateId().get(), request);
 
         return RestResponse.<CandidateResponse>builder()
                 .status(HttpStatus.OK)
                 .data(candidateMapper.toResponse(candidate))
+                .build();
+    }
+
+    @PostMapping("/experiences")
+    public RestResponse<Set<CandidateExperienceResponse>> addExperience(@Valid @RequestBody CandidateRequest.CandidateExperienceRequest request) throws ChangeSetPersister.NotFoundException{
+        Candidate candidate = candidateService.addExperience(securityUtils.getCandidateId().get(), request);
+        return RestResponse.<Set<CandidateExperienceResponse>>builder()
+                .status(HttpStatus.OK)
+                .data(candidateExperienceMapper.toResponses(candidate.getExperiences()))
+                .build();
+    }
+    @PutMapping("/experiences/{experienceId}")
+    public RestResponse<Set<CandidateExperienceResponse>> updateExperience(@PathVariable String experienceId ,@Valid @RequestBody CandidateRequest.CandidateExperienceRequest request) throws ChangeSetPersister.NotFoundException{
+        Candidate candidate = candidateService.updateExperience(securityUtils.getCandidateId().get(), experienceId, request);
+        return RestResponse.<Set<CandidateExperienceResponse>>builder()
+                .status(HttpStatus.OK)
+                .data(candidateExperienceMapper.toResponses(candidate.getExperiences()))
+                .build();
+    }
+
+    @DeleteMapping("/experiences/{experienceId}")
+    public RestResponse<Set<CandidateExperienceResponse>> deleteExperience(@PathVariable String experienceId) throws ChangeSetPersister.NotFoundException{
+        Candidate candidate = candidateService.deleteExperience(securityUtils.getCandidateId().get(), experienceId);
+        return RestResponse.<Set<CandidateExperienceResponse>>builder()
+                .status(HttpStatus.OK)
+                .data(candidateExperienceMapper.toResponses(candidate.getExperiences()))
                 .build();
     }
 }
