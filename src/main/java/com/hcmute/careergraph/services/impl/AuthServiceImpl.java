@@ -2,6 +2,7 @@ package com.hcmute.careergraph.services.impl;
 
 import com.hcmute.careergraph.enums.common.ErrorType;
 import com.hcmute.careergraph.enums.common.Role;
+import com.hcmute.careergraph.enums.common.Status;
 import com.hcmute.careergraph.exception.AppException;
 import com.hcmute.careergraph.persistence.dtos.request.AuthRequests;
 import com.hcmute.careergraph.persistence.dtos.response.AuthResponses;
@@ -55,7 +56,7 @@ public class AuthServiceImpl implements AuthService {
     @Override
     public void register(AuthRequests.RegisterRequest request, boolean isHR) {
         if (accountRepository.existsByEmail(request.getEmail())) {
-            throw new AppException(ErrorType.CONFLICT, "Invalid OTP");
+            throw new AppException(ErrorType.CONFLICT, "User already existed with email");
         }
 
         // Create account
