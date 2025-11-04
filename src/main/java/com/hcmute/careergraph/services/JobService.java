@@ -35,6 +35,10 @@ public interface JobService {
 
     List<Job> getJobsPersonalized(String userId);
 
+    List<Job> getJobsForAnonymousUser();
+
+    List<Job> getJobsPopular();
+
     Map<String, String> lookup(String companyId, String query);
 
     Page<Job> search(JobFilterRequest filter, String companyId, String query, Pageable pageable);

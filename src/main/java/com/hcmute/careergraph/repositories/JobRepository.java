@@ -4,6 +4,7 @@ import com.hcmute.careergraph.enums.common.Status;
 import com.hcmute.careergraph.enums.job.EmploymentType;
 import com.hcmute.careergraph.enums.job.JobCategory;
 import com.hcmute.careergraph.persistence.models.Job;
+import org.joda.time.DateTime;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -58,4 +59,35 @@ public interface JobRepository extends JpaRepository<Job, String> {
             @Param("query") String query,
             Pageable pageable
     );
+
+    @Query("""
+        SELECT j FROM Job j
+        WHERE j.status = 'ACTIVE'
+        ORDER BY j.views DESC, j.applicants DESC, j.liked DESC, j.shared DESC
+    """)
+    List<Job> findPopularJob();
+
+    @Query(value = """
+        SELECT DISTINCT j.*
+        FROM jobs j
+        WHERE j.status = 'ACTIVE'
+            AND j.expiry_date >= :currentDate
+            AND EXISTS (
+                SELECT 1
+                FROM candidates c
+                WHERE c.id = :userId AND (
+                    (c.industries IS NOT NULL AND jsonb_exists(c.industries::jsonb, j.job_category))
+                    OR (c.locations IS NOT NULL AND jsonb_exists(c.locations::jsonb, j.state))
+                    OR (c.work_types IS NOT NULL AND jsonb_exists(c.work_types::jsonb, j.employment_type))
+                    OR (c.years_of_experience IS NOT NULL
+                        AND (j.min_experience IS NULL OR c.years_of_experience >= j.min_experience)
+                        AND (j.max_experience IS NULL OR c.years_of_experience <= j.max_experience))
+                    OR (c.education_level IS NOT NULL AND c.education_level = j.education)
+                )
+          )
+    """, nativeQuery = true)
+    List<Job> findJobByPersonalized(@Param("userId") String userId,
+                                    @Param("currentDate") String currentDate);
+
+    List<Job> findAllByOrderByCreatedDateDesc(Pageable pageable);
 }

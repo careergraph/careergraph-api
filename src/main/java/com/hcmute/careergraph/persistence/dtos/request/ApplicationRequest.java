@@ -14,5 +14,4 @@ public record ApplicationRequest(
         String candidateId,
         @NotBlank(message = "Job ID is required")
         String jobId
-) {
-}
+) { }
