@@ -6,12 +6,17 @@ COPY src ./src
 
 RUN mvn clean package -DskipTests
 
-# Stage 2: Runtime stage
-FROM openjdk:21-jdk-slim
+# Stage 2: Runtime stage - SỬA DÒNG NÀY
+FROM amazoncorretto:21-alpine
 WORKDIR /app
 
 COPY --from=build /app/target/*.jar app.jar
 
+# Đọc biến PORT từ Azure
+ENV PORT=8080
 EXPOSE 8080
 
-ENTRYPOINT ["java", "-jar", "app.jar"]
+# Tối ưu memory
+ENV JAVA_OPTS="-Xmx512m -Xms256m -XX:MaxMetaspaceSize=128m"
+
+ENTRYPOINT ["sh", "-c", "java $JAVA_OPTS -Dserver.port=${PORT} -jar app.jar"]
