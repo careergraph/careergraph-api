@@ -49,3 +49,8 @@ integration:
     secretKey: ${INTEGRATION_S3_SECRET_KEY:}
     bucket: ${INTEGRATION_S3_BUCKET:}
     region: ${INTEGRATION_S3_REGION:}
+
+cloudinary:
+  cloud_name: ${CLOUDINARY_CLOUD_NAME:}
+  api_key: ${CLOUDINARY_API_KEY:}
+  api_secret: ${CLOUDINARY_API_SECRET:}

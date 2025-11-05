@@ -10,16 +10,19 @@ import com.hcmute.careergraph.persistence.dtos.request.JobCreationRequest;
 import com.hcmute.careergraph.persistence.dtos.request.JobFilterRequest;
 import com.hcmute.careergraph.persistence.models.Company;
 import com.hcmute.careergraph.persistence.models.Job;
+import com.hcmute.careergraph.repositories.CandidateRepository;
 import com.hcmute.careergraph.repositories.CompanyRepository;
 import com.hcmute.careergraph.repositories.JobRepository;
 import com.hcmute.careergraph.services.JobService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
 import java.util.*;
 
 @Service
@@ -29,6 +32,7 @@ public class JobServiceImpl implements JobService {
 
     private final JobRepository jobRepository;
     private final CompanyRepository companyRepository;
+    private final CandidateRepository candidateRepository;
     private final JobMapper jobMapper;
 
     /**
@@ -186,7 +190,45 @@ public class JobServiceImpl implements JobService {
     @Transactional(readOnly = true)
     @Override
     public List<Job> getJobsPersonalized(String userId) {
-        return List.of();
+
+        // Validate userId
+        if (userId == null || userId.trim().isEmpty()) {
+            throw new IllegalArgumentException("User ID cannot be null or empty");
+        }
+
+        // Check if candidate exists
+        candidateRepository.findById(userId)
+                .orElseThrow(() -> new NotFoundException("Candidate not found with id: " + userId));
+
+        // Get current date for filtering expired jobs
+        String currentDate = LocalDate.now().toString();
+
+        // Fetch and return personalized jobs from repository
+        return jobRepository.findJobByPersonalized(userId, currentDate);
+    }
+
+    @Override
+    public List<Job> getJobsForAnonymousUser() {
+
+        // Get new job
+        List<Job> newJobs = jobRepository.findAllByOrderByCreatedDateDesc(PageRequest.of(0, 8));
+        if (newJobs == null) {
+            return new ArrayList<>();
+        }
+
+        return newJobs;
+    }
+
+    @Transactional(readOnly = true)
+    @Override
+    public List<Job> getJobsPopular() {
+
+        List<Job> jobsPopular = jobRepository.findPopularJob();
+        if (jobsPopular.isEmpty()) {
+            return new ArrayList<>();
+        }
+
+        return jobsPopular;
     }
 
     /**
