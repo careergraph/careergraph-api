@@ -18,7 +18,7 @@ import java.util.HashMap;
 import java.util.List;
 
 @RestController
-@RequestMapping("company")
+@RequestMapping("companies")
 @RequiredArgsConstructor
 public class CompanyController {
 
@@ -38,9 +38,10 @@ public class CompanyController {
 
     @GetMapping("/lookup")
     public RestResponse<List<HashMap<String,String>>> lookup(@RequestParam(required = false)String query) {
+        List<HashMap<String,String>> result = companyService.lookup(query);
         return RestResponse.<List<HashMap<String, String>>>builder()
                 .status(HttpStatus.OK)
-                .data(companyService.lookup(query))
+                .data(result)
                 .build();
 
     }
