@@ -27,8 +27,8 @@ public class Contact extends BaseEntity {
     private Boolean isPrimary;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "type")
-    private ContactType type;
+    @Column(name = "contact_type")
+    private ContactType contactType;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "party_id", nullable = false)

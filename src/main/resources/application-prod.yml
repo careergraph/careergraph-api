@@ -1,8 +1,8 @@
 spring:
   datasource:
-    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/careergraph}
-    username: ${SPRING_DATASOURCE_USERNAME:postgres}
-    password: ${SPRING_DATASOURCE_PASSWORD:postgres}
+    url: ${SPRING_DATASOURCE_URL:}
+    username: ${SPRING_DATASOURCE_USERNAME:}
+    password: ${SPRING_DATASOURCE_PASSWORD:}
     driver-class-name: org.postgresql.Driver
     hikari:
       maximum-pool-size: 20
@@ -14,33 +14,34 @@ spring:
       data-source-properties:
         TimeZone: Asia/Ho_Chi_Minh
 
-
   jpa:
     database-platform: org.hibernate.dialect.PostgreSQLDialect
-    show-sql: true
+    show-sql: false          # Không log SQL ở prod
     hibernate:
       ddl-auto: update
-      format_sql: true
+      format_sql: false
     properties:
       hibernate.jdbc.time_zone: UTC
 
   redis:
-    host: ${SPRING_REDIS_HOST:localhost}
+    host: ${SPRING_REDIS_HOST:}
     port: ${SPRING_REDIS_PORT:6379}
+    password: ${SPRING_REDIS_PASSWORD:}
+    ssl: ${SPRING_REDIS_SSL:true}
     timeout: 2000ms
     database: 0
-    password: ${SPRING_REDIS_PASSWORD:}
     lettuce:
       pool:
-        max-active: 8
+        max-active: 16
         max-idle: 8
         min-idle: 0
         max-wait: -1ms
       shutdown-timeout: 100ms
+
   servlet:
     multipart:
-      max-file-size: 5MB        # Giới hạn cho mỗi file
-      max-request-size: 10MB
+      max-file-size: 10MB
+      max-request-size: 20MB
 
 integration:
   s3:
@@ -54,3 +55,23 @@ cloudinary:
   cloud_name: ${CLOUDINARY_CLOUD_NAME:}
   api_key: ${CLOUDINARY_API_KEY:}
   api_secret: ${CLOUDINARY_API_SECRET:}
+
+server:
+  port: ${SERVER_PORT:8080}
+  servlet:
+    context-path: ${SERVER_SERVLET_CONTEXT_PATH:/careergraph}
+
+logging:
+  level:
+    root: INFO
+    org.springframework.web: WARN
+    org.hibernate: WARN
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: never

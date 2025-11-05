@@ -1,18 +1,11 @@
 package com.hcmute.careergraph.config.app;
 
 import com.github.javafaker.Faker;
-import com.hcmute.careergraph.enums.work.EmploymentType;
-import com.hcmute.careergraph.enums.work.JobCategory;
-import com.hcmute.careergraph.enums.common.Status;
-import com.hcmute.careergraph.enums.candidate.ContactType;
-import com.hcmute.careergraph.persistence.models.*;
 import com.hcmute.careergraph.repositories.*;
 import lombok.RequiredArgsConstructor;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
-
-import java.util.*;
 
 @Component
 @RequiredArgsConstructor

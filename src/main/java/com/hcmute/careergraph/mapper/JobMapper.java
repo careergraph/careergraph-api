@@ -72,8 +72,8 @@ public class JobMapper {
         job.setLiked(0);
         job.setShared(0);
 
-        // Status - Default ACTIVE
-        job.setStatus(Status.ACTIVE);
+        // Status - Default DRAFT
+        job.setStatus(Status.DRAFT);
 
         // Company relationship
         job.setCompany(company);
@@ -115,7 +115,6 @@ public class JobMapper {
                 .employmentType(job.getEmploymentType())
                 .type(job.getEmploymentType()) // UI dùng 'type' thay vì 'employmentType'
                 .jobCategory(job.getJobCategory())
-                .jobFunction(job.getJobCategory()) // UI dùng 'jobFunction' thay vì 'jobCategory'
                 .education(job.getEducation())
 
                 // Location
