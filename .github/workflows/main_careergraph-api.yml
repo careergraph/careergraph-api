@@ -25,15 +25,15 @@ jobs:
         uses: docker/login-action@v2
         with:
           registry: https://index.docker.io/v1/
-          username: ${{ secrets.AZUREAPPSERVICE_CONTAINERUSERNAME_1776048F9FC54B2698D9FC48D5C1ADFD }}
-          password: ${{ secrets.AZUREAPPSERVICE_CONTAINERPASSWORD_C0A2F822169742C0BAE5442CBEE56EBD }}
+          username: ${{ secrets.AZUREAPPSERVICE_CONTAINERUSERNAME_59D87F87C17243EA8EFFBEF265BE31F2 }}
+          password: ${{ secrets.AZUREAPPSERVICE_CONTAINERPASSWORD_01C18C2B28034CE8ADA52C8390B8B124 }}
 
       - name: Build and push container image to registry
         uses: docker/build-push-action@v3
         with:
           context: .
           push: true
-          tags: index.docker.io/${{ secrets.AZUREAPPSERVICE_CONTAINERUSERNAME_1776048F9FC54B2698D9FC48D5C1ADFD }}/careergraph/careergraph-api:${{ github.sha }}
+          tags: index.docker.io/${{ secrets.AZUREAPPSERVICE_CONTAINERUSERNAME_59D87F87C17243EA8EFFBEF265BE31F2 }}/congquynguyen296/careergraph-api:${{ github.sha }}
           file: ./Dockerfile
 
   deploy:
@@ -49,9 +49,9 @@ jobs:
       - name: Login to Azure
         uses: azure/login@v2
         with:
-          client-id: ${{ secrets.AZUREAPPSERVICE_CLIENTID_627A38F3A6774786810E04503DEDAF6F }}
-          tenant-id: ${{ secrets.AZUREAPPSERVICE_TENANTID_2311BF6B44DF4174AC15860A464E0216 }}
-          subscription-id: ${{ secrets.AZUREAPPSERVICE_SUBSCRIPTIONID_B75E43DEFD824C60976539D9FFEE488D }}
+          client-id: ${{ secrets.AZUREAPPSERVICE_CLIENTID_C06C7526E9304775BBBFEDA10DEA5389 }}
+          tenant-id: ${{ secrets.AZUREAPPSERVICE_TENANTID_225117578A304CB79E0E02796B4364D3 }}
+          subscription-id: ${{ secrets.AZUREAPPSERVICE_SUBSCRIPTIONID_825520B4F2DD4119928A36732BA62D68 }}
 
       - name: Deploy to Azure Web App
         id: deploy-to-webapp
@@ -59,5 +59,5 @@ jobs:
         with:
           app-name: 'careergraph-api'
           slot-name: 'Production'
-          images: 'index.docker.io/${{ secrets.AZUREAPPSERVICE_CONTAINERUSERNAME_1776048F9FC54B2698D9FC48D5C1ADFD }}/careergraph/careergraph-api:${{ github.sha }}'
+          images: 'index.docker.io/${{ secrets.AZUREAPPSERVICE_CONTAINERUSERNAME_59D87F87C17243EA8EFFBEF265BE31F2 }}/congquynguyen296/careergraph-api:${{ github.sha }}'
           
