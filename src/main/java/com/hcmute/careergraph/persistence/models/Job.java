@@ -1,9 +1,9 @@
 package com.hcmute.careergraph.persistence.models;
 
-import com.hcmute.careergraph.enums.work.EducationType;
-import com.hcmute.careergraph.enums.work.EmploymentType;
-import com.hcmute.careergraph.enums.work.ExperienceLevel;
-import com.hcmute.careergraph.enums.work.JobCategory;
+import com.hcmute.careergraph.enums.job.EducationType;
+import com.hcmute.careergraph.enums.job.EmploymentType;
+import com.hcmute.careergraph.enums.job.ExperienceLevel;
+import com.hcmute.careergraph.enums.job.JobCategory;
 import com.hcmute.careergraph.enums.common.Status;
 import com.hcmute.careergraph.helper.JsonUtils;
 import jakarta.persistence.*;
@@ -172,6 +172,7 @@ public class Job extends BaseEntity {
     @Override
     public void prePersist() {
         super.prePersist();
+        super.setStatus(Status.DRAFT);
 
         if (postedDate == null) {
             postedDate = LocalDate.now().toString();

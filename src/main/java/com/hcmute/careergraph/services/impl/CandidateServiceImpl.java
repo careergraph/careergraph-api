@@ -1,19 +1,19 @@
 package com.hcmute.careergraph.services.impl;
 
 import com.hcmute.careergraph.enums.candidate.AddressType;
+import com.hcmute.careergraph.enums.candidate.ContactType;
 import com.hcmute.careergraph.enums.common.FileType;
 import com.hcmute.careergraph.helper.SecurityUtils;
-import com.hcmute.careergraph.helper.StringHelper;
 import com.hcmute.careergraph.persistence.dtos.request.CandidateRequest;
 import com.hcmute.careergraph.persistence.models.Address;
 import com.hcmute.careergraph.persistence.models.Candidate;
+import com.hcmute.careergraph.persistence.models.Contact;
 import com.hcmute.careergraph.repositories.CandidateRepository;
 import com.hcmute.careergraph.services.CandidateService;
-import com.hcmute.careergraph.services.MinioService;
+import com.hcmute.careergraph.services.S3StorageService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.logging.log4j.util.InternalException;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.crossstore.ChangeSetPersister;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -28,13 +28,10 @@ import java.util.Set;
 @Slf4j
 public class CandidateServiceImpl implements CandidateService {
 
-    private final MinioService minioService;
+    private final S3StorageService storageService;
 
     private final CandidateRepository candidateRepository;
     private final SecurityUtils securityUtils;
-
-    @Value("${integration.minio.bucket}")
-    private String bucketName;
 
     @Override
     public String updateResource(String candidateId, MultipartFile file, FileType fileType) {
@@ -46,20 +43,33 @@ public class CandidateServiceImpl implements CandidateService {
         if (!securityUtils.getCandidateId().get().equals(candidateId)) {
             throw new InternalException("You do not have permission to update this candidate");
         }
-
-        // Update minio
-        String objectName = StringHelper.buildObjectName(candidateId, fileType, file.getOriginalFilename());
-        minioService.uploadFile(objectName, file);
-
-        // Update DB
-        switch (fileType) {
-            case AVATAR -> candidate.setAvatar(objectName);
-            case COVER  -> candidate.setCover(objectName);
-            case RESUME -> candidate.setResumes(List.of(objectName));
+        S3StorageService.StoredFile storedFile;
+        try {
+            storedFile = storageService.uploadCandidateFile(candidateId, fileType, file);
+        } catch (Exception e) {
+            throw new InternalException("Unable to upload candidate resource");
         }
+
+        String objectKey = storedFile.key();
+
+        if (fileType == FileType.RESUME) {
+            List<String> resumes = candidate.getResumes();
+            if (resumes == null) {
+                resumes = new java.util.ArrayList<>();
+            }
+            resumes.add(objectKey);
+            candidate.setResumes(resumes);
+        }
+        if (fileType == FileType.AVATAR) {
+            candidate.setAvatar(objectKey);
+        }
+        if (fileType == FileType.COVER) {
+            candidate.setCover(objectKey);
+        }
+
         candidateRepository.save(candidate);
 
-        return objectName;
+        return storedFile.url();
     }
 
     @Override
@@ -77,13 +87,19 @@ public class CandidateServiceImpl implements CandidateService {
         String objectKey = switch (fileType) {
             case AVATAR -> candidate.getAvatar();
             case COVER  -> candidate.getCover();
-            case RESUME -> candidate.getResumes().get(0);
+            case RESUME -> {
+                List<String> resumes = candidate.getResumes();
+                if (resumes == null || resumes.isEmpty()) {
+                    throw new ChangeSetPersister.NotFoundException();
+                }
+                yield resumes.getFirst();
+            }
         };
 
         if (objectKey == null)
             throw new ChangeSetPersister.NotFoundException();
 
-        return minioService.getFileUrl(objectKey);
+        return storageService.getFileUrl(objectKey);
     }
     @Override
     public Candidate getMyProfile(String candidateId) throws ChangeSetPersister.NotFoundException {
@@ -92,28 +108,89 @@ public class CandidateServiceImpl implements CandidateService {
     }
 
     @Override
-    public Candidate updateInformation(String candidateId, CandidateRequest.UpdateInformation candidateRequest) throws ChangeSetPersister.NotFoundException {
+    public Candidate updateInformation(String candidateId, CandidateRequest.UpdateInformationRequest candidateRequest) throws ChangeSetPersister.NotFoundException {
         Candidate candidate = candidateRepository.findById(candidateId)
                 .orElseThrow(ChangeSetPersister.NotFoundException::new);
-        candidate.setFirstName(candidateRequest.name());
-        candidate.setLastName(candidateRequest.name());
-        Set<Address> addresses = candidate.getAddresses();
-        Address address = addresses.stream()
-                .filter(a -> AddressType.HOME_ADDRESS.name().equals(a.getName()))
-                .findFirst()
-                .orElse(null);
-        if(address == null){
-            address = new Address();
-            address.setName(AddressType.HOME_ADDRESS.name());
-            addresses.add(address);
-        }
-        address.setProvince(candidateRequest.province());
-        address.setDistrict(candidateRequest.district());
-        candidate.setAddresses(addresses);
+        // ----- Basic fields -----
+        candidate.setFirstName(candidateRequest.firstName());
+        candidate.setLastName(candidateRequest.lastName());
         candidate.setDateOfBirth(candidateRequest.dateOfBirth());
         candidate.setGender(candidateRequest.gender());
         candidate.setIsMarried(candidateRequest.isMarried());
+
+        Set<Address> addresses = candidate.getAddresses();
+        Address homeAddress = addresses.stream()
+                .filter(a -> a != null && a.getAddressType() != null)
+                .filter(a -> AddressType.HOME_ADDRESS.name().equals(a.getAddressType().name()))
+                .findFirst()
+                .orElse(null);
+
+        if(homeAddress == null){
+            homeAddress = new Address();
+            homeAddress.setName(AddressType.HOME_ADDRESS.name());
+            homeAddress.setAddressType(AddressType.HOME_ADDRESS);
+            homeAddress.setParty(candidate);
+            addresses.add(homeAddress);
+        }
+
+        CandidateRequest.AddressDTO adr = candidateRequest.address();
+        if (adr != null) {
+            homeAddress.setCountry(adr.country());
+            homeAddress.setProvince(adr.province());
+            homeAddress.setDistrict(adr.district());
+            homeAddress.setWard(adr.ward());
+            homeAddress.setIsPrimary(Boolean.TRUE.equals(adr.isPrimary()));
+        }
+
+
+        Set<Contact> contacts = candidate.getContacts();
+
+        CandidateRequest.ContactDTO contactReq = candidateRequest.contact();
+        if (contactReq != null && "PHONE".equalsIgnoreCase(contactReq.type())) {
+            Contact primaryPhone = contacts.stream()
+                    .filter(c -> c.getContactType() == ContactType.PHONE && Boolean.TRUE.equals(c.getIsPrimary()))
+                    .findFirst()
+                    .orElse(null);
+
+            if (primaryPhone == null) {
+                primaryPhone = new Contact();
+                primaryPhone.setParty(candidate);
+                primaryPhone.setContactType(ContactType.PHONE);
+                contacts.add(primaryPhone);
+            }
+
+            primaryPhone.setValue(contactReq.value());
+            primaryPhone.setIsPrimary(Boolean.TRUE.equals(contactReq.isPrimary()));
+            // giữ verified như cũ, đừng tự set true ở đây trừ khi BE cho phép
+        }
         candidateRepository.save(candidate);
         return candidate;
     }
+
+    @Override
+    public Candidate updateJobFindCriteriaInfo(String candidateId, CandidateRequest.UpdateJobCriteriaRequest candidateRequest) throws ChangeSetPersister.NotFoundException {
+
+        Candidate candidate = candidateRepository.findById(candidateId)
+                .orElseThrow(ChangeSetPersister.NotFoundException::new);
+
+        candidate.setDesiredPosition(candidateRequest.desiredPosition());
+        candidate.setIndustries(candidateRequest.industries());
+        candidate.setWorkTypes(candidateRequest.workTypes());
+        candidate.setSalaryExpectationMin(candidateRequest.salaryExpectationMin());
+        candidate.setSalaryExpectationMax(candidateRequest.salaryExpectationMax());
+        candidate.setLocations(candidateRequest.locations());
+        return candidateRepository.save(candidate);
+    }
+
+    @Override
+    public Candidate updateGeneralInfo(String candidateId, CandidateRequest.UpdateGeneralInfo candidateRequest) throws ChangeSetPersister.NotFoundException {
+        Candidate candidate = candidateRepository.findById(candidateId)
+                .orElseThrow(ChangeSetPersister.NotFoundException::new);
+        candidate.setYearsOfExperience(candidateRequest.yearsOfExperience());
+        candidate.setEducationLevel(candidateRequest.educationLevel());
+        candidate.setCurrentPosition(candidate.getCurrentPosition());
+        return candidateRepository.save(candidate);
+    }
+
+
 }

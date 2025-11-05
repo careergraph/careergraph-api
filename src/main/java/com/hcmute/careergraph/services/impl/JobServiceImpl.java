@@ -1,31 +1,38 @@
 package com.hcmute.careergraph.services.impl;
 
 import com.hcmute.careergraph.enums.common.Status;
+import com.hcmute.careergraph.enums.job.EmploymentType;
+import com.hcmute.careergraph.enums.job.JobCategory;
+import com.hcmute.careergraph.exception.BadRequestException;
+import com.hcmute.careergraph.exception.NotFoundException;
 import com.hcmute.careergraph.mapper.JobMapper;
 import com.hcmute.careergraph.persistence.dtos.request.JobCreationRequest;
+import com.hcmute.careergraph.persistence.dtos.request.JobFilterRequest;
 import com.hcmute.careergraph.persistence.models.Company;
 import com.hcmute.careergraph.persistence.models.Job;
+import com.hcmute.careergraph.repositories.CandidateRepository;
 import com.hcmute.careergraph.repositories.CompanyRepository;
 import com.hcmute.careergraph.repositories.JobRepository;
 import com.hcmute.careergraph.services.JobService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.HashMap;
-import java.util.List;
+import java.time.LocalDate;
+import java.util.*;
 
 @Service
-@Transactional
 @RequiredArgsConstructor
 @Slf4j
 public class JobServiceImpl implements JobService {
 
     private final JobRepository jobRepository;
     private final CompanyRepository companyRepository;
+    private final CandidateRepository candidateRepository;
     private final JobMapper jobMapper;
 
     /**
@@ -34,7 +41,7 @@ public class JobServiceImpl implements JobService {
      * @param request JobCreationRequest từ client
      * @param companyId ID của công ty đăng job (lấy từ authenticated user)
      * @return JobResponse chứa thông tin job vừa tạo
-     * @throws IllegalArgumentException nếu company không tồn tại
+     * @throws NotFoundException nếu company không tồn tại
      */
     @Transactional
     @Override
@@ -43,7 +50,7 @@ public class JobServiceImpl implements JobService {
 
         // 1. Validate và lấy Company
         Company company = companyRepository.findById(companyId)
-                .orElseThrow(() -> new IllegalArgumentException("Company not found with ID: " + companyId));
+                .orElseThrow(() -> new NotFoundException("Company not found with ID: " + companyId));
 
         // 3. Map request -> entity
         Job job = jobMapper.toEntity(request, company);
@@ -88,6 +95,7 @@ public class JobServiceImpl implements JobService {
         return jobs;
     }
 
+    @Transactional(readOnly = true)
     @Override
     public Page<Job> getAllJobs(Pageable pageable) {
         log.info("Fetching all jobs");
@@ -104,6 +112,33 @@ public class JobServiceImpl implements JobService {
     public Job updateJob(String jobId, JobCreationRequest request, String companyId) {
         // TODO: Implement update logic
         throw new UnsupportedOperationException("Update job not implemented yet");
+    }
+
+    /**
+     * Publish job
+     *
+     * @param jobId: ID of job
+     * @param companyId: ID of company
+     * @return Job entity
+     */
+    @Override
+    public Job publishJob(String jobId, String companyId) {
+        log.info("Publish job with ID: {}", jobId);
+
+        if (jobId == null || companyId == null) {
+            throw new BadRequestException("JobID or CompanyID is not null");
+        }
+
+        Optional<Job> job = jobRepository.findByIdAndCompanyId(jobId, companyId);
+        if (job.isEmpty()) {
+            throw new NotFoundException("Job not found with ID: " + jobId);
+        }
+
+        // Update job
+        job.get().setStatus(Status.ACTIVE);
+        jobRepository.save(job.get());
+
+        return job.get();
     }
 
     /**
@@ -129,23 +164,112 @@ public class JobServiceImpl implements JobService {
         log.info("Job deleted successfully with ID: {}", jobId);
     }
 
+    @Transactional
     @Override
     public void activateJob(String jobId, String companyId) {
 
     }
 
+    @Transactional
     @Override
     public void deactivateJob(String jobId, String companyId) {
 
     }
 
+    @Transactional(readOnly = true)
     @Override
-    public List<HashMap<String, Object>> getJobCategories() {
-        return List.of();
+    public Page<Job> getJobByCategory(JobCategory jobCategory, Pageable pageable) {
+
+        if (jobCategory == null) {
+            return Page.empty();
+        }
+
+        return jobRepository.findByJobCategory(jobCategory, pageable);
+    }
+
+    @Transactional(readOnly = true)
+    @Override
+    public List<Job> getJobsPersonalized(String userId) {
+
+        // Validate userId
+        if (userId == null || userId.trim().isEmpty()) {
+            throw new IllegalArgumentException("User ID cannot be null or empty");
+        }
+
+        // Check if candidate exists
+        candidateRepository.findById(userId)
+                .orElseThrow(() -> new NotFoundException("Candidate not found with id: " + userId));
+
+        // Get current date for filtering expired jobs
+        String currentDate = LocalDate.now().toString();
+
+        // Fetch and return personalized jobs from repository
+        return jobRepository.findJobByPersonalized(userId, currentDate);
     }
 
     @Override
-    public List<Job> getJobsPersonalized(String userId) {
-        return List.of();
+    public List<Job> getJobsForAnonymousUser() {
+
+        // Get new job
+        List<Job> newJobs = jobRepository.findAllByOrderByCreatedDateDesc(PageRequest.of(0, 8));
+        if (newJobs == null) {
+            return new ArrayList<>();
+        }
+
+        return newJobs;
+    }
+
+    @Transactional(readOnly = true)
+    @Override
+    public List<Job> getJobsPopular() {
+
+        List<Job> jobsPopular = jobRepository.findPopularJob();
+        if (jobsPopular.isEmpty()) {
+            return new ArrayList<>();
+        }
+
+        return jobsPopular;
+    }
+
+    /**
+     * Hàm lấy ra job theo query và company ID
+     *
+     * @param query Dữ liệu tìm kiếm
+     * @param companyId ID của company
+     * @return Map<ID, Job>
+     */
+    @Transactional(readOnly = true)
+    @Override
+    public Map<String, String> lookup(String companyId, String query) {
+
+        Map<String, String> jobs = jobRepository.lookup(companyId, query);
+
+        if (jobs == null) {
+            return Map.of();
+        }
+
+        return jobs;
+    }
+
+    /**
+     * Hàm search job theo filter và company ID
+     *
+     * @param filter Dữ liệu tìm kiếm
+     * @param query Data tim kiem
+     * @param companyId ID của company
+     * @return Map<ID, Job>
+     */
+    @Transactional(readOnly = true)
+    @Override
+    public Page<Job> search(JobFilterRequest filter, String companyId, String query, Pageable pageable) {
+
+        // Get params from filter
+        List<Status> statuses = filter.getStatuses();
+        List<JobCategory> jobCategories = filter.getJobCategories();
+        List<EmploymentType> employmentTypes = filter.getEmploymentTypes();
+
+        Page<Job> jobs = jobRepository.search(companyId, statuses, jobCategories, employmentTypes, query, pageable);
+
+        return jobs;
     }
 }

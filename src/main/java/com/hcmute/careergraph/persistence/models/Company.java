@@ -21,6 +21,9 @@ public class Company extends Party {
     @Column(name = "size")
     private String size;
 
+    @Column(name = "name")
+    private String name;
+
     @Column(name = "website")
     private String website;
 
