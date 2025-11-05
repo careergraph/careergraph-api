@@ -51,6 +51,11 @@ public abstract class BaseEntity {
 
     @PrePersist
     public void prePersist() {
+
+        if (this.status == null) {
+            this.status = Status.ACTIVE;
+        }
+
         if (this.createdDate == null) {
             this.createdDate = LocalDateTime.now();
         }

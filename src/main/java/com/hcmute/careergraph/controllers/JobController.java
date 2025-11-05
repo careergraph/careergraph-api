@@ -21,6 +21,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -101,15 +102,11 @@ public class JobController {
         Pageable pageable = PageRequest.of(page, size);
 
         Page<Job> jobPage = jobService.getAllJobs(pageable);
-        List<JobResponse> jobResponses = jobPage.stream()
-                .map(job -> jobMapper.toResponse(job))
-                .toList();
-        Page<JobResponse> result = new PageImpl<>(jobResponses, pageable, jobPage.getSize());
 
         return RestResponse.<Page<JobResponse>>builder()
                 .status(HttpStatus.OK)
                 .message("Jobs retrieved successfully")
-                .data(result)
+                .data(mapToJobResponsePage(jobPage, pageable))
                 .build();
     }
 
@@ -134,16 +131,11 @@ public class JobController {
         Pageable pageable = PageRequest.of(page, size);
 
         Page<Job> jobPage = jobService.getJobsByCompany(companyId, pageable);
-        List<JobResponse> jobs = jobPage.stream()
-                .map(job -> jobMapper.toResponse(job))
-                .toList();
-
-        Page result = new PageImpl<>(jobs, pageable, jobPage.getSize());
 
         return RestResponse.<Page<JobResponse>>builder()
                 .status(HttpStatus.OK)
                 .message("Jobs retrieved successfully")
-                .data(result)
+                .data(mapToJobResponsePage(jobPage, pageable))
                 .build();
     }
 
@@ -308,7 +300,7 @@ public class JobController {
      * @return RestResponse<Page<JobResponse>>
      */
     @GetMapping("/personalized")
-    public RestResponse<Page<JobResponse>> getJobsPersonalized(
+    public RestResponse<List<JobResponse>> getJobsPersonalized(
             @RequestParam(name = "page", defaultValue = "0") Integer page,
             @RequestParam(name = "size", defaultValue = "10") Integer size,
             Authentication authentication
@@ -317,14 +309,47 @@ public class JobController {
 
         Pageable pageable = PageRequest.of(page, size);
 
-        // TODO: Cần thêm method getJobsPersonalized trong JobService
-        // String candidateId = extractCandidateId(authentication);
-        // Page<JobResponse> jobs = jobService.getJobsPersonalized(candidateId, pageable);
+        String candidateId = securityUtils.extractCandidateId(authentication);
+        List<Job> recommendationJobs = new ArrayList<>();
+        if (candidateId == null) {
+            recommendationJobs = jobService.getJobsForAnonymousUser();
+        } else {
+            recommendationJobs = jobService.getJobsPersonalized(candidateId);
+        }
 
-        return RestResponse.<Page<JobResponse>>builder()
+        return RestResponse.<List<JobResponse>>builder()
                 .status(HttpStatus.OK)
                 .message("Jobs retrieved successfully")
-                .data(null) // TODO: Replace with actual data
+                .data(mapToJobResponseList(recommendationJobs))
+                .build();
+    }
+
+    /**
+     * GET /api/v1/jobs/popular
+     * Lấy danh sách jobs pho bien
+     * Dựa trên skills, experience, preferences của candidate
+     *
+     * @param page Page number
+     * @param size Page size
+     * @param authentication Authentication để lấy candidate info
+     * @return RestResponse<Page<JobResponse>>
+     */
+    @GetMapping("/popular")
+    public RestResponse<List<JobResponse>> getJobsPopular(
+            @RequestParam(name = "page", defaultValue = "0") Integer page,
+            @RequestParam(name = "size", defaultValue = "10") Integer size,
+            Authentication authentication
+    ) {
+        log.info("GET /api/v1/jobs/popular - Fetching personalized jobs");
+
+        Pageable pageable = PageRequest.of(page, size);
+
+        List<Job> jobsPopular = jobService.getJobsPopular();
+
+        return RestResponse.<List<JobResponse>>builder()
+                .status(HttpStatus.OK)
+                .message("Jobs retrieved successfully")
+                .data(mapToJobResponseList(jobsPopular))
                 .build();
     }
 
@@ -423,6 +448,14 @@ public class JobController {
         List<JobResponse> jobResponses = jobPage.stream()
                 .map(job -> jobMapper.toResponse(job))
                 .toList();
-        return new PageImpl<>(jobResponses, pageable, jobPage.getSize());
+        return new PageImpl<>(jobResponses, pageable, jobPage.getTotalElements());
+    }
+
+    // Helper method to map to response page
+    private List<JobResponse> mapToJobResponseList(List<Job> jobs) {
+        List<JobResponse> jobResponses = jobs.stream()
+                .map(job -> jobMapper.toResponse(job))
+                .toList();
+        return jobResponses;
     }
 }
