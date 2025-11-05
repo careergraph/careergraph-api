@@ -23,13 +23,13 @@ public interface CompanyRepository extends JpaRepository<Company, String> {
 
     @Query(
             value = """
-        SELECT TOP(7) 
-            CAST(c.id AS VARCHAR) AS id, 
+        SELECT
+            c.id::text AS id,
             c.name AS name
-        FROM company c
+        FROM companies c
         WHERE LOWER(c.name) LIKE LOWER(CONCAT('%', :query, '%'))
     """,
             nativeQuery = true
     )
-    List<HashMap<String, String>> lookup(@Param("query")  String query);
+    List<Object[]> lookup(@Param("query")  String query);
 }

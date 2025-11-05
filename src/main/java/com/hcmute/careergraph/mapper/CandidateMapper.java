@@ -10,9 +10,13 @@ import com.hcmute.careergraph.persistence.models.Contact;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
+import java.time.YearMonth;
+import java.time.format.DateTimeFormatter;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 @Component
 public class CandidateMapper {
@@ -25,6 +29,9 @@ public class CandidateMapper {
     private CandidateSkillMapper candidateSkillMapper;
     @Autowired
     private CandidateExperienceMapper candidateExperienceMapper;
+
+    @Autowired
+    private CandidateEducationMapper candidateEducationMapper;
 
     public CandidateResponse toResponse(Candidate candidate) {
         if (candidate == null) {
@@ -75,9 +82,19 @@ public class CandidateMapper {
                 .contacts(contactMapper.toResponses(candidate.getContacts()))
                 .skills(candidateSkillMapper.toResponses(candidate.getSkills()))
                 .experiences(candidateExperienceMapper.toResponses(candidate.getExperiences()))
+                .educations(candidateEducationMapper.toResponses(candidate.getEducations()))
                 .build();
 
 
+    }
+    private List<CandidateClientResponse.CandidateExperienceResponse> sort(Set<CandidateClientResponse.CandidateExperienceResponse> candidateExperiences) {
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM");
+
+        return candidateExperiences.stream()
+                .sorted(Comparator.comparing(
+                        (CandidateClientResponse.CandidateExperienceResponse exp) -> YearMonth.parse(exp.startDate(), formatter)
+                ).reversed())
+                .collect(Collectors.toList());
     }
 
     private String primaryResume(List<String> resumes) {

@@ -24,4 +24,10 @@ public interface CandidateService {
 
     Candidate updateExperience(String candidateId, String experienceId, CandidateRequest.CandidateExperienceRequest candidateRequest) throws ChangeSetPersister.NotFoundException;
     Candidate deleteExperience(String candidateId, String experienceId) throws ChangeSetPersister.NotFoundException;
+
+    Candidate addEducation(String candidateId,  CandidateRequest.CandidateEducationRequest candidateRequest) throws ChangeSetPersister.NotFoundException;
+
+    Candidate updateEducation(String candidateId, String experienceId, CandidateRequest.CandidateEducationRequest candidateRequest) throws ChangeSetPersister.NotFoundException;
+    Candidate deleteEducation(String candidateId, String experienceId) throws ChangeSetPersister.NotFoundException;
+
 }

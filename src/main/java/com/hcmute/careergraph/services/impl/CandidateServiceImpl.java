@@ -5,12 +5,11 @@ import com.hcmute.careergraph.enums.candidate.ContactType;
 import com.hcmute.careergraph.enums.common.FileType;
 import com.hcmute.careergraph.enums.common.Status;
 import com.hcmute.careergraph.helper.SecurityUtils;
+import com.hcmute.careergraph.mapper.CandidateEducationMapper;
 import com.hcmute.careergraph.mapper.CandidateExperienceMapper;
 import com.hcmute.careergraph.persistence.dtos.request.CandidateRequest;
 import com.hcmute.careergraph.persistence.models.*;
-import com.hcmute.careergraph.repositories.CandidateExperienceRepository;
-import com.hcmute.careergraph.repositories.CandidateRepository;
-import com.hcmute.careergraph.repositories.CompanyRepository;
+import com.hcmute.careergraph.repositories.*;
 import com.hcmute.careergraph.services.CandidateService;
 import com.hcmute.careergraph.services.S3StorageService;
 import lombok.RequiredArgsConstructor;
@@ -22,9 +21,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
+import java.time.YearMonth;
+import java.time.format.DateTimeFormatter;
+import java.util.*;
+import java.util.stream.Collectors;
 
 @Service
 @Transactional
@@ -41,6 +41,10 @@ public class CandidateServiceImpl implements CandidateService {
     private final CandidateExperienceMapper candidateExperienceMapper;
 
     private final CandidateExperienceRepository candidateExperienceRepository;
+    private final CandidateEducationMapper  candidateEducationMapper;
+
+    private final EducationRepository educationRepository;
+    private final CandidateEducationRepository candidateEducationRepository;
 
 
     @Override
@@ -112,6 +116,7 @@ public class CandidateServiceImpl implements CandidateService {
         return storageService.getFileUrl(objectKey);
     }
     @Override
+    @Transactional(readOnly = true)
     public Candidate getMyProfile(String candidateId) throws ChangeSetPersister.NotFoundException {
         return candidateRepository.findById(candidateId)
                 .orElseThrow(ChangeSetPersister.NotFoundException::new);
@@ -207,10 +212,13 @@ public class CandidateServiceImpl implements CandidateService {
         Candidate candidate = candidateRepository.findById(candidateId)
                 .orElseThrow(ChangeSetPersister.NotFoundException::new);
         Company company=null;
+        CandidateExperience candidateExperience = candidateExperienceMapper.toEntity(candidateRequest);
         if(candidateRequest.companyId() != null) {
-            company = companyRepository.findById(candidateRequest.companyId())
-                    .orElseThrow(ChangeSetPersister.NotFoundException::new);
-        }
+                company = companyRepository.findById(candidateRequest.companyId()).get();
+                candidateExperience.setCompany(company);
+            }
+
+
         if(company == null){
             company = new Company();
             company.setName(candidateRequest.companyName());
@@ -218,9 +226,9 @@ public class CandidateServiceImpl implements CandidateService {
             companyRepository.save(company);
 
         }
-        CandidateExperience candidateExperience = candidateExperienceMapper.toEntity(candidateRequest);
+
         candidateExperience.setCompany(company);
-        candidateExperience.setCandidate( candidate );
+        candidateExperience.setCandidate(candidate);
         candidateExperience.setStatus(Status.ACTIVE);
         if(candidate.getExperiences()==null){
             Set<CandidateExperience> candidateExperiences = new HashSet<>();
@@ -233,9 +241,28 @@ public class CandidateServiceImpl implements CandidateService {
 
     @Override
     public Candidate updateExperience(String candidateId, String experienceId, CandidateRequest.CandidateExperienceRequest candidateRequest) throws ChangeSetPersister.NotFoundException {
+        Candidate candidate = candidateRepository.findById(candidateId)
+                .orElseThrow(ChangeSetPersister.NotFoundException::new);
         CandidateExperience candidateExperience = candidateExperienceRepository.findById(experienceId)
                 .orElseThrow(ChangeSetPersister.NotFoundException::new);
         candidateExperience = candidateExperienceMapper.toUpdateEntity(candidateRequest, candidateExperience);
+        if(candidateRequest.companyId() != null) {
+
+            if(candidate.getExperiences().stream()
+                    .anyMatch(
+                            ex -> ex.getCompany().getId()
+                                    .equals(candidateRequest.companyId())
+                    )) {
+                Company company = companyRepository.findById(candidateRequest.companyId()).get();
+                candidateExperience.setCompany(company);
+            }
+        }else{
+            Company company = new Company();
+            company.setName(candidateRequest.companyName());
+            company.setStatus(Status.ACTIVE);
+            companyRepository.save(company);
+            candidateExperience.setCompany(company);
+        }
         candidateExperienceRepository.save(candidateExperience);
         return candidateRepository.findById(candidateId)
                 .orElseThrow(ChangeSetPersister.NotFoundException::new);
@@ -247,6 +274,68 @@ public class CandidateServiceImpl implements CandidateService {
                 .orElseThrow(ChangeSetPersister.NotFoundException::new);
         candidateExperience.softDelete();
         candidateExperienceRepository.save(candidateExperience);
+        return candidateRepository.findById(candidateId)
+                .orElseThrow(ChangeSetPersister.NotFoundException::new);
+    }
+
+    @Override
+    public Candidate addEducation(String candidateId, CandidateRequest.CandidateEducationRequest candidateRequest) throws ChangeSetPersister.NotFoundException {
+        Candidate candidate = candidateRepository.findById(candidateId)
+                .orElseThrow(ChangeSetPersister.NotFoundException::new);
+        CandidateEducation candidateEducation = candidateEducationMapper.toEntity(candidateRequest);
+        Education education=null;
+        if(candidateRequest.universityId() != null) {
+            if(!candidateRequest.universityId().equals(candidateEducation.getEducation().getId())) {
+                education = educationRepository.findById(candidateRequest.universityId())
+                        .orElseThrow(ChangeSetPersister.NotFoundException::new);
+            }
+        }
+        if(education == null){
+            education = new Education();
+            education.setOfficialName(candidateRequest.officialName());
+            education.setStatus(Status.ACTIVE);
+            educationRepository.save(education);
+            candidateEducation.setEducation(education);
+        }
+        candidateEducation.setCandidate(candidate);
+        candidateEducation.setStatus(Status.ACTIVE);
+        if(candidate.getExperiences()==null){
+            Set<CandidateExperience> candidateExperiences = new HashSet<>();
+            candidate.setExperiences(candidateExperiences);
+        }
+        candidate.getEducations().add(candidateEducation);
+
+        return candidateRepository.save(candidate);
+    }
+
+    @Override
+    public Candidate updateEducation(String candidateId, String experienceId, CandidateRequest.CandidateEducationRequest candidateRequest) throws ChangeSetPersister.NotFoundException {
+        CandidateEducation candidateEducation = candidateEducationRepository.findById(experienceId)
+                .orElseThrow(ChangeSetPersister.NotFoundException::new);
+        candidateEducation = candidateEducationMapper.toEntity(candidateRequest,candidateEducation);
+        if(candidateRequest.universityId() != null) {
+            if(!candidateEducation.getEducation().getId().equals(candidateRequest.universityId())) {
+                Education education = educationRepository.findById(candidateRequest.universityId()).get();
+                candidateEducation.setEducation(education);
+            }
+        }else{
+            Education education = new Education();
+            education.setOfficialName(candidateRequest.officialName());
+            education.setStatus(Status.ACTIVE);
+            educationRepository.save(education);
+            candidateEducation.setEducation(education);
+        }
+        candidateEducationRepository.save(candidateEducation);
+        return candidateRepository.findById(candidateId)
+                .orElseThrow(ChangeSetPersister.NotFoundException::new);
+    }
+
+    @Override
+    public Candidate deleteEducation(String candidateId, String educationId) throws ChangeSetPersister.NotFoundException {
+        CandidateEducation candidateEducation = candidateEducationRepository.findById(educationId)
+                .orElseThrow(ChangeSetPersister.NotFoundException::new);
+        candidateEducation.softDelete();
+        candidateEducationRepository.save(candidateEducation);
         return candidateRepository.findById(candidateId)
                 .orElseThrow(ChangeSetPersister.NotFoundException::new);
     }

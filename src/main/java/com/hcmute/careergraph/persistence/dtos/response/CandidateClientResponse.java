@@ -1,5 +1,11 @@
 package com.hcmute.careergraph.persistence.dtos.response;
 
+import com.hcmute.careergraph.persistence.models.Candidate;
+import com.hcmute.careergraph.persistence.models.Education;
+import jakarta.persistence.Column;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
 import lombok.Builder;
 
 import java.util.List;
@@ -67,4 +73,32 @@ public final class CandidateClientResponse {
             String currentPosition
     ) {
     }
+
+    @Builder
+    public record CandidateEducationResponse(
+            String startDate,
+            String endDate,
+            String degreeTitle,
+            Boolean isCurrent,
+            String description,
+            String universityId,
+            String officialName,
+            String major
+    ){}
+
+    @Builder
+    public record CandidateExperienceResponse(
+            String id,
+            String startDate,
+            String endDate,
+            Integer salary,
+            String jobTitle,
+            Boolean isCurrent,
+            String description,
+            String candidateId,
+            String companyId,
+            String companyName
+    ) {
+    }
+
 }

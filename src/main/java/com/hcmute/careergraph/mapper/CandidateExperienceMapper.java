@@ -1,20 +1,24 @@
 package com.hcmute.careergraph.mapper;
 
 import com.hcmute.careergraph.persistence.dtos.request.CandidateRequest;
-import com.hcmute.careergraph.persistence.dtos.response.CandidateExperienceResponse;
+import com.hcmute.careergraph.persistence.dtos.response.CandidateClientResponse;
 import com.hcmute.careergraph.persistence.models.BaseEntity;
 import com.hcmute.careergraph.persistence.models.CandidateExperience;
 import org.springframework.stereotype.Component;
 
+import java.time.YearMonth;
+import java.time.format.DateTimeFormatter;
+import java.util.Comparator;
+import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
 
 @Component
 public class CandidateExperienceMapper {
-    public CandidateExperienceResponse toResponse(CandidateExperience candidateExperience) {
-        if(candidateExperience == null) return CandidateExperienceResponse.builder().build();
+    public CandidateClientResponse.CandidateExperienceResponse toResponse(CandidateExperience candidateExperience) {
+        if(candidateExperience == null) return CandidateClientResponse.CandidateExperienceResponse.builder().build();
 
-        return CandidateExperienceResponse.builder()
+        return CandidateClientResponse.CandidateExperienceResponse.builder()
                 .id(candidateExperience.getId())
                 .description(candidateExperience.getDescription())
                 .endDate(candidateExperience.getEndDate())
@@ -25,9 +29,15 @@ public class CandidateExperienceMapper {
                 .jobTitle(candidateExperience.getJobTitle())
                 .build();
     }
-    public Set<CandidateExperienceResponse> toResponses(Set<CandidateExperience> candidateExperiences) {
-        if(candidateExperiences == null) return Set.of();
-        return candidateExperiences.stream().filter(BaseEntity::isActive).map(this::toResponse).collect(Collectors.toSet());
+    public List<CandidateClientResponse.CandidateExperienceResponse> toResponses(Set<CandidateExperience> candidateExperiences) {
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM");
+
+        if(candidateExperiences == null) return List.of();
+        return candidateExperiences.stream().filter(BaseEntity::isActive)
+                        .sorted(Comparator.comparing(
+                                (CandidateExperience exp) -> YearMonth.parse(exp.getStartDate(), formatter)
+                        ).reversed())
+                        .map(this::toResponse).collect(Collectors.toList());
     }
 
     public CandidateExperience toEntity(CandidateRequest.CandidateExperienceRequest candidateRequest) {

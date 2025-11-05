@@ -25,6 +25,9 @@ public class CandidateEducation extends BaseEntity {
     @Column(name = "degree_title")
     private String degreeTitle;
 
+    @Column(name = "major")
+    private String major;
+
     @Column(name = "is_current")
     private Boolean isCurrent;
 
