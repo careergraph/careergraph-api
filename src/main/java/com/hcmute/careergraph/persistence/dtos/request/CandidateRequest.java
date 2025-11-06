@@ -1,6 +1,7 @@
 package com.hcmute.careergraph.persistence.dtos.request;
 
-import lombok.Builder;
+import jakarta.validation.constraints.NotNull;
+import lombok.*;
 
 import java.util.List;
 
@@ -63,4 +64,46 @@ public final class CandidateRequest {
             String currentPosition
     ) {
     }
+
+    @Builder
+    public record CandidateExperienceRequest(
+            String startDate,
+            String endDate,
+            Integer salary,
+            String jobTitle,
+            Boolean isCurrent,
+            String description,
+            String candidateId,
+            String companyId,
+            String companyName
+    ) {
+    }
+
+
+    @Builder
+    public record CandidateEducationRequest(
+            String startDate,
+            String endDate,
+            String degreeTitle,
+            Boolean isCurrent,
+            String description,
+            String universityId,
+            String officialName,
+            String major
+    ){}
+
+//    @Builder
+//    public record ReplaceSkillsRequest (
+//            List<String> skills
+//    ){}
+
+    @Getter
+    @Setter
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class ReplaceSkillsRequest {
+        @NotNull
+        private List<String> skills;
+    }
+
 }

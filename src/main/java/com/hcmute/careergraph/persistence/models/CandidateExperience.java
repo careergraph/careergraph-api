@@ -40,7 +40,7 @@ public class CandidateExperience extends BaseEntity {
     private Candidate candidate;
 
     // Many-to-One relationship with Company
-    @ManyToOne(fetch = FetchType.LAZY)
+    @ManyToOne(fetch = FetchType.EAGER)
     @JoinColumn(name = "company_id")
     private Company company;
 }
