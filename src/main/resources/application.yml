@@ -14,7 +14,7 @@ logging:
     org.springframework.transaction: DEBUG
 
 jwt:
-  signer-key: ${JWT_SIGNER_KEY:}
+  signer-key: ${JWT_SIGNER_KEY:uT+Q3VZKCE+yNxmPoB0SH7qqDB8EGtBQY/F1GK2shIRKMZasRvvvyI5T/5y/FDX+}
   valid-duration: ${JWT_VALID_DURATION:3600}
   refreshable-duration: ${JWT_REFRESHABLE_DURATION:36000}
 
