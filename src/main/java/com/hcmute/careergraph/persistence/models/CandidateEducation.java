@@ -40,7 +40,7 @@ public class CandidateEducation extends BaseEntity {
     private Candidate candidate;
 
     // Many-to-One relationship with Education
-    @ManyToOne(fetch = FetchType.LAZY)
+    @ManyToOne(fetch = FetchType.EAGER)
     @JoinColumn(name = "education_id")
     private Education education;
 }

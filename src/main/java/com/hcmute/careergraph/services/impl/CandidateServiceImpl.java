@@ -15,14 +15,11 @@ import com.hcmute.careergraph.services.S3StorageService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.logging.log4j.util.InternalException;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.crossstore.ChangeSetPersister;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
-import java.time.YearMonth;
-import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -45,6 +42,10 @@ public class CandidateServiceImpl implements CandidateService {
 
     private final EducationRepository educationRepository;
     private final CandidateEducationRepository candidateEducationRepository;
+
+    private static final int MAX = 20;
+    private final SkillRepository skillRepository;
+    private final CandidateSkillRepository candidateSkillRepository;
 
 
     @Override
@@ -309,8 +310,8 @@ public class CandidateServiceImpl implements CandidateService {
     }
 
     @Override
-    public Candidate updateEducation(String candidateId, String experienceId, CandidateRequest.CandidateEducationRequest candidateRequest) throws ChangeSetPersister.NotFoundException {
-        CandidateEducation candidateEducation = candidateEducationRepository.findById(experienceId)
+    public Candidate updateEducation(String candidateId, String educationId, CandidateRequest.CandidateEducationRequest candidateRequest) throws ChangeSetPersister.NotFoundException {
+        CandidateEducation candidateEducation = candidateEducationRepository.findById(educationId)
                 .orElseThrow(ChangeSetPersister.NotFoundException::new);
         candidateEducation = candidateEducationMapper.toEntity(candidateRequest,candidateEducation);
         if(candidateRequest.universityId() != null) {
@@ -339,6 +340,80 @@ public class CandidateServiceImpl implements CandidateService {
         return candidateRepository.findById(candidateId)
                 .orElseThrow(ChangeSetPersister.NotFoundException::new);
     }
+
+    @Transactional
+    @Override
+    public Candidate replaceSkillsForUser(String candidateId, CandidateRequest.ReplaceSkillsRequest request)
+            throws ChangeSetPersister.NotFoundException {
+
+        Candidate candidate = candidateRepository.findById(candidateId)
+                .orElseThrow(ChangeSetPersister.NotFoundException::new);
+
+        // Lấy collection managed (không copy)
+        Set<CandidateSkill> managed = Optional.ofNullable(candidate.getSkills())
+                .orElseGet(() -> {
+                    Set<CandidateSkill> init = new HashSet<>();
+                    candidate.setSkills(init);
+                    return init;
+                });
+
+        // Nếu request rỗng => xoá sạch thông qua orphanRemoval
+        if (request == null || request.getSkills() == null || request.getSkills().isEmpty()) {
+            managed.clear();           // orphanRemoval sẽ DELETE từng row
+            return candidate;
+        }
+
+        // Chuẩn hoá tên
+        List<String> normalized = request.getSkills().stream()
+                .filter(Objects::nonNull)
+                .map(s -> s.replaceAll("\\s+", " ").trim())
+                .filter(s -> !s.isEmpty())
+                .map(s -> s.length() > 120 ? s.substring(0, 120) : s)
+                .distinct()
+                .toList();
+
+        // 1) Xoá những skill KHÔNG còn trong normalized (chỉ thao tác collection)
+        managed.removeIf(cs -> {
+            String existName = cs.getSkill() != null ? cs.getSkill().getName() : null;
+            return existName != null && normalized.stream().noneMatch(existName::equals);
+        });
+        // -> orphanRemoval tạo DELETE theo id cho những phần tử bị remove
+
+        // 2) Tên cần thêm
+        List<String> toAddNames = normalized.stream()
+                .filter(name -> managed.stream()
+                        .noneMatch(cs -> Objects.equals(cs.getSkill().getName(), name)))
+                .toList();
+
+        if (!toAddNames.isEmpty()) {
+            List<Skill> existed = skillRepository.findByNameIn(toAddNames);
+            Map<String, Skill> byExactName = existed.stream()
+                    .filter(s -> s.getName() != null)
+                    .collect(Collectors.toMap(Skill::getName, s -> s, (a, b) -> a, LinkedHashMap::new));
+
+            for (String name : toAddNames) {
+                byExactName.computeIfAbsent(name, n -> {
+                    Skill created = new Skill();
+                    created.setName(n);
+                    return skillRepository.save(created);
+                });
+            }
+
+            for (String name : toAddNames) {
+                Skill skill = byExactName.get(name);
+                CandidateSkill cs = new CandidateSkill();
+                cs.setCandidate(candidate);
+                cs.setSkill(skill);
+                cs.setIsVerified(false);
+                cs.setEndorsementCount(0);
+                managed.add(cs); // add vào collection là đủ; cascade persist sẽ lo
+            }
+        }
+
+        return candidate;
+    }
+
+
 
 
 }

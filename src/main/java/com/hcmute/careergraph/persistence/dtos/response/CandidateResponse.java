@@ -40,7 +40,7 @@ public record CandidateResponse(
         Set<ConnectionResponse> connections,
         List<CandidateClientResponse.CandidateEducationResponse> educations,
         List<CandidateClientResponse.CandidateExperienceResponse> experiences,
-        Set<CandidateSkillResponse> skills,
+        List<CandidateSkillResponse> skills,
         Set<ApplicationResponse> applications
 ) {
     public CandidateResponse {
@@ -49,7 +49,7 @@ public record CandidateResponse(
         connections = connections != null ? connections : Set.of();
         educations = educations != null ? educations : List.of();
         experiences = experiences != null ? experiences : List.of();
-        skills = skills != null ? skills : Set.of();
+        skills = skills != null ? skills : List.of();
         applications = applications != null ? applications : Set.of();
         industries = industries != null ? industries: List.of();
         locations = locations != null ? locations : List.of();

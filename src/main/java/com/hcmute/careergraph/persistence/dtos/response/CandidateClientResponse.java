@@ -76,6 +76,7 @@ public final class CandidateClientResponse {
 
     @Builder
     public record CandidateEducationResponse(
+            String id,
             String startDate,
             String endDate,
             String degreeTitle,
@@ -98,6 +99,13 @@ public final class CandidateClientResponse {
             String candidateId,
             String companyId,
             String companyName
+    ) {
+    }
+
+    @Builder
+    public record CandidateSkillResponse(
+            String id,
+            String name
     ) {
     }
 
