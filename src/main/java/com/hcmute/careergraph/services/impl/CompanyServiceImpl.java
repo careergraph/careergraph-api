@@ -10,6 +10,10 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+
 @Service
 @RequiredArgsConstructor
 @Slf4j
@@ -21,9 +25,20 @@ public class CompanyServiceImpl implements CompanyService {
     @Transactional(readOnly = true)
     public Company getCompanyById(String companyId) {
 
-        Company company = companyRepository.findById(companyId)
+        return companyRepository.findById(companyId)
                 .orElseThrow(() -> new NotFoundException("Company not found"));
+    }
 
-        return company;
+    @Override
+    public List<HashMap<String, String>> lookup(String query) {
+        List<Object[]> raw = companyRepository.lookup(query);
+        List<HashMap<String, String>> result = new ArrayList<>();
+        for (Object[] row : raw) {
+            HashMap<String, String> map = new HashMap<>();
+            map.put("id", String.valueOf(row[0]));
+            map.put("name", String.valueOf(row[1]));
+            result.add(map);
+        }
+        return result;
     }
 }
