@@ -6,9 +6,11 @@ import com.hcmute.careergraph.helper.SecurityUtils;
 import com.hcmute.careergraph.mapper.CandidateEducationMapper;
 import com.hcmute.careergraph.mapper.CandidateExperienceMapper;
 import com.hcmute.careergraph.mapper.CandidateMapper;
+import com.hcmute.careergraph.mapper.CandidateSkillMapper;
 import com.hcmute.careergraph.persistence.dtos.request.CandidateRequest;
 import com.hcmute.careergraph.persistence.dtos.response.CandidateClientResponse;
 import com.hcmute.careergraph.persistence.dtos.response.CandidateResponse;
+import com.hcmute.careergraph.persistence.dtos.response.CandidateSkillResponse;
 import com.hcmute.careergraph.persistence.models.Candidate;
 import com.hcmute.careergraph.services.CandidateService;
 import jakarta.validation.Valid;
@@ -30,6 +32,7 @@ public class CandidateController {
     private final SecurityUtils securityUtils;
     private final CandidateExperienceMapper candidateExperienceMapper;
     private final CandidateEducationMapper candidateEducationMapper;
+    private final CandidateSkillMapper candidateSkillMapper;
 
     @PostMapping("/{id}/files")
     public RestResponse<String> uploadFile(
@@ -142,12 +145,23 @@ public class CandidateController {
                 .build();
     }
 
+
+
     @DeleteMapping("/educations/{educationId}")
     public RestResponse<List<CandidateClientResponse.CandidateEducationResponse>> deleteEducation(@PathVariable String educationId) throws ChangeSetPersister.NotFoundException{
         Candidate candidate = candidateService.deleteEducation(securityUtils.getCandidateId().get(), educationId);
         return RestResponse.<List<CandidateClientResponse.CandidateEducationResponse>>builder()
                 .status(HttpStatus.OK)
                 .data(candidateEducationMapper.toResponses(candidate.getEducations()))
+                .build();
+    }
+
+    @PutMapping("/skills")
+    public RestResponse<List<CandidateSkillResponse>> replaceSkillsForUser( @Valid @RequestBody CandidateRequest.ReplaceSkillsRequest request) throws ChangeSetPersister.NotFoundException{
+        Candidate candidate = candidateService.replaceSkillsForUser(securityUtils.getCandidateId().get(), request);
+        return RestResponse.<List<CandidateSkillResponse>>builder()
+                .status(HttpStatus.OK)
+                .data(candidateSkillMapper.toResponseList(candidate.getSkills()))
                 .build();
     }
 }

@@ -25,6 +25,7 @@ public class EducationServiceIml implements EducationService {
             HashMap<String, String> map = new HashMap<>();
             map.put("id", row[0].toString());
             map.put("name", row[1].toString());
+            result.add(map);
         }
         return result;
     }

@@ -21,11 +21,14 @@ public class CandidateEducationMapper {
     public CandidateClientResponse.CandidateEducationResponse toResponse(CandidateEducation candidateEducation){
         if(candidateEducation == null) return CandidateClientResponse.CandidateEducationResponse.builder().build();
         return CandidateClientResponse.CandidateEducationResponse.builder()
+                .id(candidateEducation.getId())
                 .major(candidateEducation.getMajor())
                 .startDate(candidateEducation.getStartDate())
                 .endDate(candidateEducation.getEndDate())
                 .degreeTitle(candidateEducation.getDegreeTitle())
                 .description(candidateEducation.getDescription())
+                .universityId(candidateEducation.getEducation().getId())
+                .officialName(candidateEducation.getEducation().getOfficialName())
                 .build();
     }
     public List<CandidateClientResponse.CandidateEducationResponse> toResponses(Set<CandidateEducation> candidateEducations){

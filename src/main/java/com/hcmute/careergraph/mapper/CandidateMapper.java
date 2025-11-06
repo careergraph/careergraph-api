@@ -80,7 +80,7 @@ public class CandidateMapper {
                 )
                 .addresses(addressMaper.toResponses(candidate.getAddresses()))
                 .contacts(contactMapper.toResponses(candidate.getContacts()))
-                .skills(candidateSkillMapper.toResponses(candidate.getSkills()))
+                .skills(candidateSkillMapper.toResponseList(candidate.getSkills()))
                 .experiences(candidateExperienceMapper.toResponses(candidate.getExperiences()))
                 .educations(candidateEducationMapper.toResponses(candidate.getEducations()))
                 .build();
