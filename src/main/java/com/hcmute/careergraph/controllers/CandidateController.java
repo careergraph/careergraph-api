@@ -1,6 +1,7 @@
 package com.hcmute.careergraph.controllers;
 
 import com.hcmute.careergraph.enums.common.FileType;
+import com.hcmute.careergraph.exception.BadRequestException;
 import com.hcmute.careergraph.helper.RestResponse;
 import com.hcmute.careergraph.helper.SecurityUtils;
 import com.hcmute.careergraph.mapper.CandidateEducationMapper;
@@ -17,6 +18,7 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.crossstore.ChangeSetPersister;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -62,8 +64,14 @@ public class CandidateController {
     }
 
     @GetMapping("/me")
-    public RestResponse<CandidateResponse> getMyProfile() throws ChangeSetPersister.NotFoundException {
-        Candidate candidate = candidateService.getMyProfile(securityUtils.getCandidateId().get());
+    public RestResponse<CandidateResponse> getMyProfile(Authentication authentication) throws ChangeSetPersister.NotFoundException {
+
+        String candidateId = securityUtils.extractCandidateId(authentication);
+        if (candidateId == null || candidateId.isEmpty()) {
+            throw new BadRequestException("Candidate ID invalid");
+        }
+
+        Candidate candidate = candidateService.getMyProfile(candidateId);
 
         return RestResponse.<CandidateResponse>builder()
                 .status(HttpStatus.OK)

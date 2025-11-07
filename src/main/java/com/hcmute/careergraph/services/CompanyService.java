@@ -8,5 +8,6 @@ import java.util.List;
 public interface CompanyService {
 
     Company getCompanyById(String companyId);
+
     List<HashMap<String, String>> lookup(String companyId);
 }

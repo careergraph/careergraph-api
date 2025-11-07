@@ -17,6 +17,11 @@ public record JobResponse(
         String description,
         String department,
 
+        // Basic info of company
+        String companyId,
+        String companyAvatar,
+        String companyName,
+
         // Arrays
         List<String> responsibilities,
         List<String> qualifications,

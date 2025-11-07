@@ -26,11 +26,13 @@ public interface CandidateService {
     Candidate addExperience(String candidateId,  CandidateRequest.CandidateExperienceRequest candidateRequest) throws ChangeSetPersister.NotFoundException;
 
     Candidate updateExperience(String candidateId, String experienceId, CandidateRequest.CandidateExperienceRequest candidateRequest) throws ChangeSetPersister.NotFoundException;
+
     Candidate deleteExperience(String candidateId, String experienceId) throws ChangeSetPersister.NotFoundException;
 
     Candidate addEducation(String candidateId,  CandidateRequest.CandidateEducationRequest candidateRequest) throws ChangeSetPersister.NotFoundException;
 
     Candidate updateEducation(String candidateId, String educationId, CandidateRequest.CandidateEducationRequest candidateRequest) throws ChangeSetPersister.NotFoundException;
+
     Candidate deleteEducation(String candidateId, String educationId) throws ChangeSetPersister.NotFoundException;
 
     Candidate replaceSkillsForUser(String candidateId, CandidateRequest.ReplaceSkillsRequest request) throws ChangeSetPersister.NotFoundException;
