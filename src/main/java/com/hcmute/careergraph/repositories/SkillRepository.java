@@ -8,6 +8,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.util.Collection;
 import java.util.List;
 
 import java.util.List;
@@ -30,4 +31,8 @@ public interface SkillRepository extends JpaRepository<Skill, String> {
     SELECT s FROM Skill s WHERE LOWER(s.name) LIKE LOWER(CONCAT('%', :query, '%'))
     """)
     List<Skill> lookupSkill(@Param("query") String query);
+
+    @Query("select s from Skill s where s.name in :names")
+    List<Skill> findByNameIn(@Param("names") Collection<String> names);
+
 }

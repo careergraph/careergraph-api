@@ -38,18 +38,18 @@ public record CandidateResponse(
         Set<ContactResponse> contacts,
         Set<AddressResponse> addresses,
         Set<ConnectionResponse> connections,
-        Set<CandidateEducationResponse> educations,
-        Set<CandidateExperienceResponse> experiences,
-        Set<CandidateSkillResponse> skills,
+        List<CandidateClientResponse.CandidateEducationResponse> educations,
+        List<CandidateClientResponse.CandidateExperienceResponse> experiences,
+        List<CandidateSkillResponse> skills,
         Set<ApplicationResponse> applications
 ) {
     public CandidateResponse {
         contacts = contacts != null ? contacts : Set.of();
         addresses = addresses != null ? addresses : Set.of();
         connections = connections != null ? connections : Set.of();
-        educations = educations != null ? educations : Set.of();
-        experiences = experiences != null ? experiences : Set.of();
-        skills = skills != null ? skills : Set.of();
+        educations = educations != null ? educations : List.of();
+        experiences = experiences != null ? experiences : List.of();
+        skills = skills != null ? skills : List.of();
         applications = applications != null ? applications : Set.of();
         industries = industries != null ? industries: List.of();
         locations = locations != null ? locations : List.of();

@@ -11,6 +11,7 @@ public record CandidateSkillResponse(
         Long endorsementDate,
         Integer endorsementCount,
         String candidateId,
-        String skillId
+        String skillId,
+        String skillName
 ) {
 }
