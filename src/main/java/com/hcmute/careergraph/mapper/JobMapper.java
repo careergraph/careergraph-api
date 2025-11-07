@@ -100,6 +100,11 @@ public class JobMapper {
                 .description(job.getDescription())
                 .department(job.getDepartment())
 
+                // Basic info company
+                .companyId(job.getCompany().getId())
+                .companyAvatar(job.getCompany().getAvatar())
+                .companyName(job.getCompany().getName())
+
                 // Arrays
                 .responsibilities(job.getResponsibilities())
                 .qualifications(job.getQualifications())

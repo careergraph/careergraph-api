@@ -111,35 +111,6 @@ public class JobController {
     }
 
     /**
-     * GET /api/v1/jobs/company/{companyId}
-     * Lấy tất cả jobs của một company với pagination
-     *
-     * @param companyId Company ID
-     * @param page Page number
-     * @param size Page size
-     * @return RestResponse<Page<JobResponse>>
-     */
-    @GetMapping("/company/{companyId}")
-    public RestResponse<Page<JobResponse>> getJobsByCompany(
-            @PathVariable String companyId,
-            @RequestParam(name = "page", defaultValue = "0") Integer page,
-            @RequestParam(name = "size", defaultValue = "10") Integer size
-    ) {
-        log.info("GET /api/v1/jobs/company/{} - Fetching jobs (page: {}, size: {})",
-                companyId, page, size);
-
-        Pageable pageable = PageRequest.of(page, size);
-
-        Page<Job> jobPage = jobService.getJobsByCompany(companyId, pageable);
-
-        return RestResponse.<Page<JobResponse>>builder()
-                .status(HttpStatus.OK)
-                .message("Jobs retrieved successfully")
-                .data(mapToJobResponsePage(jobPage, pageable))
-                .build();
-    }
-
-    /**
      * PUT /api/v1/jobs/{id}
      * Cập nhật job
      *

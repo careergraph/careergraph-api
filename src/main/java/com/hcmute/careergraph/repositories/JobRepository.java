@@ -20,8 +20,11 @@ import java.util.Optional;
 @Repository
 public interface JobRepository extends JpaRepository<Job, String> {
 
-    List<Job> findByCompanyId(String companyId);
-
+    @Query("""
+        SELECT j
+        FROM Job j
+        WHERE j.company.id = :companyId
+    """)
     Page<Job> findByCompanyId(String companyId, Pageable pageable);
 
     Page<Job> findByJobCategory(JobCategory jobCategory, Pageable pageable);
