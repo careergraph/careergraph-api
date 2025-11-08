@@ -58,7 +58,7 @@ public interface JobRepository extends JpaRepository<Job, String> {
     """)
     Page<Job> searchJobForCompany(
             @Param("companyId") String companyId,
-            @Param("statuses") List<Status> status,
+            @Param("statuses") List<Status> statuses,
             @Param("categories") List<JobCategory> categories,
             @Param("types") List<EmploymentType> types,
             @Param("query") String query,
@@ -68,12 +68,14 @@ public interface JobRepository extends JpaRepository<Job, String> {
     @Query("""
         SELECT j
         FROM Job j
-        WHERE (:city IS NULL OR j.city = :city)
+        WHERE (NULLIF(TRIM(:city), '') IS NULL
+                OR lower(j.city) LIKE lower(concat('%', :city, '%'))
+                OR lower(j.state) LIKE lower(concat('%', :city, '%')))
             AND (:jobCategories IS NULL OR j.jobCategory IN :jobCategories)
             AND (:employmentTypes IS NULL OR j.employmentType IN :employmentTypes)
             AND (:experienceLevels IS NULL OR j.experienceLevel IN :experienceLevels)
             AND (:educationTypes IS NULL OR j.education IN :educationTypes)
-            AND (:query IS NULL OR
+            AND (NULLIF(TRIM(:query), '') IS NULL OR
                 lower(j.title) LIKE lower(concat('%', :query, '%')) OR
                 lower(j.description) LIKE lower(concat('%', :query, '%')))
     """)

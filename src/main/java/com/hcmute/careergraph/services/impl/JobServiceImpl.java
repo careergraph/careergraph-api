@@ -258,12 +258,17 @@ public class JobServiceImpl implements JobService {
     @Override
     public Page<Job> search(JobFilterRequest filter, String partyId, String query, Pageable pageable, PartyType type) {
 
+        // Check company ID
+        if (type == PartyType.COMPANY && partyId == null) {
+            throw new BadRequestException("Company ID is required");
+        }
+
         // Get params from filter
-        List<Status> statuses = filter.getStatuses();
-        List<JobCategory> jobCategories = filter.getJobCategories();
-        List<EmploymentType> employmentTypes = filter.getEmploymentTypes();
-        List<EducationType> educationTypes = filter.getEducationTypes();
-        List<ExperienceLevel> experienceLevels = filter.getExperienceLevels();
+        List<Status> statuses = filter.getStatuses().isEmpty() ? null : filter.getStatuses();
+        List<JobCategory> jobCategories = filter.getJobCategories().isEmpty() ? null : filter.getJobCategories();
+        List<EmploymentType> employmentTypes = filter.getEmploymentTypes().isEmpty() ? null : filter.getEmploymentTypes();
+        List<EducationType> educationTypes = filter.getEducationTypes().isEmpty() ? null : filter.getEducationTypes();
+        List<ExperienceLevel> experienceLevels = filter.getExperienceLevels().isEmpty() ? null : filter.getExperienceLevels();
         String city = filter.getCity();
 
         Page<Job> jobs = null;
