@@ -1,5 +1,6 @@
 package com.hcmute.careergraph.controllers;
 
+import com.hcmute.careergraph.enums.common.PartyType;
 import com.hcmute.careergraph.enums.job.JobCategory;
 import com.hcmute.careergraph.exception.BadRequestException;
 import com.hcmute.careergraph.helper.RestResponse;
@@ -399,13 +400,15 @@ public class JobController {
         log.info("POST /api/v1/jobs/search - Fetching lookup jobs");
 
         String companyId = securityUtils.extractCompanyId(authentication);
-        if (companyId == null) {
-            throw new BadRequestException("Company ID is not null");
+        String candidateId = securityUtils.extractCandidateId(authentication);
+        if (companyId == null && candidateId == null) {
+            throw new BadRequestException("ID of candidate or company is required");
         }
 
         Pageable pageable = PageRequest.of(page, size);
-
-        Page<Job> jobPage = jobService.search(filter, companyId, query, pageable);
+        Page<Job> jobPage = (companyId != null && !companyId.isEmpty())
+                ? jobService.search(filter, companyId, query, pageable, PartyType.COMPANY)
+                : jobService.search(filter, candidateId, query, pageable, PartyType.CANDIDATE);
 
         return RestResponse.<Page<JobResponse>>builder()
                 .status(HttpStatus.OK)

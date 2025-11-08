@@ -1,7 +1,9 @@
 package com.hcmute.careergraph.repositories;
 
 import com.hcmute.careergraph.enums.common.Status;
+import com.hcmute.careergraph.enums.job.EducationType;
 import com.hcmute.careergraph.enums.job.EmploymentType;
+import com.hcmute.careergraph.enums.job.ExperienceLevel;
 import com.hcmute.careergraph.enums.job.JobCategory;
 import com.hcmute.careergraph.persistence.models.Job;
 import org.joda.time.DateTime;
@@ -54,11 +56,34 @@ public interface JobRepository extends JpaRepository<Job, String> {
                 lower(j.title) LIKE lower(concat('%', :query, '%')) OR
                 lower(j.description) LIKE lower(concat('%', :query, '%')))
     """)
-    Page<Job> search(
+    Page<Job> searchJobForCompany(
             @Param("companyId") String companyId,
             @Param("statuses") List<Status> status,
             @Param("categories") List<JobCategory> categories,
             @Param("types") List<EmploymentType> types,
+            @Param("query") String query,
+            Pageable pageable
+    );
+
+    @Query("""
+        SELECT j
+        FROM Job j
+        WHERE (:city IS NULL OR j.city = :city)
+            AND (:jobCategories IS NULL OR j.jobCategory IN :jobCategories)
+            AND (:employmentTypes IS NULL OR j.employmentType IN :employmentTypes)
+            AND (:experienceLevels IS NULL OR j.experienceLevel IN :experienceLevels)
+            AND (:educationTypes IS NULL OR j.education IN :educationTypes)
+            AND (:query IS NULL OR
+                lower(j.title) LIKE lower(concat('%', :query, '%')) OR
+                lower(j.description) LIKE lower(concat('%', :query, '%')))
+    """)
+    Page<Job> searchJobForCandidate(
+            @Param("candidateId") String candidateId,
+            @Param("city") String city,
+            @Param("jobCategories") List<JobCategory> jobCategories,
+            @Param("employmentTypes") List<EmploymentType> employmentTypes,
+            @Param("experienceLevels") List<ExperienceLevel> experienceLevels,
+            @Param("educationTypes") List<EducationType> educationTypes,
             @Param("query") String query,
             Pageable pageable
     );
