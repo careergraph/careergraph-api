@@ -67,6 +67,10 @@ public record JobResponse(
         Integer likes,
         Integer shares,
 
+        // Application recruiment
+        Boolean resume,
+        Boolean coverLetter,
+
         // Timeline (optional - for detail view)
         List<JobTimelineEventResponse> timeline,
 

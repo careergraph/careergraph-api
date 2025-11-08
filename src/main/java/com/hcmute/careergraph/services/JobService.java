@@ -4,6 +4,7 @@ import com.hcmute.careergraph.enums.common.PartyType;
 import com.hcmute.careergraph.enums.job.JobCategory;
 import com.hcmute.careergraph.persistence.dtos.request.JobCreationRequest;
 import com.hcmute.careergraph.persistence.dtos.request.JobFilterRequest;
+import com.hcmute.careergraph.persistence.dtos.request.JobRecruimentRequest;
 import com.hcmute.careergraph.persistence.models.Job;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -25,6 +26,8 @@ public interface JobService {
     Page<Job> getAllJobs(Pageable pageable);
 
     Job updateJob(String jobId, JobCreationRequest request, String companyId);
+
+    Job updateJob(String jobId, String companyId, JobRecruimentRequest request);
 
     Job publishJob(String jobId, String companyId);
 

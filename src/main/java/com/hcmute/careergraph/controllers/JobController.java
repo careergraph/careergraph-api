@@ -8,6 +8,7 @@ import com.hcmute.careergraph.helper.SecurityUtils;
 import com.hcmute.careergraph.mapper.JobMapper;
 import com.hcmute.careergraph.persistence.dtos.request.JobCreationRequest;
 import com.hcmute.careergraph.persistence.dtos.request.JobFilterRequest;
+import com.hcmute.careergraph.persistence.dtos.request.JobRecruimentRequest;
 import com.hcmute.careergraph.persistence.dtos.response.JobResponse;
 import com.hcmute.careergraph.persistence.models.Job;
 import com.hcmute.careergraph.services.JobService;
@@ -138,6 +139,27 @@ public class JobController {
                 .data(jobMapper.toResponse(job))
                 .build();
     }
+
+    @PutMapping("/{id}/recruitment")
+    public RestResponse<JobResponse> updateJobRecruitment(
+            @PathVariable("id") String jobId,
+            @RequestBody JobRecruimentRequest request,
+            Authentication authentication
+    ) {
+        if (jobId == null) {
+            throw new BadRequestException("Job ID is required");
+        }
+        String companyId = securityUtils.extractCompanyId(authentication);
+
+        Job job = jobService.updateJob(jobId, companyId, request);
+
+        return RestResponse.<JobResponse>builder()
+                .status(HttpStatus.OK)
+                .message("Job updated successfully")
+                .data(jobMapper.toResponse(job))
+                .build();
+    }
+
 
     /**
      * PUT /api/v1/jobs/{id}/publish

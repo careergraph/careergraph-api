@@ -11,6 +11,7 @@ import com.hcmute.careergraph.exception.NotFoundException;
 import com.hcmute.careergraph.mapper.JobMapper;
 import com.hcmute.careergraph.persistence.dtos.request.JobCreationRequest;
 import com.hcmute.careergraph.persistence.dtos.request.JobFilterRequest;
+import com.hcmute.careergraph.persistence.dtos.request.JobRecruimentRequest;
 import com.hcmute.careergraph.persistence.models.Company;
 import com.hcmute.careergraph.persistence.models.Job;
 import com.hcmute.careergraph.repositories.CandidateRepository;
@@ -115,6 +116,24 @@ public class JobServiceImpl implements JobService {
     public Job updateJob(String jobId, JobCreationRequest request, String companyId) {
         // TODO: Implement update logic
         throw new UnsupportedOperationException("Update job not implemented yet");
+    }
+
+    @Override
+    public Job updateJob(String jobId, String companyId, JobRecruimentRequest request) {
+
+        Job job = jobRepository.findById(jobId)
+                .orElseThrow(() -> new NotFoundException("Job not found with ID: " + jobId));
+
+        if (!job.getCompany().getId().equals(companyId)) {
+            throw new BadRequestException("Company not have job with ID: " + jobId);
+        }
+
+        // Update recruiment for job
+        job.setResume(request.resume());
+        job.setCoverLetter(request.coverLetter());
+
+
+        return jobRepository.save(job);
     }
 
     /**
@@ -267,8 +286,8 @@ public class JobServiceImpl implements JobService {
         List<Status> statuses = filter.getStatuses().isEmpty() ? null : filter.getStatuses();
         List<JobCategory> jobCategories = filter.getJobCategories().isEmpty() ? null : filter.getJobCategories();
         List<EmploymentType> employmentTypes = filter.getEmploymentTypes().isEmpty() ? null : filter.getEmploymentTypes();
-        List<EducationType> educationTypes = filter.getEducationTypes().isEmpty() ? null : filter.getEducationTypes();
-        List<ExperienceLevel> experienceLevels = filter.getExperienceLevels().isEmpty() ? null : filter.getExperienceLevels();
+        List<EducationType> educationTypes = null;
+        List<ExperienceLevel> experienceLevels = null;
         String city = filter.getCity();
 
         Page<Job> jobs = null;
