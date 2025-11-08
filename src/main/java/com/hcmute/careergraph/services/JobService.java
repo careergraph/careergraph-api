@@ -1,5 +1,6 @@
 package com.hcmute.careergraph.services;
 
+import com.hcmute.careergraph.enums.common.PartyType;
 import com.hcmute.careergraph.enums.job.JobCategory;
 import com.hcmute.careergraph.persistence.dtos.request.JobCreationRequest;
 import com.hcmute.careergraph.persistence.dtos.request.JobFilterRequest;
@@ -41,5 +42,5 @@ public interface JobService {
 
     Map<String, String> lookup(String companyId, String query);
 
-    Page<Job> search(JobFilterRequest filter, String companyId, String query, Pageable pageable);
+    Page<Job> search(JobFilterRequest filter, String partyId, String query, Pageable pageable, PartyType type);
 }

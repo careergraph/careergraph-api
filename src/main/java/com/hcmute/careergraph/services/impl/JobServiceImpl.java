@@ -1,7 +1,10 @@
 package com.hcmute.careergraph.services.impl;
 
+import com.hcmute.careergraph.enums.common.PartyType;
 import com.hcmute.careergraph.enums.common.Status;
+import com.hcmute.careergraph.enums.job.EducationType;
 import com.hcmute.careergraph.enums.job.EmploymentType;
+import com.hcmute.careergraph.enums.job.ExperienceLevel;
 import com.hcmute.careergraph.enums.job.JobCategory;
 import com.hcmute.careergraph.exception.BadRequestException;
 import com.hcmute.careergraph.exception.NotFoundException;
@@ -251,25 +254,26 @@ public class JobServiceImpl implements JobService {
         return jobs;
     }
 
-    /**
-     * Hàm search job theo filter và company ID
-     *
-     * @param filter Dữ liệu tìm kiếm
-     * @param query Data tim kiem
-     * @param companyId ID của company
-     * @return Map<ID, Job>
-     */
     @Transactional(readOnly = true)
     @Override
-    public Page<Job> search(JobFilterRequest filter, String companyId, String query, Pageable pageable) {
+    public Page<Job> search(JobFilterRequest filter, String partyId, String query, Pageable pageable, PartyType type) {
 
         // Get params from filter
         List<Status> statuses = filter.getStatuses();
         List<JobCategory> jobCategories = filter.getJobCategories();
         List<EmploymentType> employmentTypes = filter.getEmploymentTypes();
+        List<EducationType> educationTypes = filter.getEducationTypes();
+        List<ExperienceLevel> experienceLevels = filter.getExperienceLevels();
+        String city = filter.getCity();
 
-        Page<Job> jobs = jobRepository.search(companyId, statuses, jobCategories, employmentTypes, query, pageable);
+        Page<Job> jobs = null;
 
+        if (type == PartyType.COMPANY) {
+            jobs = jobRepository.searchJobForCompany(partyId, statuses, jobCategories, employmentTypes, query, pageable);
+        } else {
+            jobs = jobRepository.searchJobForCandidate(partyId, city, jobCategories, employmentTypes,
+                    experienceLevels, educationTypes, query, pageable);
+        }
         return jobs;
     }
 }
