@@ -395,15 +395,12 @@ public class JobController {
             @RequestBody JobFilterRequest filter,
             @RequestParam(name = "page", defaultValue = "0") Integer page,
             @RequestParam(name = "size", defaultValue = "10") Integer size,
-            @RequestParam(required = false) String query,
+            @RequestParam(required = false, defaultValue = "") String query,
             Authentication authentication) {
         log.info("POST /api/v1/jobs/search - Fetching lookup jobs");
 
         String companyId = securityUtils.extractCompanyId(authentication);
         String candidateId = securityUtils.extractCandidateId(authentication);
-        if (companyId == null && candidateId == null) {
-            throw new BadRequestException("ID of candidate or company is required");
-        }
 
         Pageable pageable = PageRequest.of(page, size);
         Page<Job> jobPage = (companyId != null && !companyId.isEmpty())

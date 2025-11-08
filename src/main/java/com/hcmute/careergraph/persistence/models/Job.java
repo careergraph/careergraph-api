@@ -27,13 +27,13 @@ import java.util.Set;
 @NoArgsConstructor
 public class Job extends BaseEntity {
 
-    @Column(name = "title", nullable = false)
+    @Column(name = "title", nullable = false, columnDefinition = "TEXT")
     private String title;
 
     @Column(name = "description", columnDefinition = "TEXT")
     private String description;
 
-    @Column(name = "department")
+    @Column(name = "department", columnDefinition = "TEXT")
     private String department;
 
     /**
@@ -82,19 +82,19 @@ public class Job extends BaseEntity {
     private Integer maxExperience;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "experience_level")
+    @Column(name = "experience_level", columnDefinition = "TEXT")
     private ExperienceLevel experienceLevel;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "employment_type")
+    @Column(name = "employment_type", columnDefinition = "TEXT")
     private EmploymentType employmentType;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "job_category")
+    @Column(name = "job_category", columnDefinition = "TEXT")
     private JobCategory jobCategory;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "education")
+    @Column(name = "education", columnDefinition = "TEXT")
     private EducationType education;
 
     /**
@@ -122,16 +122,16 @@ public class Job extends BaseEntity {
      * Address for JOB - CẬP NHẬT: Thêm state (tỉnh/thành phố)
      * Cấu trúc: state (tỉnh) -> city (quận/huyện) -> district (phường/xã) -> address (địa chỉ cụ thể)
      */
-    @Column(name = "state")
+    @Column(name = "state", columnDefinition = "TEXT")
     private String state; // Tỉnh/Thành phố (code từ API location)
 
-    @Column(name = "city")
+    @Column(name = "city", columnDefinition = "TEXT")
     private String city; // Quận/Huyện (code từ API location)
 
-    @Column(name = "district")
+    @Column(name = "district", columnDefinition = "TEXT")
     private String district; // Phường/Xã (code từ API location)
 
-    @Column(name = "address")
+    @Column(name = "address", columnDefinition = "TEXT")
     private String address; // Địa chỉ cụ thể
 
     @Column(name = "remote_job")
