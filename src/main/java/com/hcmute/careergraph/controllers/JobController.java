@@ -11,6 +11,7 @@ import com.hcmute.careergraph.persistence.dtos.request.JobFilterRequest;
 import com.hcmute.careergraph.persistence.dtos.request.JobRecruimentRequest;
 import com.hcmute.careergraph.persistence.dtos.response.JobResponse;
 import com.hcmute.careergraph.persistence.models.Job;
+import com.hcmute.careergraph.services.ApplicationService;
 import com.hcmute.careergraph.services.JobService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -35,6 +36,7 @@ import java.util.Map;
 public class JobController {
 
     private final JobService jobService;
+    private final ApplicationService applicationService;
     private final JobMapper jobMapper;
     private final SecurityUtils securityUtils;
 
@@ -157,6 +159,25 @@ public class JobController {
                 .status(HttpStatus.OK)
                 .message("Job updated successfully")
                 .data(jobMapper.toResponse(job))
+                .build();
+    }
+
+    @PostMapping("/{id}/apply")
+    public RestResponse<JobResponse> applyJob(
+            @PathVariable("id") String jobId,
+            @RequestBody JobRecruimentRequest request,
+            Authentication authentication) {
+        if (jobId == null) {
+            throw new BadRequestException("Job ID is required");
+        }
+        String candidateId = securityUtils.extractCandidateId(authentication);
+
+
+
+        return RestResponse.<JobResponse>builder()
+                .status(HttpStatus.OK)
+                .message("Apply job successfully")
+                .data(jobMapper.toResponse(null))
                 .build();
     }
 
