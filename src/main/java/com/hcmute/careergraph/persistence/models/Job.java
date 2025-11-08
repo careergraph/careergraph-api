@@ -155,6 +155,13 @@ public class Job extends BaseEntity {
     @Column(name = "shared")
     private Integer shared = 0;
 
+    // ===== Application Recruiment ====
+    @Column(name = "resume")
+    private Boolean resume;
+
+    @Column(name = "cover_letter")
+    private Boolean coverLetter;
+
     // ===== Thêm status field =====
     @Enumerated(EnumType.STRING)
     @Column(name = "status")

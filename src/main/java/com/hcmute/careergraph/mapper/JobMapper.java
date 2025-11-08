@@ -151,6 +151,10 @@ public class JobMapper {
                 .likes(job.getLiked())
                 .shares(job.getShared())
 
+                // Application recruiment
+                .resume(job.getResume())
+                .coverLetter(job.getCoverLetter())
+
                 // Timeline - null for now, có thể implement sau
                 .timeline(null)
 
