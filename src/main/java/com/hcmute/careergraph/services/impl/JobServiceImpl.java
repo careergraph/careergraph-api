@@ -77,7 +77,6 @@ public class JobServiceImpl implements JobService {
      * @return JobResponse
      * @throws IllegalArgumentException nếu job không tồn tại
      */
-    @Transactional(readOnly = true)
     @Override
     public Job getJobById(String jobId) {
         log.info("Fetching job with ID: {}", jobId);
@@ -85,7 +84,10 @@ public class JobServiceImpl implements JobService {
         Job job = jobRepository.findById(jobId)
                 .orElseThrow(() -> new IllegalArgumentException("Job not found with ID: " + jobId));
 
-        return job;
+        // Increase views of job
+        job.setViews(job.getViews() + 1);
+
+        return jobRepository.save(job);
     }
 
     /**

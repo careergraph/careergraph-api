@@ -146,7 +146,7 @@ public class JobMapper {
 
                 // Stats
                 .views(job.getViews())
-                .applicants(job.getApplicants())
+                .applicants(job.getApplications().size())
                 .saved(job.getSaved())
                 .likes(job.getLiked())
                 .shares(job.getShared())
