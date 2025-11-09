@@ -21,6 +21,7 @@ import com.hcmute.careergraph.services.JobService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -28,6 +29,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.util.*;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -38,6 +40,8 @@ public class JobServiceImpl implements JobService {
     private final CompanyRepository companyRepository;
     private final CandidateRepository candidateRepository;
     private final JobMapper jobMapper;
+
+    private final Integer PAGE_SIZE_PERSONAL_JOB = 8;
 
     /**
      * Tạo job mới
@@ -226,7 +230,19 @@ public class JobServiceImpl implements JobService {
         String currentDate = LocalDate.now().toString();
 
         // Fetch and return personalized jobs from repository
-        return jobRepository.findJobByPersonalized(userId, currentDate);
+        List<Job> personalJobs = jobRepository.findJobByPersonalized(userId, currentDate);
+        if (personalJobs.size() >= PAGE_SIZE_PERSONAL_JOB) {
+            return personalJobs.subList(0, PAGE_SIZE_PERSONAL_JOB);
+        }
+
+        int remaining = PAGE_SIZE_PERSONAL_JOB - personalJobs.size();
+        List<String> excludeIds = personalJobs.stream().map(Job::getId).toList();
+        List<Job> extraJobs = jobRepository.findLatestJobsExcluding(currentDate, excludeIds.isEmpty() ? null : excludeIds);
+
+        List<Job> result = new ArrayList<>(personalJobs);
+        result.addAll(extraJobs);
+
+        return result;
     }
 
     @Override
@@ -251,6 +267,17 @@ public class JobServiceImpl implements JobService {
         }
 
         return jobsPopular;
+    }
+
+    @Override
+    public Page<Job> getSimilarJob(String jobId, Pageable pageable) {
+
+        Page<Job> jobsSimilar = jobRepository.findSimilarJob(jobId, pageable);
+        if (jobsSimilar == null) {
+            return new PageImpl<>(null);
+        }
+
+        return jobsSimilar;
     }
 
     /**

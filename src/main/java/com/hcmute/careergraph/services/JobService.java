@@ -9,17 +9,16 @@ import com.hcmute.careergraph.persistence.models.Job;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
 public interface JobService {
 
+    // ============================== MANAGEMENT JOB ==============================
+
     Job createJob(JobCreationRequest request, String companyId);
 
     Job getJobById(String jobId);
-
-    Page<Job> getJobsByCompany(String companyId, Pageable pageable);
 
     Page<Job> getJobByCategory(JobCategory jobCategory, Pageable pageable);
 
@@ -37,11 +36,17 @@ public interface JobService {
 
     void deactivateJob(String jobId, String companyId);
 
+    // ============================== JOB FOR CANDIDATE ==============================
+
+    Page<Job> getJobsByCompany(String companyId, Pageable pageable);
+
     List<Job> getJobsPersonalized(String userId);
 
     List<Job> getJobsForAnonymousUser();
 
     List<Job> getJobsPopular();
+
+    Page<Job> getSimilarJob(String jobId, Pageable pageable);
 
     Map<String, String> lookup(String companyId, String query);
 

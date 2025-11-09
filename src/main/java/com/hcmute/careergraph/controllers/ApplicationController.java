@@ -1,6 +1,8 @@
 package com.hcmute.careergraph.controllers;
 
+import com.hcmute.careergraph.exception.BadRequestException;
 import com.hcmute.careergraph.helper.RestResponse;
+import com.hcmute.careergraph.helper.SecurityUtils;
 import com.hcmute.careergraph.mapper.ApplicationMapper;
 import com.hcmute.careergraph.persistence.dtos.request.ApplicationRequest;
 import com.hcmute.careergraph.persistence.dtos.request.ApplicationStageUpdateRequest;
@@ -12,6 +14,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
@@ -21,9 +24,21 @@ public class ApplicationController {
 
     private final ApplicationService applicationService;
     private final ApplicationMapper applicationMapper;
+    private final SecurityUtils securityUtils;
 
     @PostMapping
-    public RestResponse<ApplicationResponse> createApplication(@Valid @RequestBody ApplicationRequest request) {
+    public RestResponse<ApplicationResponse> createApplication(@RequestBody ApplicationRequest request, Authentication authentication) {
+
+        String candidateId = securityUtils.extractCandidateId(authentication);
+        if (candidateId == null || candidateId.isBlank()) {
+            throw new BadRequestException("Candidate ID invalid");
+        }
+        request.setCandidateId(candidateId);
+
+        if (request.getResumeUrl().isBlank()) {
+            throw new BadRequestException("Application invalid. Resume is required");
+        }
+
         Application application = applicationService.createApplication(request);
         return RestResponse.<ApplicationResponse>builder()
                 .status(HttpStatus.CREATED)
