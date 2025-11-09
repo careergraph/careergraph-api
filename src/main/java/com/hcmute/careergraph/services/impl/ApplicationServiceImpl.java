@@ -21,6 +21,7 @@ import org.springframework.util.StringUtils;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.Comparator;
+import java.util.List;
 import java.util.Optional;
 
 @Service
@@ -92,9 +93,14 @@ public class ApplicationServiceImpl implements ApplicationService {
 
     @Override
     @Transactional(readOnly = true)
-    public Page<Application> getAllApplications(Pageable pageable) {
+    public List<Application> getAllApplications(String jobId, String companyId) {
         log.info("Getting all applications with pagination");
-        return applicationRepository.findAll(pageable);
+
+        List<Application> applications = applicationRepository.findByCompanyIdAndJobId(companyId, jobId);
+        if (applications.isEmpty()) {
+            return List.of();
+        }
+        return applications;
     }
 
     @Override

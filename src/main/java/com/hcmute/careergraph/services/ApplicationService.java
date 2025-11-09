@@ -6,13 +6,15 @@ import com.hcmute.careergraph.persistence.models.Application;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 
+import java.util.List;
+
 public interface ApplicationService {
 
     Application createApplication(ApplicationRequest request);
 
     Application getApplicationById(String id);
 
-    Page<Application> getAllApplications(Pageable pageable);
+    List<Application> getAllApplications(String jobId, String companyId);
 
     Page<Application> getApplicationsByCandidate(String candidateId, Pageable pageable);
 

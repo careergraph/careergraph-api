@@ -17,6 +17,8 @@ import org.springframework.http.HttpStatus;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
+
 @RestController
 @RequestMapping("applications")
 @RequiredArgsConstructor
@@ -47,6 +49,25 @@ public class ApplicationController {
                 .build();
     }
 
+    @GetMapping
+    public RestResponse<List<ApplicationResponse>> getApplicationsByJob(
+            @RequestParam("jobId") String jobId,
+            Authentication authentication) {
+
+        String companyId = securityUtils.extractCompanyId(authentication);
+        if (companyId == null || companyId.isBlank()) {
+            throw new BadRequestException("Candidate ID invalid");
+        }
+
+        List<Application> applications = applicationService.getAllApplications(jobId, companyId);
+
+        return RestResponse.<List<ApplicationResponse>>builder()
+                .status(HttpStatus.CREATED)
+                .message("Application created successfully")
+                .data(applicationMapper.toResponseList(applications))
+                .build();
+    }
+
     @GetMapping("/{id}")
     public RestResponse<ApplicationResponse> getApplicationById(@PathVariable String id) {
         Application application = applicationService.getApplicationById(id);
@@ -54,16 +75,6 @@ public class ApplicationController {
                 .status(HttpStatus.OK)
                 .message("Application retrieved successfully")
                 .data(applicationMapper.toResponse(application))
-                .build();
-    }
-
-    @GetMapping
-    public RestResponse<Page<ApplicationResponse>> getAllApplications(Pageable pageable) {
-        Page<Application> applications = applicationService.getAllApplications(pageable);
-        return RestResponse.<Page<ApplicationResponse>>builder()
-                .status(HttpStatus.OK)
-                .message("Applications retrieved successfully")
-                .data(applications.map(applicationMapper::toResponse))
                 .build();
     }
 
@@ -106,7 +117,7 @@ public class ApplicationController {
                 .build();
     }
 
-    @PatchMapping("/{id}/stage")
+    @PutMapping("/{id}/stage")
     public RestResponse<ApplicationResponse> updateApplicationStage(
             @PathVariable String id,
             @Valid @RequestBody ApplicationStageUpdateRequest request
