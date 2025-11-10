@@ -1,7 +1,9 @@
 package com.hcmute.careergraph.repositories;
 
 import com.hcmute.careergraph.enums.common.Status;
+import com.hcmute.careergraph.enums.job.EducationType;
 import com.hcmute.careergraph.enums.job.EmploymentType;
+import com.hcmute.careergraph.enums.job.ExperienceLevel;
 import com.hcmute.careergraph.enums.job.JobCategory;
 import com.hcmute.careergraph.persistence.models.Job;
 import org.joda.time.DateTime;
@@ -12,10 +14,8 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
+import java.time.LocalDate;
+import java.util.*;
 
 @Repository
 public interface JobRepository extends JpaRepository<Job, String> {
@@ -54,11 +54,36 @@ public interface JobRepository extends JpaRepository<Job, String> {
                 lower(j.title) LIKE lower(concat('%', :query, '%')) OR
                 lower(j.description) LIKE lower(concat('%', :query, '%')))
     """)
-    Page<Job> search(
+    Page<Job> searchJobForCompany(
             @Param("companyId") String companyId,
-            @Param("statuses") List<Status> status,
+            @Param("statuses") List<Status> statuses,
             @Param("categories") List<JobCategory> categories,
             @Param("types") List<EmploymentType> types,
+            @Param("query") String query,
+            Pageable pageable
+    );
+
+    @Query("""
+        SELECT j
+        FROM Job j
+        WHERE (NULLIF(TRIM(:city), '') IS NULL
+                OR lower(j.city) LIKE lower(concat('%', :city, '%'))
+                OR lower(j.state) LIKE lower(concat('%', :city, '%')))
+            AND (:jobCategories IS NULL OR j.jobCategory IN :jobCategories)
+            AND (:employmentTypes IS NULL OR j.employmentType IN :employmentTypes)
+            AND (:experienceLevels IS NULL OR j.experienceLevel IN :experienceLevels)
+            AND (:educationTypes IS NULL OR j.education IN :educationTypes)
+            AND (NULLIF(TRIM(:query), '') IS NULL OR
+                lower(j.title) LIKE lower(concat('%', :query, '%')) OR
+                lower(j.description) LIKE lower(concat('%', :query, '%')))
+    """)
+    Page<Job> searchJobForCandidate(
+            @Param("candidateId") String candidateId,
+            @Param("city") String city,
+            @Param("jobCategories") List<JobCategory> jobCategories,
+            @Param("employmentTypes") List<EmploymentType> employmentTypes,
+            @Param("experienceLevels") List<ExperienceLevel> experienceLevels,
+            @Param("educationTypes") List<EducationType> educationTypes,
             @Param("query") String query,
             Pageable pageable
     );
@@ -91,6 +116,34 @@ public interface JobRepository extends JpaRepository<Job, String> {
     """, nativeQuery = true)
     List<Job> findJobByPersonalized(@Param("userId") String userId,
                                     @Param("currentDate") String currentDate);
+
+
+    @Query("""
+        SELECT j
+            FROM Job j
+            JOIN Job target ON target.id = :jobId
+            WHERE j.id <> :jobId
+                AND j.status = 'ACTIVE'
+                AND j.jobCategory = target.jobCategory
+                OR (
+                    j.experienceLevel = target.experienceLevel
+                    OR (j.minExperience <= target.maxExperience
+                        AND j.maxExperience >= target.minExperience))
+                OR CAST(j.postedDate AS date) >= CURRENT_DATE
+            ORDER BY j.postedDate DESC
+    """)
+    Page<Job> findSimilarJob(@Param("jobId") String jobId, Pageable pageable);
+
+    @Query("""
+        SELECT j
+        FROM Job j
+        WHERE j.status = 'ACTIVE'
+            AND j.expiryDate >= :currentDate
+            AND (:excludeIds IS NULL OR j.id NOT IN :excludeIds)
+        ORDER BY j.createdDate DESC
+    """)
+    List<Job> findLatestJobsExcluding(@Param("currentDate") String currentDate, @Param("excludeIds") Collection<String> excludeIds);
+
 
     List<Job> findAllByOrderByCreatedDateDesc(Pageable pageable);
 }

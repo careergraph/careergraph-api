@@ -2,16 +2,23 @@ package com.hcmute.careergraph.persistence.dtos.request;
 
 import jakarta.validation.constraints.NotBlank;
 import lombok.Builder;
+import lombok.Getter;
+import lombok.Setter;
 
 @Builder
-public record ApplicationRequest(
-        String coverLetter,
-        String resumeUrl,
-        Integer rating,
-        String notes,
-        String appliedDate,
-        @NotBlank(message = "Candidate ID is required")
-        String candidateId,
+@Getter
+@Setter
+public class ApplicationRequest {
+        private String coverLetter;
+
+        private String resumeUrl;
+
+        private String notes;
+
+        private String appliedDate;
+
+        private String candidateId;
+
         @NotBlank(message = "Job ID is required")
-        String jobId
-) { }
+        private String jobId;
+}

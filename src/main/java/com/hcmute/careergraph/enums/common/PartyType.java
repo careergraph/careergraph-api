@@ -2,7 +2,7 @@ package com.hcmute.careergraph.enums.common;
 
 public enum PartyType {
 
-    COMPANY, CANDIDATE, EDUCATION
+    COMPANY, CANDIDATE, EDUCATION, CORPORATE
     ;
 
     public boolean isCompany() {

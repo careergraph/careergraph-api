@@ -99,22 +99,7 @@ public class CandidateServiceImpl implements CandidateService {
             throw new InternalException("You do not have permission to get this this resource");
         }
 
-        String objectKey = switch (fileType) {
-            case AVATAR -> candidate.getAvatar();
-            case COVER  -> candidate.getCover();
-            case RESUME -> {
-                List<String> resumes = candidate.getResumes();
-                if (resumes == null || resumes.isEmpty()) {
-                    throw new ChangeSetPersister.NotFoundException();
-                }
-                yield resumes.getFirst();
-            }
-        };
-
-        if (objectKey == null)
-            throw new ChangeSetPersister.NotFoundException();
-
-        return storageService.getFileUrl(objectKey);
+        return null;
     }
     @Override
     @Transactional(readOnly = true)
