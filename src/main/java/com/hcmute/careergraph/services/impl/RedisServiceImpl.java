@@ -92,4 +92,9 @@ public class RedisServiceImpl implements com.hcmute.careergraph.services.RedisSe
             throw new InternalException("Failed to deserialize field value", e);
         }
     }
+
+    @Override
+    public Long getTtl(String key) {
+        return redisTemplate.getExpire(key, TimeUnit.SECONDS);
+    }
 }

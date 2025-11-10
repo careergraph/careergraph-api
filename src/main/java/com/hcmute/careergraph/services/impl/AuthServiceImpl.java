@@ -4,6 +4,7 @@ import com.hcmute.careergraph.enums.common.ErrorType;
 import com.hcmute.careergraph.enums.common.Role;
 import com.hcmute.careergraph.enums.common.Status;
 import com.hcmute.careergraph.exception.AppException;
+import com.hcmute.careergraph.helper.RestResponse;
 import com.hcmute.careergraph.persistence.dtos.request.AuthRequests;
 import com.hcmute.careergraph.persistence.dtos.response.AuthResponses;
 import com.hcmute.careergraph.persistence.models.Account;
@@ -18,6 +19,7 @@ import com.hcmute.careergraph.services.JwtTokenService;
 import com.hcmute.careergraph.services.MailService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
@@ -26,8 +28,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.security.SecureRandom;
-import java.util.Map;
-import java.util.Optional;
+import java.util.*;
+
 import com.google.api.client.googleapis.auth.oauth2.GoogleIdToken;
 import com.google.api.client.googleapis.auth.oauth2.GoogleIdTokenVerifier;
 
@@ -46,6 +48,8 @@ public class AuthServiceImpl implements AuthService {
     private final MailService mailService;
     private final JwtDecoder jwtDecoder;
     private final GoogleIdTokenVerifier googleIdTokenVerifier;
+
+    private Integer TIME_OTP_EXPIRED = 300;
 
     @Value("${jwt.valid-duration}")
     private long accessTtl;
@@ -84,14 +88,17 @@ public class AuthServiceImpl implements AuthService {
 
             companyRepository.save(company);
         }
+        sendOtp(request.getEmail());
+    }
 
+    private void sendOtp(String email) {
         String otp = generateOtp();
-        redisService.setObject(otpKey(request.getEmail()), otp, 300);
-        mailService.sendOtp(request.getEmail(), otp);
+        redisService.setObject(otpKey(email), otp, TIME_OTP_EXPIRED);
+        mailService.sendOtp(email, otp);
     }
 
     @Override
-    public void confirmOtp(AuthRequests.ConfirmOtpRequest request) {
+    public String confirmOtp(AuthRequests.ConfirmOtpRequest request) {
         String cachedOtp = redisService.getObject(otpKey(request.getEmail()), String.class);
 
         if (cachedOtp == null) {
@@ -108,10 +115,11 @@ public class AuthServiceImpl implements AuthService {
         accountRepository.save(account);
 
         redisService.deleteObject(otpKey(request.getEmail()));
+        return jwtTokenService.generateResetPasswordToken(request.getEmail());
     }
 
     @Override
-    public void resendOtp(AuthRequests.ConfirmOtpRequest request) {
+    public Integer resendOtp(AuthRequests.ResendOtpRequest request) {
         Account account = accountRepository.findByEmail(request.getEmail())
                 .orElseThrow(() -> new AppException(ErrorType.NOT_FOUND, "Account not found"));
 
@@ -119,11 +127,13 @@ public class AuthServiceImpl implements AuthService {
             throw new AppException(ErrorType.BAD_REQUEST, "Email already verified");
         }
 
-        String otp = generateOtp();
+        sendOtp(request.getEmail());
+        return TIME_OTP_EXPIRED;
+    }
 
-        redisService.setObject(otpKey(request.getEmail()), otp, 300);
-
-        mailService.sendOtp(request.getEmail(), otp);
+    @Override
+    public Long getTtlOtp(String  email) {
+        return redisService.getTtl(otpKey(email));
     }
 
 
@@ -133,6 +143,13 @@ public class AuthServiceImpl implements AuthService {
                 .orElseThrow(() -> new AppException(ErrorType.NOT_FOUND, "Account not found"));
         if (!passwordEncoder.matches(request.getPassword(), account.getPasswordHash())) {
             throw new AppException(ErrorType.UNAUTHORIZED, "Invalid password");
+        }
+
+        if(!account.isEmailVerified()) {
+            sendOtp(request.getEmail());
+            Map<String, Object> meta = new HashMap<>();
+            meta.put("expiredIn", String.valueOf(TIME_OTP_EXPIRED));
+            throw new AppException(ErrorType.UNVERIFIED, "Email not verified", meta);
         }
         String accessToken = jwtTokenService.generateAccessToken(account);
         String refreshToken = jwtTokenService.generateRefreshTokenWithFamily(account);
@@ -200,25 +217,30 @@ public class AuthServiceImpl implements AuthService {
     }
 
     @Override
-    public void forgotPassword(AuthRequests.ForgotPasswordRequest request) {
+    public Integer forgotPassword(AuthRequests.ForgotPasswordRequest request) {
         Optional<Account> accountOpt = accountRepository.findByEmail(request.getEmail());
-        if (accountOpt.isEmpty()) return; // do not reveal
+        if (accountOpt.isEmpty())
+            throw new AppException(ErrorType.NOT_FOUND, "User not registered yet");
         String otp = generateOtp();
-        redisService.setObject(otpKey(request.getEmail()), otp, 300);
+
         mailService.sendOtp(request.getEmail(), otp);
+        redisService.setObject(otpKey(request.getEmail()), otp, TIME_OTP_EXPIRED);
+        return TIME_OTP_EXPIRED;
     }
 
     @Override
-    public void resetPassword(AuthRequests.ResetPasswordRequest request) {
-        String cached = redisService.getObject(otpKey(request.getEmail()), String.class);
-        if (cached == null || !cached.equals(request.getOtp())) {
-            throw new AppException(ErrorType.BAD_REQUEST, "Invalid OTP");
+    public void resetPassword(String resetPasswordToken, AuthRequests.ResetPasswordRequest request) {
+
+        Jwt jwt = jwtDecoder.decode(resetPasswordToken);
+        if(!jwt.getClaim("type").equals("opt_token")) {
+            throw new AppException(ErrorType.UNAUTHORIZED, "Invalid token type");
         }
-        Account account = accountRepository.findByEmail(request.getEmail())
+        String email = jwt.getSubject();
+        Account account = accountRepository.findByEmail(email)
                 .orElseThrow(() -> new AppException(ErrorType.NOT_FOUND, "Invalid OTP"));
         account.setPasswordHash(passwordEncoder.encode(request.getNewPassword()));
         accountRepository.save(account);
-        redisService.deleteObject(otpKey(request.getEmail()));
+        redisService.deleteObject(otpKey(email));
     }
 
     @Override
@@ -333,6 +355,12 @@ public class AuthServiceImpl implements AuthService {
                 .expiresIn(accessTtl)
                 .build();
 
+    }
+
+
+    @Override
+    public String generateOTPToken(String email) {
+        return "";
     }
 
     /*============================================ HELPER METHOD ============================================*/

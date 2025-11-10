@@ -6,9 +6,12 @@ import com.hcmute.careergraph.persistence.dtos.response.AuthResponses;
 import com.hcmute.careergraph.services.AuthService;
 import com.hcmute.careergraph.services.RedisService;
 import com.hcmute.careergraph.services.impl.AuthServiceImpl;
+import jakarta.persistence.criteria.CriteriaBuilder;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.Email;
+import jakarta.validation.constraints.NotBlank;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
@@ -34,6 +37,7 @@ public class AuthController {
     private String cookieSameSite;
 
     private static final String REFRESH_COOKIE = "rt";
+    private static final String RESET_PASSWORD_COOKIE = "ttl_t";
     private final JwtDecoder jwtDecoder;
     private final AuthServiceImpl authServiceImpl;
 
@@ -58,9 +62,27 @@ public class AuthController {
                 .build();
     }
 
-    @PostMapping("/confirm-otp")
-    public RestResponse<Void> confirmOtp(@Valid @RequestBody AuthRequests.ConfirmOtpRequest request) {
+    @PostMapping("/confirm-otp-register")
+    public RestResponse<Void> confirmOtpRegister(@Valid @RequestBody AuthRequests.ConfirmOtpRequest request) {
         authService.confirmOtp(request);
+        return RestResponse.<Void>builder()
+                .status(HttpStatus.OK)
+                .message("OTP confirmed successfully")
+                .build();
+    }
+    @PostMapping("/confirm-otp-reset-password")
+    public RestResponse<Void> confirmOtpResetPassWord(@Valid @RequestBody AuthRequests.ConfirmOtpRequest request, HttpServletResponse resp) {
+        String restPasswordToken = authService.confirmOtp(request);
+
+        long resetPasswordTtl = 1000L;
+        ResponseCookie cookie = ResponseCookie.from(RESET_PASSWORD_COOKIE, restPasswordToken)
+                .httpOnly(true)
+                .secure(cookieSecure)
+                .sameSite(cookieSameSite)
+                .path("/")
+                .maxAge(Duration.ofSeconds(resetPasswordTtl))
+                .build();
+        resp.addHeader(HttpHeaders.SET_COOKIE, cookie.toString());
         return RestResponse.<Void>builder()
                 .status(HttpStatus.OK)
                 .message("OTP confirmed successfully")
@@ -68,10 +90,18 @@ public class AuthController {
     }
 
     @PostMapping("/resend-otp")
-    public RestResponse<Void> resendOtp(@Valid @RequestBody AuthRequests.ConfirmOtpRequest request) {
-        authService.resendOtp(request);
-        return RestResponse.<Void>builder()
+    public RestResponse<Integer> resendOtp(@Valid @RequestBody AuthRequests.ResendOtpRequest request) {
+        return RestResponse.<Integer>builder()
                 .status(HttpStatus.OK)
+                .data(authService.resendOtp(request))
+                .message("OTP resent successfully")
+                .build();
+    }
+    @GetMapping("/ttl-otp")
+    public RestResponse<Long> getTtlOtp(@RequestParam("email") @Email @NotBlank String email) {
+        return RestResponse.<Long>builder()
+                .status(HttpStatus.OK)
+                .data(authService.getTtlOtp(email))
                 .message("OTP resent successfully")
                 .build();
     }
@@ -130,17 +160,36 @@ public class AuthController {
     }
 
     @PostMapping("/forgot-password")
-    public RestResponse<Void> forgotPassword(@Valid @RequestBody AuthRequests.ForgotPasswordRequest request) {
+    public RestResponse<Integer> forgotPassword(@Valid @RequestBody AuthRequests.ForgotPasswordRequest request) {
         authService.forgotPassword(request);
-        return RestResponse.<Void>builder()
+        return RestResponse.<Integer>builder()
                 .status(HttpStatus.OK)
+                .data(authService.forgotPassword(request))
                 .message("Password reset link sent successfully")
                 .build();
     }
 
-    @PostMapping("/reset-password")
-    public RestResponse<Void> resetPassword(@Valid @RequestBody AuthRequests.ResetPasswordRequest request) {
-        authService.resetPassword(request);
+    @PutMapping("/reset-password")
+    public RestResponse<Void> resetPassword(@CookieValue(name= RESET_PASSWORD_COOKIE, required = false) String resetPasswordCookie,
+                                            HttpServletRequest request, HttpServletResponse response,
+                                            @Valid @RequestBody AuthRequests.ResetPasswordRequest resetRequest) {
+
+        if(resetPasswordCookie == null || resetPasswordCookie.isBlank()) {
+            return RestResponse.<Void>builder()
+                    .status(HttpStatus.UNAUTHORIZED)
+                    .message("Missing refresh cookie")
+                    .build();
+        }
+        authService.resetPassword(resetPasswordCookie, resetRequest);
+        ResponseCookie expiredCookie = ResponseCookie.from(RESET_PASSWORD_COOKIE, "")
+                .httpOnly(true)
+                .secure(cookieSecure)
+                .sameSite(cookieSameSite)
+                .path("/")
+                .maxAge(Duration.ZERO)
+                .build();
+        response.addHeader(HttpHeaders.SET_COOKIE, expiredCookie.toString());
+
         return RestResponse.<Void>builder()
                 .status(HttpStatus.OK)
                 .message("Password reset successfully")
@@ -184,5 +233,6 @@ public class AuthController {
                 .data(AuthResponses.OnlyTokenResponse.builder().accessToken(token.getAccessToken()).build())
                 .build();
     }
+
 
 }
