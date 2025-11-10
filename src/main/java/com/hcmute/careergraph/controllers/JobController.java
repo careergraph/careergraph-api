@@ -1,14 +1,21 @@
 package com.hcmute.careergraph.controllers;
 
+import com.hcmute.careergraph.enums.common.PartyType;
 import com.hcmute.careergraph.enums.job.JobCategory;
 import com.hcmute.careergraph.exception.BadRequestException;
 import com.hcmute.careergraph.helper.RestResponse;
 import com.hcmute.careergraph.helper.SecurityUtils;
+import com.hcmute.careergraph.mapper.ApplicationMapper;
 import com.hcmute.careergraph.mapper.JobMapper;
+import com.hcmute.careergraph.persistence.dtos.request.ApplicationRequest;
 import com.hcmute.careergraph.persistence.dtos.request.JobCreationRequest;
 import com.hcmute.careergraph.persistence.dtos.request.JobFilterRequest;
+import com.hcmute.careergraph.persistence.dtos.request.JobRecruimentRequest;
+import com.hcmute.careergraph.persistence.dtos.response.ApplicationResponse;
 import com.hcmute.careergraph.persistence.dtos.response.JobResponse;
+import com.hcmute.careergraph.persistence.models.Application;
 import com.hcmute.careergraph.persistence.models.Job;
+import com.hcmute.careergraph.services.ApplicationService;
 import com.hcmute.careergraph.services.JobService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -33,8 +40,12 @@ import java.util.Map;
 public class JobController {
 
     private final JobService jobService;
+    private final ApplicationService applicationService;
     private final JobMapper jobMapper;
+    private final ApplicationMapper applicationMapper;
     private final SecurityUtils securityUtils;
+
+    // ============================ JOB MANAGEMENT ============================
 
     /**
      * POST /api/v1/jobs
@@ -130,6 +141,26 @@ public class JobController {
         String companyId = securityUtils.extractCompanyId(authentication);
 
         Job job = jobService.updateJob(id, request, companyId);
+
+        return RestResponse.<JobResponse>builder()
+                .status(HttpStatus.OK)
+                .message("Job updated successfully")
+                .data(jobMapper.toResponse(job))
+                .build();
+    }
+
+    @PutMapping("/{id}/recruitment")
+    public RestResponse<JobResponse> updateJobRecruitment(
+            @PathVariable("id") String jobId,
+            @RequestBody JobRecruimentRequest request,
+            Authentication authentication
+    ) {
+        if (jobId == null) {
+            throw new BadRequestException("Job ID is required");
+        }
+        String companyId = securityUtils.extractCompanyId(authentication);
+
+        Job job = jobService.updateJob(jobId, companyId, request);
 
         return RestResponse.<JobResponse>builder()
                 .status(HttpStatus.OK)
@@ -260,6 +291,8 @@ public class JobController {
                 .build();
     }
 
+    // ============================ JOB FOR CANDIDATE ============================
+
     /**
      * GET /api/v1/jobs/personalized
      * Lấy danh sách jobs được personalized cho user hiện tại
@@ -321,6 +354,28 @@ public class JobController {
                 .status(HttpStatus.OK)
                 .message("Jobs retrieved successfully")
                 .data(mapToJobResponseList(jobsPopular))
+                .build();
+    }
+
+    @GetMapping("{jobId}/similar")
+    public RestResponse<Page<JobResponse>> getJobsSimilar(
+            @PathVariable("jobId") String jobId,
+            @RequestParam(name = "page", defaultValue = "0") Integer page,
+            @RequestParam(name = "size", defaultValue = "5") Integer size
+    ) {
+
+        if (jobId.isBlank()) {
+            throw new BadRequestException("Job ID invalid");
+        }
+
+        Pageable pageable = PageRequest.of(page, size);
+
+        Page<Job> jobs = jobService.getSimilarJob(jobId, pageable);
+
+        return RestResponse.<Page<JobResponse>>builder()
+                .status(HttpStatus.OK)
+                .message("Get jobs similar success")
+                .data(mapToJobResponsePage(jobs, pageable))
                 .build();
     }
 
@@ -394,18 +449,17 @@ public class JobController {
             @RequestBody JobFilterRequest filter,
             @RequestParam(name = "page", defaultValue = "0") Integer page,
             @RequestParam(name = "size", defaultValue = "10") Integer size,
-            @RequestParam(required = false) String query,
+            @RequestParam(required = false, defaultValue = "") String query,
             Authentication authentication) {
         log.info("POST /api/v1/jobs/search - Fetching lookup jobs");
 
         String companyId = securityUtils.extractCompanyId(authentication);
-        if (companyId == null) {
-            throw new BadRequestException("Company ID is not null");
-        }
+        String candidateId = securityUtils.extractCandidateId(authentication);
 
         Pageable pageable = PageRequest.of(page, size);
-
-        Page<Job> jobPage = jobService.search(filter, companyId, query, pageable);
+        Page<Job> jobPage = (companyId != null && !companyId.isEmpty())
+                ? jobService.search(filter, companyId, query, pageable, PartyType.COMPANY)
+                : jobService.search(filter, candidateId, query, pageable, PartyType.CANDIDATE);
 
         return RestResponse.<Page<JobResponse>>builder()
                 .status(HttpStatus.OK)
@@ -413,6 +467,35 @@ public class JobController {
                 .data(mapToJobResponsePage(jobPage, pageable))
                 .build();
     }
+
+    // ============================ APPLY JOB MANAGEMENT ============================
+
+    @PostMapping("/{id}/application")
+    public RestResponse<ApplicationResponse> apply(
+            @PathVariable("id") String jobId,
+            @RequestBody ApplicationRequest request,
+            Authentication authentication) {
+
+        String candidateId = securityUtils.extractCandidateId(authentication);
+        if (candidateId == null || candidateId.isBlank()) {
+            throw new BadRequestException("Candidate ID invalid");
+        }
+        request.setCandidateId(candidateId);
+
+        if (request.getResumeUrl().isBlank()) {
+            throw new BadRequestException("Application invalid. Resume is required");
+        }
+
+        Application application = applicationService.createApplication(request);
+        return RestResponse.<ApplicationResponse>builder()
+                .status(HttpStatus.CREATED)
+                .message("Application created successfully")
+                .data(applicationMapper.toResponse(application))
+                .build();
+    }
+
+
+    // ============================ HELPER METHOD ============================
 
     // Helper method to map to response page
     private Page<JobResponse> mapToJobResponsePage(Page<Job> jobPage, Pageable pageable) {

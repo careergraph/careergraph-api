@@ -1,13 +1,17 @@
 package com.hcmute.careergraph.services.impl;
 
+import com.hcmute.careergraph.enums.common.PartyType;
 import com.hcmute.careergraph.enums.common.Status;
+import com.hcmute.careergraph.enums.job.EducationType;
 import com.hcmute.careergraph.enums.job.EmploymentType;
+import com.hcmute.careergraph.enums.job.ExperienceLevel;
 import com.hcmute.careergraph.enums.job.JobCategory;
 import com.hcmute.careergraph.exception.BadRequestException;
 import com.hcmute.careergraph.exception.NotFoundException;
 import com.hcmute.careergraph.mapper.JobMapper;
 import com.hcmute.careergraph.persistence.dtos.request.JobCreationRequest;
 import com.hcmute.careergraph.persistence.dtos.request.JobFilterRequest;
+import com.hcmute.careergraph.persistence.dtos.request.JobRecruimentRequest;
 import com.hcmute.careergraph.persistence.models.Company;
 import com.hcmute.careergraph.persistence.models.Job;
 import com.hcmute.careergraph.repositories.CandidateRepository;
@@ -17,6 +21,7 @@ import com.hcmute.careergraph.services.JobService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -24,6 +29,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.util.*;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -34,6 +40,8 @@ public class JobServiceImpl implements JobService {
     private final CompanyRepository companyRepository;
     private final CandidateRepository candidateRepository;
     private final JobMapper jobMapper;
+
+    private final Integer PAGE_SIZE_PERSONAL_JOB = 8;
 
     /**
      * Tạo job mới
@@ -69,7 +77,6 @@ public class JobServiceImpl implements JobService {
      * @return JobResponse
      * @throws IllegalArgumentException nếu job không tồn tại
      */
-    @Transactional(readOnly = true)
     @Override
     public Job getJobById(String jobId) {
         log.info("Fetching job with ID: {}", jobId);
@@ -77,7 +84,10 @@ public class JobServiceImpl implements JobService {
         Job job = jobRepository.findById(jobId)
                 .orElseThrow(() -> new IllegalArgumentException("Job not found with ID: " + jobId));
 
-        return job;
+        // Increase views of job
+        job.setViews(job.getViews() + 1);
+
+        return jobRepository.save(job);
     }
 
     /**
@@ -112,6 +122,24 @@ public class JobServiceImpl implements JobService {
     public Job updateJob(String jobId, JobCreationRequest request, String companyId) {
         // TODO: Implement update logic
         throw new UnsupportedOperationException("Update job not implemented yet");
+    }
+
+    @Override
+    public Job updateJob(String jobId, String companyId, JobRecruimentRequest request) {
+
+        Job job = jobRepository.findById(jobId)
+                .orElseThrow(() -> new NotFoundException("Job not found with ID: " + jobId));
+
+        if (!job.getCompany().getId().equals(companyId)) {
+            throw new BadRequestException("Company not have job with ID: " + jobId);
+        }
+
+        // Update recruiment for job
+        job.setResume(request.resume());
+        job.setCoverLetter(request.coverLetter());
+
+
+        return jobRepository.save(job);
     }
 
     /**
@@ -204,7 +232,19 @@ public class JobServiceImpl implements JobService {
         String currentDate = LocalDate.now().toString();
 
         // Fetch and return personalized jobs from repository
-        return jobRepository.findJobByPersonalized(userId, currentDate);
+        List<Job> personalJobs = jobRepository.findJobByPersonalized(userId, currentDate);
+        if (personalJobs.size() >= PAGE_SIZE_PERSONAL_JOB) {
+            return personalJobs.subList(0, PAGE_SIZE_PERSONAL_JOB);
+        }
+
+        int remaining = PAGE_SIZE_PERSONAL_JOB - personalJobs.size();
+        List<String> excludeIds = personalJobs.stream().map(Job::getId).toList();
+        List<Job> extraJobs = jobRepository.findLatestJobsExcluding(currentDate, excludeIds.isEmpty() ? null : excludeIds);
+
+        List<Job> result = new ArrayList<>(personalJobs);
+        result.addAll(extraJobs);
+
+        return result;
     }
 
     @Override
@@ -231,6 +271,17 @@ public class JobServiceImpl implements JobService {
         return jobsPopular;
     }
 
+    @Override
+    public Page<Job> getSimilarJob(String jobId, Pageable pageable) {
+
+        Page<Job> jobsSimilar = jobRepository.findSimilarJob(jobId, pageable);
+        if (jobsSimilar == null) {
+            return new PageImpl<>(null);
+        }
+
+        return jobsSimilar;
+    }
+
     /**
      * Hàm lấy ra job theo query và company ID
      *
@@ -251,25 +302,31 @@ public class JobServiceImpl implements JobService {
         return jobs;
     }
 
-    /**
-     * Hàm search job theo filter và company ID
-     *
-     * @param filter Dữ liệu tìm kiếm
-     * @param query Data tim kiem
-     * @param companyId ID của company
-     * @return Map<ID, Job>
-     */
     @Transactional(readOnly = true)
     @Override
-    public Page<Job> search(JobFilterRequest filter, String companyId, String query, Pageable pageable) {
+    public Page<Job> search(JobFilterRequest filter, String partyId, String query, Pageable pageable, PartyType type) {
+
+        // Check company ID
+        if (type == PartyType.COMPANY && partyId == null) {
+            throw new BadRequestException("Company ID is required");
+        }
 
         // Get params from filter
-        List<Status> statuses = filter.getStatuses();
-        List<JobCategory> jobCategories = filter.getJobCategories();
-        List<EmploymentType> employmentTypes = filter.getEmploymentTypes();
+        List<Status> statuses = filter.getStatuses().isEmpty() ? null : filter.getStatuses();
+        List<JobCategory> jobCategories = filter.getJobCategories().isEmpty() ? null : filter.getJobCategories();
+        List<EmploymentType> employmentTypes = filter.getEmploymentTypes().isEmpty() ? null : filter.getEmploymentTypes();
+        List<EducationType> educationTypes = null;
+        List<ExperienceLevel> experienceLevels = null;
+        String city = filter.getCity();
 
-        Page<Job> jobs = jobRepository.search(companyId, statuses, jobCategories, employmentTypes, query, pageable);
+        Page<Job> jobs = null;
 
+        if (type == PartyType.COMPANY) {
+            jobs = jobRepository.searchJobForCompany(partyId, statuses, jobCategories, employmentTypes, query, pageable);
+        } else {
+            jobs = jobRepository.searchJobForCandidate(partyId, city, jobCategories, employmentTypes,
+                    experienceLevels, educationTypes, query, pageable);
+        }
         return jobs;
     }
 }

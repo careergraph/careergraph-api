@@ -126,20 +126,12 @@ public class S3StorageServiceImpl implements S3StorageService {
         String extension = extractExtension(sanitizedName);
         String baseName = sanitizedName.substring(0, sanitizedName.length() - extension.length());
 
-        return switch (fileType) {
-            case AVATAR -> prefix + "avatar" + extension;
-            case COVER -> prefix + "cover" + extension;
-            case RESUME -> prefix + DateTimeFormatter.ISO_INSTANT.format(Instant.now()) + "-" + baseName + "-" + UUID.randomUUID() + extension;
-        };
+        return null;
     }
 
     private String resolvePrefix(String candidateId, FileType fileType) {
         String normalizedId = Objects.requireNonNull(candidateId, "candidateId must not be null");
-        return switch (fileType) {
-            case AVATAR -> String.format("candidates/%s/avatar/", normalizedId);
-            case COVER -> String.format("candidates/%s/cover/", normalizedId);
-            case RESUME -> String.format("candidates/%s/resumes/", normalizedId);
-        };
+        return null;
     }
 
     private String sanitizeFileName(String originalFilename) {

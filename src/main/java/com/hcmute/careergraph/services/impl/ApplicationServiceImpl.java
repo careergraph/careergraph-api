@@ -21,6 +21,7 @@ import org.springframework.util.StringUtils;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.Comparator;
+import java.util.List;
 import java.util.Optional;
 
 @Service
@@ -39,26 +40,25 @@ public class ApplicationServiceImpl implements ApplicationService {
     @Override
     public Application createApplication(ApplicationRequest request) {
         log.info("Creating new application for candidate: {} to job: {}", 
-                request.candidateId(), request.jobId());
+                request.getCandidateId(), request.getJobId());
         
         // Find candidate and job
-        Candidate candidate = candidateRepository.findById(request.candidateId())
-                .orElseThrow(() -> new RuntimeException("Candidate not found with id: " + request.candidateId()));
+        Candidate candidate = candidateRepository.findById(request.getCandidateId())
+                .orElseThrow(() -> new RuntimeException("Candidate not found with id: " + request.getCandidateId()));
         
-        Job job = jobRepository.findById(request.jobId())
-                .orElseThrow(() -> new RuntimeException("Job not found with id: " + request.jobId()));
+        Job job = jobRepository.findById(request.getJobId())
+                .orElseThrow(() -> new RuntimeException("Job not found with id: " + request.getJobId()));
 
         LocalDateTime now = LocalDateTime.now();
-        String appliedTimestamp = Optional.ofNullable(request.appliedDate())
+        String appliedTimestamp = Optional.ofNullable(request.getAppliedDate())
                 .filter(StringUtils::hasText)
                 .orElse(now.format(DateTimeFormatter.ISO_LOCAL_DATE_TIME));
 
         // Create application entity
         Application application = Application.builder()
-                .coverLetter(request.coverLetter())
-                .resumeUrl(request.resumeUrl())
-                .rating(request.rating())
-                .notes(request.notes())
+                .coverLetter(request.getCoverLetter())
+                .resumeUrl(request.getResumeUrl())
+                .notes(request.getNotes())
                 .appliedDate(appliedTimestamp)
                 .currentStage(ApplicationStage.APPLIED)
                 .stageChangedAt(now)
@@ -93,9 +93,14 @@ public class ApplicationServiceImpl implements ApplicationService {
 
     @Override
     @Transactional(readOnly = true)
-    public Page<Application> getAllApplications(Pageable pageable) {
+    public List<Application> getAllApplications(String jobId, String companyId) {
         log.info("Getting all applications with pagination");
-        return applicationRepository.findAll(pageable);
+
+        List<Application> applications = applicationRepository.findByCompanyIdAndJobId(companyId, jobId);
+        if (applications.isEmpty()) {
+            return List.of();
+        }
+        return applications;
     }
 
     @Override
@@ -120,22 +125,21 @@ public class ApplicationServiceImpl implements ApplicationService {
                 .orElseThrow(() -> new RuntimeException("Application not found with id: " + id));
 
         // Update fields
-        application.setCoverLetter(request.coverLetter());
-        application.setResumeUrl(request.resumeUrl());
-        application.setRating(request.rating());
-        application.setNotes(request.notes());
+        application.setCoverLetter(request.getCoverLetter());
+        application.setResumeUrl(request.getResumeUrl());
+        application.setNotes(request.getNotes());
 
         // Update candidate if changed
-        if (!application.getCandidate().getId().equals(request.candidateId())) {
-            Candidate candidate = candidateRepository.findById(request.candidateId())
-                    .orElseThrow(() -> new RuntimeException("Candidate not found with id: " + request.candidateId()));
+        if (!application.getCandidate().getId().equals(request.getCandidateId())) {
+            Candidate candidate = candidateRepository.findById(request.getCandidateId())
+                    .orElseThrow(() -> new RuntimeException("Candidate not found with id: " + request.getCandidateId()));
             application.setCandidate(candidate);
         }
 
         // Update job if changed
-        if (!application.getJob().getId().equals(request.jobId())) {
-            Job job = jobRepository.findById(request.jobId())
-                    .orElseThrow(() -> new RuntimeException("Job not found with id: " + request.jobId()));
+        if (!application.getJob().getId().equals(request.getJobId())) {
+            Job job = jobRepository.findById(request.getJobId())
+                    .orElseThrow(() -> new RuntimeException("Job not found with id: " + request.getJobId()));
             application.setJob(job);
         }
 
@@ -298,13 +302,13 @@ public class ApplicationServiceImpl implements ApplicationService {
             builder.append(candidate.getFirstName().trim());
         }
         if (StringUtils.hasText(candidate.getLastName())) {
-            if (builder.length() > 0) {
+            if (!builder.isEmpty()) {
                 builder.append(' ');
             }
             builder.append(candidate.getLastName().trim());
         }
 
-        if (builder.length() > 0) {
+        if (!builder.isEmpty()) {
             return builder.toString();
         }
 

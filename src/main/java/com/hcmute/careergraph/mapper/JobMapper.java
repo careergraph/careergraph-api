@@ -146,10 +146,14 @@ public class JobMapper {
 
                 // Stats
                 .views(job.getViews())
-                .applicants(job.getApplicants())
+                .applicants(job.getApplications().size())
                 .saved(job.getSaved())
                 .likes(job.getLiked())
                 .shares(job.getShared())
+
+                // Application recruiment
+                .resume(job.getResume())
+                .coverLetter(job.getCoverLetter())
 
                 // Timeline - null for now, có thể implement sau
                 .timeline(null)
