@@ -31,6 +31,19 @@ public class AuthRequests {
         @NotBlank
         private String otp;
     }
+    @Data
+    public static class ResendOtpRequest {
+        @Email
+        @NotBlank
+        private String email;
+    }
+
+    @Data
+    public static class TTLOtpRequest {
+        @Email
+        @NotBlank
+        private String email;
+    }
 
     @Data
     public static class LoginRequest {
@@ -51,12 +64,6 @@ public class AuthRequests {
 
     @Data
     public static class ResetPasswordRequest {
-        @Email
-        @NotBlank
-        private String email;
-
-        @NotBlank
-        private String otp;
 
         @NotBlank
         @Size(min = 8, max = 100)
