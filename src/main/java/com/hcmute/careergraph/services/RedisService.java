@@ -13,4 +13,6 @@ public interface RedisService {
     void setField(String key, String field, Object value);
 
     <T> T getField(String key, String field, Class<T> clazz);
+
+    Long getTtl(String key);
 }

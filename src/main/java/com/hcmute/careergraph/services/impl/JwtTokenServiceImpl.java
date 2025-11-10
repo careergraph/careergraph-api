@@ -73,6 +73,23 @@ public class JwtTokenServiceImpl implements JwtTokenService {
     public String generateRefreshTokenWithFamily(Account account) {
         return generateRefreshTokenWithFamily(account,UUID.randomUUID().toString());
     }
+
+    @Override
+    public String generateResetPasswordToken(String email) {
+        Instant now = Instant.now();
+        Instant exp = now.plusSeconds(300);
+
+        JwtClaimsSet claims = JwtClaimsSet.builder()
+                .subject(email)
+                .claim("type", "opt_token")
+                .id(UUID.randomUUID().toString())
+                .issuedAt(now)
+                .expiresAt(exp)
+                .build();
+
+        return jwtEncoder.encode(JwtEncoderParameters.from(claims)).getTokenValue();
+    }
+
     @Override
     public String rotateRefreshToken(Account account, String familyId){
         return generateRefreshTokenWithFamily(account, familyId);
@@ -119,5 +136,7 @@ public class JwtTokenServiceImpl implements JwtTokenService {
     public void blacklist(String jti, long ttlSeconds) {
         redisService.setObject("bl:" + jti, Boolean.TRUE, (int) ttlSeconds);
     }
+
+
 
 }
