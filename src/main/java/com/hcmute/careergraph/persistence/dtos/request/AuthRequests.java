@@ -20,6 +20,7 @@ public class AuthRequests {
         private String firstName;
 
         private String lastName;
+
     }
 
     @Data
