@@ -75,6 +75,8 @@ public class AuthServiceImpl implements AuthService {
             // Create candidate
             Candidate candidate = Candidate.builder()
                     .account(account)
+                    .firstName(request.getFirstName())
+                    .lastName(request.getLastName())
                     .build();
             account.setCandidate(candidate);
 
@@ -83,6 +85,7 @@ public class AuthServiceImpl implements AuthService {
             // Create company - for HR
             Company company = Company.builder()
                     .account(account)
+
                     .build();
             account.setCompany(company);
 
