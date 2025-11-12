@@ -1,47 +1,57 @@
 <!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org">
 <head>
-    <meta charset="UTF-8">
-    <title>Application stage update</title>
-    <style>
-        body { font-family: Arial, sans-serif; color: #333; }
-        .wrapper { max-width: 600px; margin: 0 auto; padding: 24px; border: 1px solid #e5e7eb; border-radius: 8px; }
-        .stage-label { color: #2563eb; font-weight: 600; }
-        .footer { font-size: 12px; color: #6b7280; margin-top: 24px; }
-    </style>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>Application stage update</title>
+        <style>
+                @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap');
+                .email-container { font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; color:#374151; line-height:1.6; }
+                @media only screen and (max-width:600px){ .mobile-padding{ padding:20px !important; } }
+        </style>
 </head>
-<body>
-<div class="wrapper">
-    <p>Dear <span th:text="${candidateName}">Candidate</span>,</p>
+<body style="margin:0; padding:0; background-color:#f8fafc;">
 
-    <p>
-        We wanted to let you know that your application for the
-        <strong th:text="${jobTitle}">position</strong> role at
-        <strong th:text="${companyName}">our company</strong>
-        is now at the
-        <span class="stage-label" th:text="${stageLabel}">current stage</span>.
-    </p>
+<table width="100%" cellpadding="0" cellspacing="0" style="padding:20px 0; background-color:#f8fafc;">
+    <tr>
+        <td align="center">
+            <table width="600" cellpadding="0" cellspacing="0" class="email-container" style="background:#fff; border-radius:8px; overflow:hidden; box-shadow:0 4px 12px rgba(0,0,0,0.05);">
 
-    <p th:if="${note}" th:text="${note}">Stage update note.</p>
+                <tr>
+                    <td style="background-color:#ffffff; padding:30px 40px 20px 40px; border-bottom:1px solid #e5e7eb;">
+                        <table width="100%"><tr>
+                            <td style="text-align:left;"><img th:src="${companyLogo}" alt="Logo" width="120" style="display:block;"/></td>
+                            <td style="text-align:right; color:#6b7280; font-size:14px;"><span th:text="${date}">28 Sep, 2025</span></td>
+                        </tr></table>
+                    </td>
+                </tr>
 
-    <p th:if="${terminal}">
-        This stage concludes the recruitment process. Our team will be in touch with any final details shortly.
-    </p>
-    <p th:if="${!terminal}">
-        Our team will keep you updated as the next steps are scheduled. You can always follow your progress by
-        signing in to your candidate dashboard.
-    </p>
+                <tr>
+                    <td class="mobile-padding" style="padding:40px;">
+                        <p style="margin:0 0 12px 0; color:#6b7280;" th:text="'Dear ' + ${candidateName} + ','">Dear Candidate,</p>
 
-    <p>Warm regards,<br/>
-        <span th:text="${companyName}">CareerGraph</span> hiring team</p>
+                        <p style="color:#374151;">We wanted to let you know that your application for the <strong th:text="${jobTitle}">position</strong> role at <strong th:text="${companyName}">our company</strong> is now at the <span style="color:#2563eb; font-weight:600;" th:text="${stageLabel}">current stage</span>.</p>
 
-    <div class="footer">
-        <p>
-            Need help? Contact us at <a th:href="${'mailto:' + supportEmail}" th:text="${supportEmail}">support@careergraph.com</a>
-            or visit <a th:href="${helpCenterUrl}" th:text="${helpCenterUrl}">our help center</a>.
-        </p>
-        <p>&copy; <span th:text="${year}">2025</span> <span th:text="${companyName}">CareerGraph</span>. All rights reserved.</p>
-    </div>
-</div>
+                        <p th:if="${note}" th:text="${note}" style="margin-top:12px;">Stage update note.</p>
+
+                        <p th:if="${terminal}" style="margin-top:12px;">This stage concludes the recruitment process. Our team will be in touch with any final details shortly.</p>
+                        <p th:if="${!terminal}" style="margin-top:12px;">Our team will keep you updated as the next steps are scheduled. You can always follow your progress by signing in to your candidate dashboard.</p>
+
+                        <p style="margin-top:16px;">Warm regards,<br/><span th:text="${companyName}">CareerGraph</span> hiring team</p>
+                    </td>
+                </tr>
+
+                <tr>
+                    <td style="background-color:#f9fafb; padding:24px 40px; text-align:center; border-top:1px solid #e5e7eb;">
+                        <p style="margin:0 0 8px 0; color:#6b7280;">Need help? Contact us at <a th:href="${'mailto:' + supportEmail}" style="color:#3b82f6;" th:text="${supportEmail}">support@careergraph.com</a> or visit <a th:href="${helpCenterUrl}" style="color:#3b82f6;" th:text="${helpCenterUrl}">help center</a>.</p>
+                        <p style="margin:8px 0 0 0; font-size:12px; color:#9ca3af;">&copy; <span th:text="${year}">2025</span> <span th:text="${companyName}">CareerGraph</span>. Tất cả quyền được bảo lưu.</p>
+                    </td>
+                </tr>
+
+            </table>
+        </td>
+    </tr>
+</table>
+
 </body>
 </html>
