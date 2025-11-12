@@ -1,32 +1,52 @@
 <!DOCTYPE html>
 <html lang="en" xmlns:th="http://www.thymeleaf.org">
 <head>
-  <meta charset="UTF-8" />
-  <title>Unread Messages</title>
-  <style>
-    body { font-family:'Inter', Arial, sans-serif; background:#f8fafc; margin:0; padding:20px; color:#374151; }
-    .email-container { max-width:600px; margin:auto; background:#fff; border-radius:8px; box-shadow:0 4px 12px rgba(0,0,0,0.05); }
-    .header { padding:30px 40px 20px; border-bottom:1px solid #e5e7eb; }
-    .content { padding:40px; text-align:center; }
-    .count { font-size:36px; font-weight:700; color:#3b82f6; margin:20px 0; }
-    .footer { background:#f9fafb; padding:24px 40px; text-align:center; border-top:1px solid #e5e7eb; font-size:12px; color:#9ca3af; }
-  </style>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Unread Messages</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap');
+        .email-container { font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; line-height:1.6; color:#374151; }
+        @media only screen and (max-width:600px){ .mobile-padding{ padding:20px !important; } }
+    </style>
 </head>
-<body>
-<div class="email-container">
-  <div class="header">
-    <img th:src="${logoUrl}" width="120" alt="Logo" />
-  </div>
-  <div class="content">
-    <h2>Bạn có tin nhắn mới</h2>
-    <p th:text="'Xin chào ' + ${username} + ','">Xin chào John,</p>
-    <p>Bạn có <span class="count" th:text="${unreadCount}">3</span> tin nhắn chưa đọc.</p>
-    <p><a th:href="${messagesUrl}" style="color:#3b82f6; font-weight:500;">Xem ngay</a></p>
-  </div>
-  <div class="footer">
-    <p th:text="${companyName}">CareerGraph</p>
-    <p>© 2025 CareerGraph</p>
-  </div>
-</div>
+<body style="margin:0; padding:0; background-color:#f8fafc;">
+
+<table width="100%" cellpadding="0" cellspacing="0" style="padding:20px 0; background-color:#f8fafc;">
+  <tr>
+    <td align="center">
+      <table width="600" cellpadding="0" cellspacing="0" class="email-container" style="background:#fff; border-radius:8px; overflow:hidden; box-shadow:0 4px 12px rgba(0,0,0,0.05);">
+
+        <tr>
+          <td style="background-color:#ffffff; padding:30px 40px 20px 40px; border-bottom:1px solid #e5e7eb;">
+            <table width="100%"><tr>
+              <td style="text-align:left;"><img th:src="${logoUrl}" alt="Logo" width="120" style="display:block;"/></td>
+              <td style="text-align:right; color:#6b7280; font-size:14px;"><span th:text="${date}">28 Sep, 2025</span></td>
+            </tr></table>
+          </td>
+        </tr>
+
+        <tr>
+          <td class="mobile-padding" style="padding:40px; text-align:center;">
+            <h2 style="margin:0 0 8px 0; font-size:22px; font-weight:600; color:#111827;">Bạn có tin nhắn mới</h2>
+            <p style="margin:0 0 12px 0; color:#6b7280;" th:text="'Xin chào ' + ${username} + ','">Xin chào John,</p>
+            <p style="margin:0 0 16px 0; color:#374151;">Bạn có <span style="font-size:36px; font-weight:700; color:#3b82f6;" th:text="${unreadCount}">3</span> tin nhắn chưa đọc.</p>
+            <p><a th:href="${messagesUrl}" style="color:#3b82f6; font-weight:500;">Xem ngay</a></p>
+          </td>
+        </tr>
+
+        <tr>
+          <td style="background-color:#f9fafb; padding:24px 40px; text-align:center; border-top:1px solid #e5e7eb;">
+            <p style="margin:0 0 4px 0; font-size:14px; font-weight:600; color:#374151;" th:text="${companyName}">CareerGraph</p>
+            <p style="margin:0 0 8px 0; font-size:13px; color:#6b7280;" th:text="${companyAddress}">123 Street, City, Country</p>
+            <p style="margin:0; font-size:12px; color:#9ca3af;">© <span th:text="${year}">2025</span> <span th:text="${companyName}">CareerGraph</span>. Tất cả quyền được bảo lưu.</p>
+          </td>
+        </tr>
+
+      </table>
+    </td>
+  </tr>
+</table>
+
 </body>
 </html>

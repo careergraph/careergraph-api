@@ -1,67 +1,80 @@
 <!DOCTYPE html>
 <html lang="en" xmlns:th="http://www.thymeleaf.org">
 <head>
-  <meta charset="UTF-8" />
-  <title>Application Status Update</title>
-  <style>
-    body { font-family:'Inter', Arial, sans-serif; background:#f8fafc; margin:0; padding:20px; color:#374151; }
-    .email-container { max-width:600px; margin:auto; background:#fff; border-radius:8px; box-shadow:0 4px 12px rgba(0,0,0,0.05); }
-    .header { padding:30px 40px 20px; border-bottom:1px solid #e5e7eb; }
-    .content { padding:40px; }
-    .status-box { border-left:4px solid #3b82f6; padding:16px; background:#f9fafb; border-radius:6px; margin-bottom:20px; }
-    .notes-box { background:#f9fafb; padding:16px; border-radius:6px; margin-top:20px; }
-    .timeline { display:flex; align-items:center; margin:20px 0; }
-    .timeline-item { flex:1; text-align:center; position:relative; }
-    .timeline-item:not(:last-child):after { content:''; position:absolute; right:-50%; top:50%; width:100%; height:2px; background:#e5e7eb; }
-    .footer { background:#f9fafb; padding:24px 40px; text-align:center; border-top:1px solid #e5e7eb; font-size:12px; color:#9ca3af; }
-  </style>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Application Status Update</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap');
+        .email-container { font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; line-height:1.6; color:#374151; }
+        @media only screen and (max-width:600px){ .mobile-padding{ padding:20px !important; } }
+        .status-box{ border-left:4px solid #3b82f6; padding:16px; background:#f9fafb; border-radius:6px; margin-bottom:20px; }
+        .notes-box{ background:#f9fafb; padding:16px; border-radius:6px; margin-top:20px; }
+    </style>
 </head>
-<body>
-<div class="email-container">
-  <div class="header">
-    <img th:src="${companyLogo}" width="120" alt="${companyName} Logo" />
-  </div>
-  <div class="content">
-    <h2>Application Status Update</h2>
-    <p>Dear ${candidateName},</p>
+<body style="margin:0; padding:0; background-color:#f8fafc;">
 
-    <div class="status-box">
-      <h3>Status Update for ${jobTitle}</h3>
-      <p>Your application status has been updated from <strong>${oldStatus}</strong> to <strong>${status}</strong> on ${updateDate}.</p>
-    </div>
+<table width="100%" cellpadding="0" cellspacing="0" style="padding:20px 0; background-color:#f8fafc;">
+  <tr>
+    <td align="center">
+      <table width="600" cellpadding="0" cellspacing="0" class="email-container" style="background:#fff; border-radius:8px; overflow:hidden; box-shadow:0 4px 12px rgba(0,0,0,0.05);">
 
-    <div th:if="${notes}" class="notes-box">
-      <h4>Additional Notes:</h4>
-      <p>${notes}</p>
-    </div>
+        <tr>
+          <td style="background-color:#ffffff; padding:30px 40px 20px 40px; border-bottom:1px solid #e5e7eb;">
+            <table width="100%"><tr>
+              <td style="text-align:left;"><img th:src="${companyLogo}" alt="${companyName} Logo" width="120" style="display:block;"/></td>
+              <td style="text-align:right; color:#6b7280; font-size:14px;"><span th:text="${date}">28 Sep, 2025</span></td>
+            </tr></table>
+          </td>
+        </tr>
 
-    <div class="timeline">
-      <div class="timeline-item" th:classappend="${status == 'SUBMITTED' ? 'active' : ''}">
-        <div>Submitted</div>
-      </div>
-      <div class="timeline-item" th:classappend="${status == 'REVIEWING' ? 'active' : ''}">
-        <div>Reviewing</div>
-      </div>
-      <div class="timeline-item" th:classappend="${status == 'INTERVIEW' ? 'active' : ''}">
-        <div>Interview</div>
-      </div>
-      <div class="timeline-item" th:classappend="${status == 'OFFERED' ? 'active' : ''}">
-        <div>Offered</div>
-      </div>
-    </div>
+        <tr>
+          <td class="mobile-padding" style="padding:40px;">
+            <h2 style="margin:0 0 8px 0; font-size:22px; font-weight:600; color:#111827;">Application Status Update</h2>
+            <p style="margin:0 0 12px 0; color:#6b7280;" th:text="'Dear ' + ${candidateName} + ','">Dear Candidate,</p>
 
-    <p th:if="${status == 'INTERVIEW'}">
-      Our HR team will contact you shortly to schedule the interview.
-    </p>
-    <p th:if="${status == 'OFFERED'}">
-      Congratulations! Please check your dashboard for the complete offer details.
-    </p>
-  </div>
+            <div class="status-box">
+              <h3 style="margin:0 0 6px 0;">Status Update for <span th:text="${jobTitle}">${jobTitle}</span></h3>
+              <p style="margin:0;">Your application status has been updated from <strong th:text="${oldStatus}">${oldStatus}</strong> to <strong th:text="${status}">${status}</strong> on <span th:text="${updateDate}">${updateDate}</span>.</p>
+            </div>
 
-  <div class="footer">
-    <p>${companyName}</p>
-    <p>© 2023 All rights reserved</p>
-  </div>
-</div>
+            <div th:if="${notes}" class="notes-box">
+              <h4 style="margin:0 0 8px 0;">Additional Notes:</h4>
+              <p th:text="${notes}">${notes}</p>
+            </div>
+
+            <div style="margin-top:18px; display:flex; gap:12px; flex-wrap:wrap;">
+              <div style="flex:1; min-width:120px; text-align:center;">
+                <div th:classappend="${status == 'SUBMITTED' ? 'active' : ''}" style="font-weight:600; color:#6b7280;">Submitted</div>
+              </div>
+              <div style="flex:1; min-width:120px; text-align:center;">
+                <div th:classappend="${status == 'REVIEWING' ? 'active' : ''}" style="font-weight:600; color:#6b7280;">Reviewing</div>
+              </div>
+              <div style="flex:1; min-width:120px; text-align:center;">
+                <div th:classappend="${status == 'INTERVIEW' ? 'active' : ''}" style="font-weight:600; color:#6b7280;">Interview</div>
+              </div>
+              <div style="flex:1; min-width:120px; text-align:center;">
+                <div th:classappend="${status == 'OFFERED' ? 'active' : ''}" style="font-weight:600; color:#6b7280;">Offered</div>
+              </div>
+            </div>
+
+            <p th:if="${status == 'INTERVIEW'}" style="margin-top:16px;">Our HR team will contact you shortly to schedule the interview.</p>
+            <p th:if="${status == 'OFFERED'}" style="margin-top:16px;">Congratulations! Please check your dashboard for the complete offer details.</p>
+          </td>
+        </tr>
+
+        <tr>
+          <td style="background-color:#f9fafb; padding:24px 40px; text-align:center; border-top:1px solid #e5e7eb;">
+            <p style="margin:0 0 4px 0; font-size:14px; font-weight:600; color:#374151;" th:text="${companyName}">CareerGraph</p>
+            <p style="margin:0 0 8px 0; font-size:13px; color:#6b7280;" th:text="${companyAddress}">123 Street, City, Country</p>
+            <p style="margin:0; font-size:12px; color:#9ca3af;">© <span th:text="${year}">2025</span> <span th:text="${companyName}">CareerGraph</span>. Tất cả quyền được bảo lưu.</p>
+          </td>
+        </tr>
+
+      </table>
+    </td>
+  </tr>
+</table>
+
 </body>
 </html>

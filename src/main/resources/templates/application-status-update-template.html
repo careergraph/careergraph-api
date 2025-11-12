@@ -1,28 +1,64 @@
 <!DOCTYPE html>
-<html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
 <head>
-    <meta charset="UTF-8">
-    <title>Application Status Update</title>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>Application Status Update</title>
+        <style>
+                @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap');
+                .email-container { font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; color:#374151; line-height:1.6; }
+                @media only screen and (max-width:600px){ .mobile-padding{ padding:20px !important; } }
+        </style>
 </head>
-<body>
-    <h2>Application Status Update</h2>
-    <p>Dear ${candidateName},</p>
-    
-    <p>There has been an update regarding your application for the <strong>${jobTitle}</strong> position at ${companyName}.</p>
-    
-    <p>Your application status has been updated to: <strong>${status}</strong></p>
-    
-    <#if status == 'SCREENING'>
-    <p>We would like to schedule an initial phone screening with you. Please expect a call or email soon to arrange this.</p>
-    </#if>
-    
-    <#if status == 'INTERVIEWING'>
-    <p>Congratulations! We would like to invite you for an interview. You will receive a separate email with the interview details shortly.</p>
-    </#if>
-    
-    <p>You can log into your candidate dashboard to view more details about your application.</p>
-    
-    <p>Best regards,<br>
-    ${companyName} Hiring Team</p>
+<body style="margin:0; padding:0; background-color:#f8fafc;">
+
+<table width="100%" cellpadding="0" cellspacing="0" style="padding:20px 0; background-color:#f8fafc;">
+    <tr>
+        <td align="center">
+            <table width="600" cellpadding="0" cellspacing="0" class="email-container" style="background:#fff; border-radius:8px; overflow:hidden; box-shadow:0 4px 12px rgba(0,0,0,0.05);">
+
+                <tr>
+                    <td style="background-color:#ffffff; padding:30px 40px 20px 40px; border-bottom:1px solid #e5e7eb;">
+                        <table width="100%"><tr>
+                            <td style="text-align:left;"><img th:src="${companyLogo}" alt="${companyName} Logo" width="120" style="display:block;"/></td>
+                            <td style="text-align:right; color:#6b7280; font-size:14px;"><span th:text="${date}">28 Sep, 2025</span></td>
+                        </tr></table>
+                    </td>
+                </tr>
+
+                <tr>
+                    <td class="mobile-padding" style="padding:40px;">
+                        <h2 style="margin:0 0 8px 0; font-size:22px; font-weight:600; color:#111827;">Application Status Update</h2>
+                        <p style="margin:0 0 12px 0; color:#6b7280;" th:text="'Dear ' + ${candidateName} + ','">Dear Candidate,</p>
+
+                        <p style="color:#374151;">There has been an update regarding your application for the <strong th:text="${jobTitle}">${jobTitle}</strong> position at <strong th:text="${companyName}">${companyName}</strong>.</p>
+                        <p style="margin-top:12px;">Your application status has been updated to: <strong th:text="${status}">${status}</strong></p>
+
+                        <div th:if="${status == 'SCREENING'}" style="margin-top:12px;">
+                            <p>We would like to schedule an initial phone screening with you. Please expect a call or email soon to arrange this.</p>
+                        </div>
+
+                        <div th:if="${status == 'INTERVIEWING'}" style="margin-top:12px;">
+                            <p>Congratulations! We would like to invite you for an interview. You will receive a separate email with the interview details shortly.</p>
+                        </div>
+
+                        <p style="margin-top:12px;">You can log into your candidate dashboard to view more details about your application.</p>
+                        <p style="margin:16px 0 0 0;">Best regards,<br/><span th:text="${companyName}">${companyName}</span> Hiring Team</p>
+                    </td>
+                </tr>
+
+                <tr>
+                    <td style="background-color:#f9fafb; padding:24px 40px; text-align:center; border-top:1px solid #e5e7eb;">
+                        <p style="margin:0 0 4px 0; font-size:14px; font-weight:600; color:#374151;" th:text="${companyName}">CareerGraph</p>
+                        <p style="margin:0 0 8px 0; font-size:13px; color:#6b7280;" th:text="${companyAddress}">123 Street, City, Country</p>
+                        <p style="margin:0; font-size:12px; color:#9ca3af;">© <span th:text="${year}">2025</span> <span th:text="${companyName}">CareerGraph</span>. Tất cả quyền được bảo lưu.</p>
+                    </td>
+                </tr>
+
+            </table>
+        </td>
+    </tr>
+</table>
+
 </body>
 </html>
