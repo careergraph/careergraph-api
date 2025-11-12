@@ -31,8 +31,17 @@
                         <h2 style="margin:0 0 8px 0; font-size:22px; font-weight:600; color:#111827;">Application Status Update</h2>
                         <p style="margin:0 0 12px 0; color:#6b7280;" th:text="'Dear ' + ${candidateName} + ','">Dear Candidate,</p>
 
-                        <p style="color:#374151;">There has been an update regarding your application for the <strong th:text="${jobTitle}">${jobTitle}</strong> position at <strong th:text="${companyName}">${companyName}</strong>.</p>
-                        <p style="margin-top:12px;">Your application status has been updated to: <strong th:text="${status}">${status}</strong></p>
+                        <!-- Message box like OTP -->
+                        <div style="background-color:#f9fafb; border-radius:8px; padding:24px; margin-bottom:24px; border-left:4px solid #3b82f6;">
+                            <p style="margin:0; color:#374151;">There has been an update regarding your application for the <strong th:text="${jobTitle}">${jobTitle}</strong> position at <strong th:text="${companyName}">${companyName}</strong>.</p>
+                        </div>
+
+                        <div style="text-align:center; margin:24px 0;">
+                            <div style="background-color:#f8fafc; border:2px solid #e5e7eb; border-radius:12px; padding:24px; display:inline-block; min-width:220px;">
+                                <p style="margin:0 0 8px 0; font-size:12px; color:#6b7280; font-weight:600; text-transform:uppercase;">Trạng thái hiện tại</p>
+                                <div style="font-size:20px; font-weight:700; color:#1f2937;" th:text="${status}">STATUS</div>
+                            </div>
+                        </div>
 
                         <div th:if="${status == 'SCREENING'}" style="margin-top:12px;">
                             <p>We would like to schedule an initial phone screening with you. Please expect a call or email soon to arrange this.</p>

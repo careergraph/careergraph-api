@@ -31,9 +31,14 @@
           <td class="mobile-padding" style="padding:40px;">
             <h2 style="margin:0 0 8px 0; font-size:22px; font-weight:600; color:#111827; text-align:left;">Gợi ý việc làm cho bạn</h2>
             <p style="margin:0 0 8px 0; color:#6b7280;" th:text="'Xin chào ' + ${username} + ','">Xin chào John,</p>
-            <p style="margin:0 0 16px 0; color:#374151;">Dưới đây là một số việc làm phù hợp với hồ sơ của bạn:</p>
+      <p style="margin:0 0 16px 0; color:#374151;">Dưới đây là một số việc làm phù hợp với hồ sơ của bạn:</p>
 
-            <div th:each="job : ${jobList}" style="margin-bottom:16px; border:1px solid #e5e7eb; border-radius:6px; padding:16px;">
+      <!-- Intro message box like OTP -->
+      <div style="background-color:#f9fafb; border-radius:8px; padding:24px; margin-bottom:24px; border-left:4px solid #3b82f6;">
+        <p style="margin:0; color:#374151;">Dưới đây là một số việc làm phù hợp với hồ sơ và sở thích của bạn.</p>
+      </div>
+
+      <div th:each="job : ${jobList}" style="margin-bottom:16px; border:1px solid #e5e7eb; border-radius:6px; padding:16px;">
               <h3 style="margin:0 0 6px 0;" th:text="${job.title}">Software Engineer</h3>
               <p style="margin:0 0 6px 0;" th:text="${job.company}">ABC Corp</p>
               <p style="margin:0 0 12px 0;"><strong>Địa điểm:</strong> <span th:text="${job.location}">Hồ Chí Minh</span></p>

@@ -45,9 +45,35 @@
                         <p style="margin:0 0 16px 0; color:#6b7280;" th:text="'Xin chào ' + ${username} + ','">Xin chào John,</p>
                         <p style="margin:0 0 24px 0; color:#374151;">Cảm ơn bạn đã đăng ký tài khoản! Chúng tôi rất vui mừng có bạn tham gia cộng đồng của chúng tôi.</p>
 
+                        <!-- Message box like OTP -->
+                        <div style="background-color:#f9fafb; border-radius:8px; padding:24px; margin-bottom:24px; border-left:4px solid #3b82f6; text-align:left;">
+                            <p style="margin:0; font-size:16px; color:#374151; line-height:1.6;">Chào mừng bạn đến với <strong th:text="${companyName}">CareerGraph</strong> — khám phá các cơ hội và tài nguyên để phát triển sự nghiệp của bạn.</p>
+                        </div>
+
+                        <!-- Centered CTA card (visual parity with OTP code card) -->
                         <div style="text-align:center; margin:32px 0;">
-                            <a th:href="${ctaUrl}" style="display:inline-block; background:#3b82f6; color:white; text-decoration:none; padding:12px 24px; border-radius:6px; font-weight:500;">Khám phá ngay</a>
-                            <a th:href="${guideUrl}" style="display:inline-block; background:#6b7280; color:white; text-decoration:none; padding:12px 24px; border-radius:6px; font-weight:500; margin-left:8px;">Hướng dẫn sử dụng</a>
+                            <div style="background-color:#f8fafc; border:2px solid #e5e7eb; border-radius:12px; padding:30px; display:inline-block; min-width:260px;">
+                                <p style="margin:0 0 8px 0; font-size:12px; color:#6b7280; font-weight:600; text-transform:uppercase; letter-spacing:1px;">Bắt đầu</p>
+                                <div style="margin:12px 0 0 0;">
+                                    <a th:href="${ctaUrl}" style="display:inline-block; background:#3b82f6; color:white; text-decoration:none; padding:12px 24px; border-radius:6px; font-weight:500;">Khám phá ngay</a>
+                                    <a th:href="${guideUrl}" style="display:inline-block; background:#6b7280; color:white; text-decoration:none; padding:12px 24px; border-radius:6px; font-weight:500; margin-left:8px;">Hướng dẫn</a>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Optional notice (use th:if to render when needed) -->
+                        <div th:if="${notice}" style="background-color:#fef3c7; border:1px solid #f59e0b; border-radius:6px; padding:16px; margin:32px 0;">
+                            <p style="margin:0; font-size:14px; color:#92400e; text-align:center;"><strong>⚠️ Lưu ý:</strong> <span th:text="${notice}">Thông tin quan trọng</span></p>
+                        </div>
+
+                        <!-- Help section like OTP -->
+                        <div style="text-align:center; margin-top:40px; padding-top:32px; border-top:1px solid #e5e7eb;">
+                            <p style="margin:0 0 16px 0; font-size:14px; color:#6b7280;">Cần hỗ trợ? Liên hệ với chúng tôi</p>
+                            <p style="margin:0;">
+                                <a th:href="'mailto:' + ${supportEmail}" style="color:#3b82f6; text-decoration:none; font-weight:500;" th:text="${supportEmail}">support@careergraph.com</a>
+                                <span style="color:#d1d5db; margin:0 8px;">|</span>
+                                <a th:href="${helpCenterUrl}" target="_blank" style="color:#3b82f6; text-decoration:none; font-weight:500;">Trung tâm hỗ trợ</a>
+                            </p>
                         </div>
                     </td>
                 </tr>

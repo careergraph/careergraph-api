@@ -13,6 +13,7 @@ import java.util.Set;
 public enum ApplicationStage {
     APPLIED("Application submitted"),
     SCREENING("Profile screening"),
+    INTERVIEW("Interview"),
     HR_CONTACTED("HR contacted"),
     INTERVIEW_SCHEDULED("Interview scheduled"),
     INTERVIEW_COMPLETED("Interview completed"),
@@ -30,7 +31,7 @@ public enum ApplicationStage {
         Map<ApplicationStage, Set<ApplicationStage>> transitions = new EnumMap<>(ApplicationStage.class);
 
         transitions.put(APPLIED, EnumSet.of(SCREENING, WITHDRAWN));
-        transitions.put(SCREENING, EnumSet.of(HR_CONTACTED, REJECTED, WITHDRAWN));
+        transitions.put(SCREENING, EnumSet.of(HR_CONTACTED, REJECTED, WITHDRAWN, INTERVIEW));
         transitions.put(HR_CONTACTED, EnumSet.of(INTERVIEW_SCHEDULED, REJECTED, WITHDRAWN));
         transitions.put(INTERVIEW_SCHEDULED, EnumSet.of(INTERVIEW_COMPLETED, REJECTED, WITHDRAWN));
         transitions.put(INTERVIEW_COMPLETED, EnumSet.of(TRIAL_PERIOD, OFFER_EXTENDED, REJECTED));

@@ -15,6 +15,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.Authentication;
+import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -120,8 +121,20 @@ public class ApplicationController {
     @PutMapping("/{id}/stage")
     public RestResponse<ApplicationResponse> updateApplicationStage(
             @PathVariable String id,
-            @Valid @RequestBody ApplicationStageUpdateRequest request
+            @Valid @RequestBody ApplicationStageUpdateRequest request,
+            Authentication authentication
     ) {
+        if (!StringUtils.hasText(id)) {
+            throw new BadRequestException("Application ID invalid");
+        }
+
+        String changeBy = securityUtils.extractCompanyId(authentication);
+        if (!StringUtils.hasText(changeBy)) {
+            throw new BadRequestException("ID of HR change stage is required");
+        }
+
+        request.setChangeBy(changeBy);
+
         Application application = applicationService.updateApplicationStage(id, request);
         return RestResponse.<ApplicationResponse>builder()
                 .status(HttpStatus.OK)

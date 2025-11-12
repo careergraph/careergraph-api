@@ -29,13 +29,36 @@
         <tr>
           <td class="mobile-padding" style="padding:40px;">
             <h2 style="margin:0 0 8px 0; font-size:22px; font-weight:600; color:#111827;">Bản tin nghề nghiệp hàng tuần</h2>
-            <p style="margin:0 0 16px 0; color:#374151;">Cập nhật những cơ hội việc làm và mẹo nghề nghiệp mới nhất.</p>
+      <p style="margin:0 0 16px 0; color:#374151;">Cập nhật những cơ hội việc làm và mẹo nghề nghiệp mới nhất.</p>
 
-            <div th:each="article : ${articles}" style="margin-bottom:24px;">
+      <!-- Intro message box like OTP -->
+      <div style="background-color:#f9fafb; border-radius:8px; padding:24px; margin-bottom:24px; border-left:4px solid #3b82f6;">
+        <p style="margin:0; color:#374151;">Dưới đây là những bài viết và cơ hội việc làm nổi bật trong tuần này.</p>
+      </div>
+
+      <div th:each="article : ${articles}" style="margin-bottom:24px;">
               <h3 style="margin:0 0 8px 0; font-size:18px;" th:text="${article.title}">Kỹ năng Java quan trọng 2025</h3>
               <p style="margin:0 0 8px 0;" th:text="${article.summary}">Tóm tắt nội dung...</p>
               <a th:href="${article.link}" style="color:#3b82f6; font-weight:500;">Đọc tiếp</a>
             </div>
+
+      <!-- Centered card CTA to read more -->
+      <div style="text-align:center; margin:32px 0;">
+        <div style="background-color:#f8fafc; border:2px solid #e5e7eb; border-radius:12px; padding:24px; display:inline-block; min-width:260px;">
+          <p style="margin:0 0 8px 0; font-size:12px; color:#6b7280; font-weight:600; text-transform:uppercase;">Bản tin</p>
+          <a th:href="${newsletterUrl}" style="display:inline-block; background:#3b82f6; color:#fff; text-decoration:none; padding:10px 18px; border-radius:6px;">Xem bản tin đầy đủ</a>
+        </div>
+      </div>
+
+      <!-- Help section -->
+      <div style="text-align:center; margin-top:40px; padding-top:32px; border-top:1px solid #e5e7eb;">
+        <p style="margin:0 0 16px 0; font-size:14px; color:#6b7280;">Cần hỗ trợ? Liên hệ với chúng tôi</p>
+        <p style="margin:0;">
+          <a th:href="'mailto:' + ${supportEmail}" style="color:#3b82f6; text-decoration:none; font-weight:500;" th:text="${supportEmail}">support@careergraph.com</a>
+          <span style="color:#d1d5db; margin:0 8px;">|</span>
+          <a th:href="${helpCenterUrl}" target="_blank" style="color:#3b82f6; text-decoration:none; font-weight:500;">Trung tâm hỗ trợ</a>
+        </p>
+      </div>
           </td>
         </tr>
 
