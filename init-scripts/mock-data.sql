@@ -5,132 +5,324 @@
 -- UUIDs chosen deterministically for reproducibility.
 
 -- 1) Parties (companies, candidates, educations use JOINED inheritance)
-INSERT INTO parties (id, party_type, tagname, avatar, cover, no_of_followers, no_of_following, no_of_connections, status)
+-- Note: created_date and last_modified_date are non-nullable in the schema (set by JPA)
+-- so we explicitly set them here to CURRENT_TIMESTAMP to satisfy DB constraints.
+INSERT INTO parties (id, party_type, tagname, avatar, cover, no_of_followers, no_of_following, no_of_connections, created_date, last_modified_date, status)
 VALUES
-  ('00000000-0000-0000-0000-000000000100','COMPANY','careergraph','', '', 0,0,0,'ACTIVE'),
-  ('00000000-0000-0000-0000-000000000200','CANDIDATE','candidate1','', '', 0,0,0,'ACTIVE'),
-  ('00000000-0000-0000-0000-000000000201','CANDIDATE','candidate2','', '', 0,0,0,'ACTIVE'),
-  ('00000000-0000-0000-0000-000000000202','CANDIDATE','candidate3','', '', 0,0,0,'ACTIVE'),
-  ('00000000-0000-0000-0000-000000000203','CANDIDATE','candidate4','', '', 0,0,0,'ACTIVE'),
-  ('00000000-0000-0000-0000-000000000204','CANDIDATE','candidate5','', '', 0,0,0,'ACTIVE'),
-  ('00000000-0000-0000-0000-000000000205','CANDIDATE','candidate6','', '', 0,0,0,'ACTIVE'),
-  ('00000000-0000-0000-0000-000000000206','CANDIDATE','candidate7','', '', 0,0,0,'ACTIVE'),
-  ('00000000-0000-0000-0000-000000000207','CANDIDATE','candidate8','', '', 0,0,0,'ACTIVE'),
-  ('00000000-0000-0000-0000-000000000208','CANDIDATE','candidate9','', '', 0,0,0,'ACTIVE'),
-  ('00000000-0000-0000-0000-000000000209','CANDIDATE','candidate10','', '', 0,0,0,'ACTIVE');
+  ('00000000-0000-0000-0000-000000000100','COMPANY','careergraph','', '', 0,0,0,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,'ACTIVE'),
+  ('00000000-0000-0000-0000-000000000200','CANDIDATE','candidate1','', '', 0,0,0,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,'ACTIVE'),
+  ('00000000-0000-0000-0000-000000000201','CANDIDATE','candidate2','', '', 0,0,0,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,'ACTIVE'),
+  ('00000000-0000-0000-0000-000000000202','CANDIDATE','candidate3','', '', 0,0,0,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,'ACTIVE'),
+  ('00000000-0000-0000-0000-000000000203','CANDIDATE','candidate4','', '', 0,0,0,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,'ACTIVE'),
+  ('00000000-0000-0000-0000-000000000204','CANDIDATE','candidate5','', '', 0,0,0,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,'ACTIVE'),
+  ('00000000-0000-0000-0000-000000000205','CANDIDATE','candidate6','', '', 0,0,0,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,'ACTIVE'),
+  ('00000000-0000-0000-0000-000000000206','CANDIDATE','candidate7','', '', 0,0,0,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,'ACTIVE'),
+  ('00000000-0000-0000-0000-000000000207','CANDIDATE','candidate8','', '', 0,0,0,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,'ACTIVE'),
+  ('00000000-0000-0000-0000-000000000208','CANDIDATE','candidate9','', '', 0,0,0,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,'ACTIVE'),
+  ('00000000-0000-0000-0000-000000000209','CANDIDATE','candidate10','', '', 0,0,0,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,'ACTIVE')
+ON CONFLICT DO NOTHING;
 
 -- 2) Companies (inherit from parties) - CareerGraph employer
-INSERT INTO companies (id, size, name, website, ceo_name, no_of_members, year_founded, status)
+INSERT INTO companies (id, size, name, website, ceo_name, no_of_members, year_founded, created_date, last_modified_date, status)
 VALUES
-  ('00000000-0000-0000-0000-000000000100','51-200','CareerGraph','https://careergraph.com','Nguyen Cong Quy',120,2020,'ACTIVE');
+  ('00000000-0000-0000-0000-000000000100','51-200','CareerGraph','https://careergraph.com','Nguyen Cong Quy',120,2020,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,'ACTIVE')
+ON CONFLICT DO NOTHING;
 
 -- 3) Candidates (inherit from parties)
-INSERT INTO candidates (id, first_name, last_name, date_of_birth, gender, current_job_title, desired_position, current_company, industry, years_of_experience, work_location, is_open_to_work, summary, is_married, salary_expectation_min, salary_expectation_max, education_level, current_position, status)
+INSERT INTO candidates (id, first_name, last_name, date_of_birth, gender, current_job_title, desired_position, current_company, industry, years_of_experience, work_location, is_open_to_work, summary, is_married, salary_expectation_min, salary_expectation_max, education_level, created_date, last_modified_date, status)
 VALUES
-  ('00000000-0000-0000-0000-000000000200','Nguyen','Van','1995-04-12','Male','Junior Developer','Backend Engineer','Startup X','Information Technology',2,'Ho Chi Minh',true,'Software engineer with 2 years experience in Java/Spring',false,500,1200,'Bachelor','Junior Developer','ACTIVE'),
-  ('00000000-0000-0000-0000-000000000201','Tran','Thi','1992-07-20','Female','Frontend Developer','Frontend Engineer','Company Y','Information Technology',4,'Ha Noi',true,'Skilled in React and TypeScript',false,800,1500,'Bachelor','Frontend Developer','ACTIVE'),
-  ('00000000-0000-0000-0000-000000000202','Le','Van','1990-01-15','Male','DevOps Engineer','DevOps Engineer','Company Z','Information Technology',5,'Da Nang',true,'Experienced in AWS, Docker, Kubernetes',false,1000,2000,'Bachelor','DevOps Engineer','ACTIVE'),
-  ('00000000-0000-0000-0000-000000000203','Pham','Thi','1997-11-30','Female','Data Analyst','Data Scientist','Startup A','Information Technology',3,'Ho Chi Minh',true,'Data analyst with SQL and Python skills',false,700,1400,'Master','Data Analyst','ACTIVE'),
-  ('00000000-0000-0000-0000-000000000204','Hoang','Van','1993-05-05','Male','Backend Developer','Senior Backend Engineer','Company B','Information Technology',6,'Ho Chi Minh',false,'Backend engineer specializing in microservices',true,1500,3000,'Bachelor','Senior Backend Engineer','ACTIVE'),
-  ('00000000-0000-0000-0000-000000000205','Vu','Thi','1998-09-09','Female','QA Engineer','QA Engineer','Company C','Information Technology',2,'Da Nang',true,'Quality assurance and automation enthusiast',false,500,1000,'Bachelor','QA Engineer','ACTIVE'),
-  ('00000000-0000-0000-0000-000000000206','Nguyen','Thi','1996-02-14','Female','Fullstack Developer','Fullstack Engineer','Freelancer','Information Technology',3,'Ha Noi',true,'Fullstack developer with React + Spring Boot',false,900,1600,'Bachelor','Fullstack Developer','ACTIVE'),
-  ('00000000-0000-0000-0000-000000000207','Do','Van','1988-12-01','Male','Senior Data Scientist','Lead Data Scientist','Company D','Information Technology',8,'Ho Chi Minh',false,'Expert in ML, Python and deployment',true,2000,4000,'PhD','Data Scientist','ACTIVE'),
-  ('00000000-0000-0000-0000-000000000208','Bui','Thi','1994-03-21','Female','Mobile Developer','Mobile Engineer','Company E','Information Technology',4,'Ha Noi',true,'Android and iOS cross-platform experience',false,1000,1800,'Bachelor','Mobile Developer','ACTIVE'),
-  ('00000000-0000-0000-0000-000000000209','Mac','Van','1991-08-08','Male','Security Engineer','Security Engineer','Company F','Information Technology',5,'Ho Chi Minh',false,'Security and pentesting background',true,1200,2500,'Bachelor','Security Engineer','ACTIVE');
+  ('00000000-0000-0000-0000-000000000200','Nguyen','Van','1995-04-12','Male','Junior Developer','Backend Engineer','Startup X','Information Technology',2,'Ho Chi Minh',true,'Software engineer with 2 years experience in Java/Spring',false,500,1200,'Bachelor',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,'ACTIVE'),
+  ('00000000-0000-0000-0000-000000000201','Tran','Thi','1992-07-20','Female','Frontend Developer','Frontend Engineer','Company Y','Information Technology',4,'Ha Noi',true,'Skilled in React and TypeScript',false,800,1500,'Bachelor',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,'ACTIVE'),
+  ('00000000-0000-0000-0000-000000000202','Le','Van','1990-01-15','Male','DevOps Engineer','DevOps Engineer','Company Z','Information Technology',5,'Da Nang',true,'Experienced in AWS, Docker, Kubernetes',false,1000,2000,'Bachelor',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,'ACTIVE'),
+  ('00000000-0000-0000-0000-000000000203','Pham','Thi','1997-11-30','Female','Data Analyst','Data Scientist','Startup A','Information Technology',3,'Ho Chi Minh',true,'Data analyst with SQL and Python skills',false,700,1400,'Master',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,'ACTIVE'),
+  ('00000000-0000-0000-0000-000000000204','Hoang','Van','1993-05-05','Male','Backend Developer','Senior Backend Engineer','Company B','Information Technology',6,'Ho Chi Minh',false,'Backend engineer specializing in microservices',true,1500,3000,'Bachelor',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,'ACTIVE'),
+  ('00000000-0000-0000-0000-000000000205','Vu','Thi','1998-09-09','Female','QA Engineer','QA Engineer','Company C','Information Technology',2,'Da Nang',true,'Quality assurance and automation enthusiast',false,500,1000,'Bachelor',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,'ACTIVE'),
+  ('00000000-0000-0000-0000-000000000206','Nguyen','Thi','1996-02-14','Female','Fullstack Developer','Fullstack Engineer','Freelancer','Information Technology',3,'Ha Noi',true,'Fullstack developer with React + Spring Boot',false,900,1600,'Bachelor',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,'ACTIVE'),
+  ('00000000-0000-0000-0000-000000000207','Do','Van','1988-12-01','Male','Senior Data Scientist','Lead Data Scientist','Company D','Information Technology',8,'Ho Chi Minh',false,'Expert in ML, Python and deployment',true,2000,4000,'PhD',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,'ACTIVE'),
+  ('00000000-0000-0000-0000-000000000208','Bui','Thi','1994-03-21','Female','Mobile Developer','Mobile Engineer','Company E','Information Technology',4,'Ha Noi',true,'Android and iOS cross-platform experience',false,1000,1800,'Bachelor',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,'ACTIVE'),
+  ('00000000-0000-0000-0000-000000000209','Mac','Van','1991-08-08','Male','Security Engineer','Security Engineer','Company F','Information Technology',5,'Ho Chi Minh',false,'Security and pentesting background',true,1200,2500,'Bachelor',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,'ACTIVE')
+ON CONFLICT DO NOTHING;
 
 -- 4) Accounts: HR account + candidate accounts
 -- HR account (linked to CareerGraph company)
-INSERT INTO accounts (id, email, password_hash, role, email_verified, company_id, status)
-VALUES ('00000000-0000-0000-0000-000000000001','congquynguyen296.dev@gmail.com','12345678','HR',true,'00000000-0000-0000-0000-000000000100','ACTIVE');
+INSERT INTO accounts (id, email, password_hash, role, email_verified, company_id, created_date, last_modified_date, status)
+VALUES ('00000000-0000-0000-0000-000000000001','congquynguyen296.dev@gmail.com','12345678','HR',true,'00000000-0000-0000-0000-000000000100',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,'ACTIVE')
+ON CONFLICT DO NOTHING;
 
 -- Candidate accounts (use +n emails)
-INSERT INTO accounts (id, email, password_hash, role, email_verified, candidate_id, status)
+INSERT INTO accounts (id, email, password_hash, role, email_verified, candidate_id, created_date, last_modified_date, status)
 VALUES
- ('00000000-0000-0000-0000-000000000210','congquynguyen296.dev+1@gmail.com','12345678','USER',true,'00000000-0000-0000-0000-000000000200','ACTIVE'),
- ('00000000-0000-0000-0000-000000000211','congquynguyen296.dev+2@gmail.com','12345678','USER',true,'00000000-0000-0000-0000-000000000201','ACTIVE'),
- ('00000000-0000-0000-0000-000000000212','congquynguyen296.dev+3@gmail.com','12345678','USER',true,'00000000-0000-0000-0000-000000000202','ACTIVE'),
- ('00000000-0000-0000-0000-000000000213','congquynguyen296.dev+4@gmail.com','12345678','USER',true,'00000000-0000-0000-0000-000000000203','ACTIVE'),
- ('00000000-0000-0000-0000-000000000214','congquynguyen296.dev+5@gmail.com','12345678','USER',true,'00000000-0000-0000-0000-000000000204','ACTIVE'),
- ('00000000-0000-0000-0000-000000000215','congquynguyen296.dev+6@gmail.com','12345678','USER',true,'00000000-0000-0000-0000-000000000205','ACTIVE'),
- ('00000000-0000-0000-0000-000000000216','congquynguyen296.dev+7@gmail.com','12345678','USER',true,'00000000-0000-0000-0000-000000000206','ACTIVE'),
- ('00000000-0000-0000-0000-000000000217','congquynguyen296.dev+8@gmail.com','12345678','USER',true,'00000000-0000-0000-0000-000000000207','ACTIVE'),
- ('00000000-0000-0000-0000-000000000218','congquynguyen296.dev+9@gmail.com','12345678','USER',true,'00000000-0000-0000-0000-000000000208','ACTIVE'),
- ('00000000-0000-0000-0000-000000000219','congquynguyen296.dev+10@gmail.com','12345678','USER',true,'00000000-0000-0000-0000-000000000209','ACTIVE');
+ ('00000000-0000-0000-0000-000000000210','congquynguyen296.dev+1@gmail.com','12345678','USER',true,'00000000-0000-0000-0000-000000000200',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,'ACTIVE'),
+ ('00000000-0000-0000-0000-000000000211','congquynguyen296.dev+2@gmail.com','12345678','USER',true,'00000000-0000-0000-0000-000000000201',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,'ACTIVE'),
+ ('00000000-0000-0000-0000-000000000212','congquynguyen296.dev+3@gmail.com','12345678','USER',true,'00000000-0000-0000-0000-000000000202',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,'ACTIVE'),
+ ('00000000-0000-0000-0000-000000000213','congquynguyen296.dev+4@gmail.com','12345678','USER',true,'00000000-0000-0000-0000-000000000203',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,'ACTIVE'),
+ ('00000000-0000-0000-0000-000000000214','congquynguyen296.dev+5@gmail.com','12345678','USER',true,'00000000-0000-0000-0000-000000000204',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,'ACTIVE'),
+ ('00000000-0000-0000-0000-000000000215','congquynguyen296.dev+6@gmail.com','12345678','USER',true,'00000000-0000-0000-0000-000000000205',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,'ACTIVE'),
+ ('00000000-0000-0000-0000-000000000216','congquynguyen296.dev+7@gmail.com','12345678','USER',true,'00000000-0000-0000-0000-000000000206',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,'ACTIVE'),
+ ('00000000-0000-0000-0000-000000000217','congquynguyen296.dev+8@gmail.com','12345678','USER',true,'00000000-0000-0000-0000-000000000207',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,'ACTIVE'),
+ ('00000000-0000-0000-0000-000000000218','congquynguyen296.dev+9@gmail.com','12345678','USER',true,'00000000-0000-0000-0000-000000000208',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,'ACTIVE'),
+ ('00000000-0000-0000-0000-000000000219','congquynguyen296.dev+10@gmail.com','12345678','USER',true,'00000000-0000-0000-0000-000000000209',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,'ACTIVE')
+ON CONFLICT DO NOTHING;
 
 -- 5) Contacts & Addresses for company and candidates
-INSERT INTO contacts (id, value, verified, is_primary, contact_type, party_id, status)
+INSERT INTO contacts (id, value, verified, is_primary, contact_type, party_id, created_date, last_modified_date, status)
 VALUES
- ('00000000-0000-0000-0000-000000000301','support@careergraph.com',true,true,'EMAIL','00000000-0000-0000-0000-000000000100','ACTIVE'),
- ('00000000-0000-0000-0000-000000000302','+84-28-1234-5678',true,true,'PHONE','00000000-0000-0000-0000-000000000100','ACTIVE');
+ ('00000000-0000-0000-0000-000000000301','support@careergraph.com',true,true,'EMAIL','00000000-0000-0000-0000-000000000100',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,'ACTIVE'),
+ ('00000000-0000-0000-0000-000000000302','+84-28-1234-5678',true,true,'PHONE','00000000-0000-0000-0000-000000000100',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,'ACTIVE')
+ON CONFLICT DO NOTHING;
 
-INSERT INTO addresses (id, name, country, province, district, ward, is_primary, address_type, party_id, status)
+INSERT INTO addresses (id, name, country, province, district, ward, is_primary, address_type, party_id, created_date, last_modified_date, status)
 VALUES
- ('00000000-0000-0000-0000-000000000401','CareerGraph Headquarter','Vietnam','Ho Chi Minh','District 1','Ward 1',true,'BUSINESS','00000000-0000-0000-0000-000000000100','ACTIVE');
+ ('00000000-0000-0000-0000-000000000401','CareerGraph Headquarter','Vietnam','Ho Chi Minh','District 1','Ward 1',true,'HEADQUARTERS','00000000-0000-0000-0000-000000000100',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,'ACTIVE')
+ON CONFLICT DO NOTHING;
 
 -- 6) Skills
-INSERT INTO skills (id, name, category, description, status)
+INSERT INTO skills (id, name, category, description, created_date, last_modified_date, status)
 VALUES
- ('00000000-0000-0000-0000-000000000501','Java','Programming','Java programming language','ACTIVE'),
- ('00000000-0000-0000-0000-000000000502','Spring Boot','Framework','Spring Boot framework','ACTIVE'),
- ('00000000-0000-0000-0000-000000000503','React','Frontend','React.js library','ACTIVE'),
- ('00000000-0000-0000-0000-000000000504','AWS','Cloud','Amazon Web Services','ACTIVE'),
- ('00000000-0000-0000-0000-000000000505','Docker','DevOps','Containerization with Docker','ACTIVE'),
- ('00000000-0000-0000-0000-000000000506','Kubernetes','DevOps','Kubernetes orchestration','ACTIVE'),
- ('00000000-0000-0000-0000-000000000507','Python','Programming','Python programming language','ACTIVE'),
- ('00000000-0000-0000-0000-000000000508','SQL','Database','Relational database SQL','ACTIVE');
+ ('00000000-0000-0000-0000-000000000501','Java','Programming','Java programming language',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,'ACTIVE'),
+ ('00000000-0000-0000-0000-000000000502','Spring Boot','Framework','Spring Boot framework',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,'ACTIVE'),
+ ('00000000-0000-0000-0000-000000000503','React','Frontend','React.js library',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,'ACTIVE'),
+ ('00000000-0000-0000-0000-000000000504','AWS','Cloud','Amazon Web Services',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,'ACTIVE'),
+ ('00000000-0000-0000-0000-000000000505','Docker','DevOps','Containerization with Docker',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,'ACTIVE'),
+ ('00000000-0000-0000-0000-000000000506','Kubernetes','DevOps','Kubernetes orchestration',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,'ACTIVE'),
+ ('00000000-0000-0000-0000-000000000507','Python','Programming','Python programming language',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,'ACTIVE'),
+ ('00000000-0000-0000-0000-000000000508','SQL','Database','Relational database SQL',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,'ACTIVE')
+ON CONFLICT DO NOTHING;
 
 -- 7) Candidate skills (link candidates to skills)
-INSERT INTO candidate_skill (id, proficiency_level, years_of_experience, is_verified, endorsed_by, endorsement_date, endorsement_count, candidate_id, skill_id, status)
+INSERT INTO candidate_skill (id, proficiency_level, years_of_experience, is_verified, endorsed_by, endorsement_date, endorsement_count, candidate_id, skill_id, created_date, last_modified_date, status)
 VALUES
- ('00000000-0000-0000-0000-000000000601','Intermediate',2,true,'colleague1',NULL,1,'00000000-0000-0000-0000-000000000200','00000000-0000-0000-0000-000000000501','ACTIVE'),
- ('00000000-0000-0000-0000-000000000602','Intermediate',2,true,'colleague2',NULL,0,'00000000-0000-0000-0000-000000000200','00000000-0000-0000-0000-000000000502','ACTIVE'),
- ('00000000-0000-0000-0000-000000000603','Advanced',4,true,'lead',NULL,3,'00000000-0000-0000-0000-000000000201','00000000-0000-0000-0000-000000000503','ACTIVE'),
- ('00000000-0000-0000-0000-000000000604','Advanced',5,true,'manager',NULL,5,'00000000-0000-0000-0000-000000000202','00000000-0000-0000-0000-000000000504','ACTIVE');
+ ('00000000-0000-0000-0000-000000000601','Intermediate',2,true,'colleague1',NULL,1,'00000000-0000-0000-0000-000000000200','00000000-0000-0000-0000-000000000501',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,'ACTIVE'),
+ ('00000000-0000-0000-0000-000000000602','Intermediate',2,true,'colleague2',NULL,0,'00000000-0000-0000-0000-000000000200','00000000-0000-0000-0000-000000000502',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,'ACTIVE'),
+ ('00000000-0000-0000-0000-000000000603','Advanced',4,true,'lead',NULL,3,'00000000-0000-0000-0000-000000000201','00000000-0000-0000-0000-000000000503',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,'ACTIVE'),
+ ('00000000-0000-0000-0000-000000000604','Advanced',5,true,'manager',NULL,5,'00000000-0000-0000-0000-000000000202','00000000-0000-0000-0000-000000000504',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,'ACTIVE')
+ON CONFLICT DO NOTHING;
 
 -- 8) Educations
-INSERT INTO educations (id, official_name, short_name, established_year, university_type, level, website, overview, accreditation, status)
+INSERT INTO educations (id, official_name, short_name, established_year, university_type, level, website, overview, accreditation, created_date, last_modified_date, status)
 VALUES
- ('00000000-0000-0000-0000-000000000701','Ho Chi Minh University of Technology','HCMUT',1995,'PUBLIC','BACHELOR','https://hcmut.edu.vn','Leading technical university','ABET','ACTIVE');
+ ('00000000-0000-0000-0000-000000000701','Ho Chi Minh University of Technology','HCMUT',1995,'PUBLIC','UNIVERSITY','https://hcmut.edu.vn','Leading technical university','ABET',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,'ACTIVE')
+ON CONFLICT DO NOTHING;
 
 -- 9) Candidate education records
-INSERT INTO candidate_education (id, start_date, end_date, degree_title, major, is_current, description, candidate_id, education_id, status)
+INSERT INTO candidate_education (id, start_date, end_date, degree_title, major, is_current, description, candidate_id, education_id, created_date, last_modified_date, status)
 VALUES
- ('00000000-0000-0000-0000-000000000801','2013-09-01','2017-06-30','B.Sc. Computer Science','Computer Science',false,'Graduated with honors','00000000-0000-0000-0000-000000000200','00000000-0000-0000-0000-000000000701','ACTIVE');
+ ('00000000-0000-0000-0000-000000000801','2013-09-01','2017-06-30','B.Sc. Computer Science','Computer Science',false,'Graduated with honors','00000000-0000-0000-0000-000000000200','00000000-0000-0000-0000-000000000701',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,'ACTIVE')
+ON CONFLICT DO NOTHING;
 
 -- 10) Candidate experience (work history)
-INSERT INTO candidate_experience (id, start_date, end_date, salary, job_title, is_current, description, candidate_id, company_id, status)
+INSERT INTO candidate_experience (id, start_date, end_date, salary, job_title, is_current, description, candidate_id, company_id, created_date, last_modified_date, status)
 VALUES
- ('00000000-0000-0000-0000-000000000901','2018-08-01','2020-12-31',800,'Junior Developer',false,'Worked on backend services','00000000-0000-0000-0000-000000000200','00000000-0000-0000-0000-000000000100','ACTIVE'),
- ('00000000-0000-0000-0000-000000000902','2021-01-01',NULL,1200,'Backend Developer',true,'Working on microservices','00000000-0000-0000-0000-000000000204','00000000-0000-0000-0000-000000000100','ACTIVE');
+ ('00000000-0000-0000-0000-000000000901','2018-08-01','2020-12-31',800,'Junior Developer',false,'Worked on backend services','00000000-0000-0000-0000-000000000200','00000000-0000-0000-0000-000000000100',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,'ACTIVE'),
+ ('00000000-0000-0000-0000-000000000902','2021-01-01',NULL,1200,'Backend Developer',true,'Working on microservices','00000000-0000-0000-0000-000000000204','00000000-0000-0000-0000-000000000100',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,'ACTIVE')
+ON CONFLICT (id) DO NOTHING;
 
 -- 11) Jobs (under CareerGraph company) - responsibilities/qualifications stored as JSON arrays
-INSERT INTO jobs (id, title, description, department, responsibilities, qualifications, minimum_qualifications, benefits, salary_range, min_experience, max_experience, experience_level, employment_type, job_category, education, posted_date, expiry_date, number_of_positions, contact_email, contact_phone, promotion_type, state, city, district, address, remote_job, views, applicants, saved, liked, shared, resume, cover_letter, status, company_id)
+INSERT INTO jobs (id, title, description, department, responsibilities, qualifications, minimum_qualifications, benefits, salary_range, min_experience, max_experience, experience_level, employment_type, job_category, education, posted_date, expiry_date, number_of_positions, contact_email, contact_phone, promotion_type, state, city, district, address, remote_job, views, applicants, saved, liked, shared, resume, cover_letter, created_date, last_modified_date, status, company_id)
 VALUES
- ('00000000-0000-0000-0000-000000001001','Software Engineer','Develop backend services for our core platform','Engineering','["Design and implement APIs","Write unit and integration tests","Collaborate with cross-functional teams"]','["3+ years experience","Proficiency in Java","Experience with Spring Boot"]','["Bachelor degree in CS or related","2+ years in backend"]','["Health insurance","Flexible time","Remote allowance"]','1000-2000',2,5,'MID','FULL_TIME','SOFTWARE','BACHELOR','2025-11-01','2026-01-01',2,'hr@careergraph.com','+84-28-1234-5678','free','HCM','District 1','Ward 1','123 Le Loi',false,120,10,5,2,1,true,true,'ACTIVE','00000000-0000-0000-0000-000000000100'),
- ('00000000-0000-0000-0000-000000001002','Frontend Engineer','Build beautiful and responsive UI','Product','["Develop React components","Optimize for performance","Collaborate with designers"]','["2+ years experience","Proficiency in React","Good CSS skills"]','["Portfolio of web apps"]','["Training budget","Gym"]','800-1500',1,4,'JUNIOR','FULL_TIME','SOFTWARE','BACHELOR','2025-11-05','2026-02-01',1,'frontend@careergraph.com','+84-28-1234-0000','free','HCM','District 1','Ward 1','123 Le Loi',false,80,6,4,1,1,true,true,'ACTIVE','00000000-0000-0000-0000-000000000100'),
- ('00000000-0000-0000-0000-000000001003','DevOps Engineer','Maintain CI/CD pipelines and cloud infrastructure','Infrastructure','["Maintain infrastructure","Implement CI/CD","Monitor systems"]','["Experience with Docker/Kubernetes","AWS experience"]','["3+ years experience"]','["Competitive salary","Remote work"]','1200-2500',3,7,'SENIOR','FULL_TIME','OPS','BACHELOR','2025-10-15','2026-03-01',1,'devops@careergraph.com','+84-28-2222-3333','paid','HCM','District 1','Ward 1','123 Le Loi',true,200,15,8,3,1,true,true,'ACTIVE','00000000-0000-0000-0000-000000000100');
+ -- Job 1: Software Engineer (detailed responsibilities >=100 chars per element)
+ ('00000000-0000-0000-0000-000000001001',
+  'Software Engineer',
+  'Develop backend services for our core platform and contribute to system architecture and performance improvements',
+  'Engineering',
+  '["Lead the design and implementation of highly available and scalable RESTful APIs, focusing on clear contracts, backward compatibility, security practices, and observability to support millions of monthly users across distributed services.","Write comprehensive unit, integration, and end-to-end tests; build CI pipelines that validate behavior under realistic loads and edge cases while enabling quick rollback and safe deployments.","Collaborate with product managers, QA, and frontend engineers to translate product requirements into maintainable technical designs and to iterate rapidly on feature delivery while keeping technical debt manageable."]',
+  '["5+ years of professional experience building backend systems in Java and Spring Boot, including deep knowledge of concurrency, performance tuning, JVM internals and production debugging of distributed systems.","Strong knowledge of REST/HTTP, API versioning and backward-compatible schema evolution, plus hands-on experience with observability tools like Prometheus, Grafana, and OpenTelemetry.","Proven experience with relational and NoSQL databases, query optimization, schema migrations, and designing for high availability and disaster recovery."]',
+  '["Bachelor degree in Computer Science or equivalent industry experience, with proven projects demonstrating design and delivery of production-grade microservices and API-driven systems.","Proven track record of writing production-quality code, performing code reviews and mentoring junior engineers in a collaborative engineering culture.","Familiarity with containerization and orchestration platforms, CI/CD pipelines and deployment automation in a cloud environment."]',
+  '["Comprehensive medical insurance with family coverage; flexible working hours and hybrid work model with remote-first options; monthly remote-work stipend to support home office setup and connectivity.","Dedicated annual training budget for conferences, workshops and certifications; generous paid time off and company-wide wellness initiatives to promote work-life balance.","Stock options for long-term contributors and a transparent career ladder with regular performance feedback and mentorship programs."]',
+  '1000-2000',2,6,'MIDDLE','FULL_TIME','ENGINEER','BACHELORS_DEGREE','2025-11-01','2026-01-01',2,'hr@careergraph.com','+84-28-1234-5678','free','HCM','District 1','Ward 1','123 Le Loi',false,120,10,5,2,1,true,true,'ACTIVE','00000000-0000-0000-0000-000000000100'),
+
+ -- Job 2: Frontend Engineer
+ ('00000000-0000-0000-0000-000000001002',
+  'Frontend Engineer',
+  'Build beautiful, accessible and responsive UI components and optimize web performance at scale',
+  'Product',
+  '["Design and implement reusable, accessible React components with a focus on performance, progressive enhancement, and cross-browser compatibility; incorporate automated visual regression tests into the workflow.","Collaborate closely with designers and backend engineers to build end-to-end features, produce pixel-perfect UI, and iterate using data-driven experiments and user feedback.","Own frontend architecture decisions, adopt best practices for CSS-in-JS or utility-first CSS, and build performant client-side rendering while optimizing critical rendering paths."]',
+  '["3+ years of experience building modern SPAs using React; deep understanding of component lifecycles, hooks, context API and state management patterns.","Practical experience optimizing bundle size, lazy-loading, code-splitting and critical CSS to achieve fast first meaningful paints and interactive times under real-world network conditions.","Experience with frontend testing (unit, integration, e2e), accessibility (WCAG), and CI pipelines for frontend deployments."]',
+  '["Bachelor degree in Computer Science or equivalent industry experience, demonstrable portfolio of production web apps and strong UI sensitivity.","A history of shipping features end-to-end and working within cross-functional teams to prioritize product quality and maintainability.","Familiarity with TypeScript, modern build tools and performance profiling tools for web applications."]',
+  '["Training budget and conference allowance, flexible hours and wellness programs; generous parental leave policy and a relocation package where applicable.","Stipends for hardware and home office improvements; regular team-building and mentorship programs focused on personal growth and career development.","Access to coaching and leadership development paths for engineers aiming to grow into technical lead roles."]',
+  '800-1500',1,4,'JUNIOR','FULL_TIME','ENGINEER','BACHELORS_DEGREE','2025-11-05','2026-02-01',1,'frontend@careergraph.com','+84-28-1234-0000','free','HCM','District 1','Ward 1','123 Le Loi',false,80,6,4,1,1,true,true,'ACTIVE','00000000-0000-0000-0000-000000000100'),
+
+ -- Job 3: DevOps Engineer
+ ('00000000-0000-0000-0000-000000001003',
+  'DevOps Engineer',
+  'Maintain and evolve CI/CD pipelines, cloud infrastructure and observability for a high-throughput production system',
+  'Infrastructure',
+  '["Design, build and maintain resilient CI/CD pipelines and deployment automation for microservices; ensure zero-downtime deploys and fast rollback strategies with safe release practices.","Operate and evolve monitoring, alerting and tracing systems; define SLOs and SLIs, run post-incident reviews and continuously improve system reliability.","Automate infrastructure provisioning and enforce infrastructure-as-code patterns with strong testing and review practices, while optimizing cloud cost and performance."]',
+  '["3+ years of experience building cloud infrastructure on AWS, GCP or Azure with hands-on knowledge of Terraform/CloudFormation and Kubernetes operators.","Proficiency with container runtimes, orchestration (Kubernetes), CI systems, and log/trace management solutions.","Strong scripting skills for automation and experience with secure secret management and policy-as-code solutions."]',
+  '["Bachelor degree in Computer Science or similar, with demonstrable experience delivering production-ready infrastructure and improving service reliability.","Operational understanding of networking, security, and storage subsystems relevant to large-scale web services.","Certifications such as CKA/CKAD or cloud provider certifications are a plus."]',
+  '["Competitive salary and comprehensive benefits including remote work allowance; annual training budget for certifications and conferences; flexible working hours and generous leave policies.","Opportunities to lead reliability engineering initiatives and shape the platform roadmap with a direct impact on engineering velocity and product stability.","Access to modern tooling and budget to experiment with new observability and automation technologies."]',
+  '1200-2500',3,8,'SENIOR','FULL_TIME','ENGINEER','BACHELORS_DEGREE','2025-10-15','2026-03-01',1,'devops@careergraph.com','+84-28-2222-3333','paid','HCM','District 1','Ward 1','123 Le Loi',true,200,15,8,3,1,true,true,'ACTIVE','00000000-0000-0000-0000-000000000100'),
+
+ -- Additional jobs (4..18) across departments to increase volume and variety
+ ('00000000-0000-0000-0000-000000001004','Senior Backend Engineer','Architect and build backend platforms that power business-critical features with a focus on reliability and performance','Engineering',
+  '["Lead technical design sessions and deliver robust backend components; drive cross-team consistency for APIs and shared libraries while mentoring mid-level engineers to improve code quality and system understanding across the organization.","Optimize database schemas, queries and indexing strategies to reduce latency and increase throughput at scale; design partitioning and sharding strategies where necessary.","Implement observability and runbooks for owned services and coach teams on effective incident response and post-incident remediation to prevent recurrence."]',
+  '["7+ years of experience in backend engineering with production systems at scale; deep expertise in microservices architecture, backend scaling patterns and distributed transaction handling.","Proven experience with data modeling, query optimization, and distributed caching solutions to improve throughput and stability.","Strong leadership in code reviews, architecture decisions and mentoring engineering teams through technical challenges."]',
+  '["Computer Science degree or equivalent professional background; demonstrated delivery of complex backend systems that are currently running in production.","Excellent communication and stakeholder management skills to align technical work with business priorities.","Familiarity with security practices and compliance requirements for user data handling."]',
+  '["Equity options for senior hires; enhanced medical plan and generous vacation policy; budget for tools and personal development to support continuous learning.","Flexible hybrid work environment and relocation support where applicable; additional parental leave policies for families.","Performance bonuses tied to company and team milestones to reward high impact contributors."]',
+  '1800-3500',5,12,'SENIOR','FULL_TIME','ENGINEER','BACHELORS_DEGREE','2025-11-10','2026-04-01',2,'backend-leads@careergraph.com','+84-28-3333-4444','paid','HCM','District 1','Ward 1','123 Le Loi',false,220,18,9,4,2,true,true,'ACTIVE','00000000-0000-0000-0000-000000000100'),
+
+ ('00000000-0000-0000-0000-000000001005','Mobile Engineer (Android)','Design and deliver native Android applications with performant UI and robust offline capabilities','Mobile',
+  '["Design and implement modern, modular Android architecture with robust offline-first behavior; ensure high test coverage and performance on a range of devices representative of our user base.","Collaborate with product designers and backend teams to iterate on mobile features, optimize networking strategies and implement effective caching and synchronization logic.","Maintain app health via instrumentation, crash analytics, and performance monitoring and shepherd releases through Play Store with solid rollout strategies."]',
+  '["4+ years experience developing production Android applications with Java/Kotlin and strong knowledge of Android SDK; experience with Jetpack components and architecture patterns.","Strong UI/UX thinking and ability to translate designs into pixel-perfect, accessible mobile interfaces.","Familiarity with CI/CD for mobile, testing strategies and release management tools."]',
+  '["Bachelor degree in related field or equivalent professional experience; published applications or public repositories demonstrating architecture choices and code quality.","Experience working independently and within teams to ship major mobile features.","Ability to diagnose and fix memory, battery and performance issues on mobile platforms."]',
+  '["Device stipend and conference budget for mobile teams; flexible working hours and remote options; health insurance and wellness programs; relocation assistance if needed.","Opportunity to lead mobile platform initiatives and influence product roadmaps with direct user impact.","Fast-feedback release process and emphasis on high-quality user experience."]',
+  '900-1800',3,7,'MIDDLE','FULL_TIME','ENGINEER','BACHELORS_DEGREE','2025-11-12','2026-06-01',1,'mobile@careergraph.com','+84-28-4444-5555','free','HCM','District 1','Ward 1','123 Le Loi',true,90,7,3,2,1,true,true,'ACTIVE','00000000-0000-0000-0000-000000000100'),
+
+ ('00000000-0000-0000-0000-000000001006','Data Engineer','Build reliable data pipelines and ETL systems to power analytics and ML products','Data',
+  '["Design and operate robust data pipelines that transform raw event streams into clean, queryable datasets; ensure data quality, schema evolution handling and cost-effective storage practices for large-scale analytics workloads.","Collaborate with data scientists and product analysts to expose datasets with appropriate access controls, optimize query performance and enable reproducible experiments and modeling workflows.","Implement monitoring and alerting for data freshness, lineage, and pipeline reliability, and establish remediation playbooks for common failure modes."]',
+  '["3+ years experience building data pipelines using tools like Spark, Flink, Airflow or equivalent; strong SQL skills and experience with data modeling for analytics workloads.","Experience with data warehouses, partitioning strategies, and query performance tuning at scale.","Familiarity with cloud storage systems, data serialization formats, and best practices for cost-efficient data processing."]',
+  '["Degree in Computer Science, Data Engineering or related field preferred; demonstrable past projects involving end-to-end data pipeline implementations and performance tuning.","Good understanding of privacy and compliance considerations for handling user data in analytics contexts.","Strong debugging skills and ability to implement pipeline resilience."]',
+  '["Generous training budget for data certifications and conferences; remote-friendly culture and flexible hours; medical and dental plan; performance bonuses linked to team KPIs.","Opportunity to work closely with ML teams and product owners to deliver analytics that directly inform product decisions.","Modern data stack with budget to introduce best-fit technologies where needed."]',
+  '1100-2200',2,6,'MIDDLE','FULL_TIME','ENGINEER','BACHELORS_DEGREE','2025-11-15','2026-05-01',2,'data@careergraph.com','+84-28-5555-6666','free','HCM','District 1','Ward 1','123 Le Loi',true,70,9,4,3,1,true,true,'ACTIVE','00000000-0000-0000-0000-000000000100'),
+
+ ('00000000-0000-0000-0000-000000001007','Product Manager','Lead product strategy, define roadmaps and work with engineers to deliver measurable outcomes','Product',
+  '["Define product vision and roadmap, synthesize user research and data signals to prioritize features that move key metrics, and align stakeholders on business and technical trade-offs to ensure sustainable growth.","Partner closely with engineering and design to craft clear requirements, success metrics and experiments; lead discovery phases and build small, fast iterations to validate assumptions.","Own the lifecycle of product features end-to-end including launch strategies, post-launch measurement and iterative improvements based on user feedback and analytics."]',
+  '["5+ years of experience as a product manager in B2B or consumer SaaS with a track record of shipping impactful features and driving measurable business outcomes.","Strong analytical skills and comfort with product analytics tools, A/B testing, and hypothesis-driven development.","Excellent communication and stakeholder management to balance competing priorities across design, engineering, sales and marketing teams."]',
+  '["Formal education in business, engineering or related fields preferred; demonstrable product case studies and shipped features.","Customer-centric mindset and experience working with cross-functional remote teams.","Comfort with ambiguity and ability to make decisions with incomplete information."]',
+  '["Competitive compensation and equity for product leadership roles; comprehensive benefits and learning stipend for continuous professional development.","Flexible working arrangements and a supportive leadership culture focused on outcomes, coaching and career growth.","Access to market research and user research resources to validate product hypotheses."]',
+  '1500-3000',4,10,'SENIOR','FULL_TIME','BUSINESS','BACHELORS_DEGREE','2025-11-20','2026-07-01',1,'pm@careergraph.com','+84-28-6666-7777','paid','HCM','District 1','Ward 1','123 Le Loi',false,50,6,2,1,1,true,true,'ACTIVE','00000000-0000-0000-0000-000000000100'),
+
+ ('00000000-0000-0000-0000-000000001008','QA Automation Engineer','Build test automation frameworks and define quality practices across teams','Quality',
+  '["Design, implement and maintain test automation frameworks for integration and E2E testing; collaborate with CI teams to make tests reliable and fast for pull-request feedback loops.","Work with developers to define testable requirements and integration contracts; champion testability and invest in tooling to reduce manual test overhead.","Monitor test health, flaky tests and system stability; triage failures and drive remediation efforts to improve signal-to-noise ratio in the test pipelines."]',
+  '["3+ years experience in test automation with modern frameworks; proficiency in writing maintainable test code and designing test data management strategies.","Experience with CI/CD integration, test parallelization, and reducing feedback time for engineering teams.","Strong debugging skills and ability to collaborate across teams to improve system reliability."]',
+  '["Degree in Computer Science or related field, or equivalent practical experience building automated testing solutions.","Demonstrated experience in improving test coverage and reducing regression risk through automation.","Knowledge of performance testing and load testing methodologies is a plus."]',
+  '["Flexible work policy with training budget for certifications; access to tooling budgets and a collaborative engineering culture focused on quality.","Opportunity to lead QA initiatives and establish quality engineering practices across the organization.","Health insurance and wellness benefits."]',
+  '800-1600',2,5,'MIDDLE','FULL_TIME','ENGINEER','BACHELORS_DEGREE','2025-11-22','2026-04-01',1,'qa@careergraph.com','+84-28-7777-8888','free','HCM','District 1','Ward 1','123 Le Loi',false,40,3,2,1,1,true,true,'ACTIVE','00000000-0000-0000-0000-000000000100'),
+
+ ('00000000-0000-0000-0000-000000001009','Machine Learning Engineer','Develop and productionize ML models and tooling for recommendation and personalization products','AI',
+  '["Prototype and productionize machine learning models for personalization, recommendations and ranking; implement scalable training pipelines and feature stores to enable repeatable experiments and model lifecycle management.","Work with product and data teams to define measurable success metrics and design online/ offline evaluation frameworks; build A/B testing pipelines to validate model performance in production.","Ensure models are auditable and explainable; implement monitoring for model drift, data quality issues and performance regression; automate retraining workflows when quality deteriorates."]',
+  '["4+ years of experience in applied machine learning and MLOps; hands-on experience with TensorFlow/PyTorch and production deployment of models behind APIs or streaming pipelines.","Strong understanding of feature engineering, model evaluation metrics and ability to translate business objectives into ML solutions.","Experience with data pipelines, feature stores, model registries and automated retraining systems."]',
+  '["Advanced degree in Machine Learning, Computer Science or strong equivalent experience; past projects demonstrating production ML systems are highly preferred.","Ability to balance research and engineering to deliver robust, maintainable models.","Familiarity with hardware acceleration and optimization techniques for model inference."]',
+  '["Excellent compensation and equity for ML roles; dedicated research budget and access to GPU resources for experimentation; flexible remote policy.","Opportunities to publish and collaborate with academic partners; mentorship programs for junior ML engineers.","Health and wellness benefits plus family-friendly leave policies."]',
+  '2000-4500',3,10,'SENIOR','FULL_TIME','ENGINEER','MASTERS_DEGREE','2025-11-25','2026-08-01',1,'ml@careergraph.com','+84-28-8888-9999','paid','HCM','District 1','Ward 1','123 Le Loi',true,60,5,2,1,1,true,true,'ACTIVE','00000000-0000-0000-0000-000000000100'),
+
+ ('00000000-0000-0000-0000-000000001010','Customer Success Manager','Drive customer adoption and retention by partnering closely with key accounts','Customer Success',
+  '["Develop deep relationships with strategic customers to ensure they achieve their desired outcomes; lead onboarding and post-launch support programs to maximize value and retention.","Partner with product and engineering to prioritize customer-facing improvements and advocate for customer needs in roadmap discussions.","Analyze usage metrics and account health signals to proactively identify at-risk customers and create tailored success plans to mitigate churn."]',
+  '["5+ years in customer success or account management roles, preferably in SaaS; strong communication and problem-solving skills with demonstrated success improving retention metrics.","Comfort with data and analytics to derive insights and measure customer health using quantitative signals.","Experience leading cross-functional programs to improve product adoption and customer satisfaction."]',
+  '["Bachelor degree or equivalent experience; prior experience managing strategic accounts in B2B SaaS is highly valued.","Ability to travel as needed for customer on-site engagements and workshops.","Excellent organizational and negotiation skills."]',
+  '["Competitive compensation and target-based bonuses; comprehensive benefits and learning allowances; flexible working arrangements.","A collaborative environment where success is measured by customer outcomes and long-term partnerships.","Strong internal career mobility into product and leadership roles."]',
+  '1400-2800',4,8,'MIDDLE','FULL_TIME','CUSTOMER_SERVICE','BACHELORS_DEGREE','2025-11-28','2026-07-15',1,'cs@careergraph.com','+84-28-9999-0000','free','HCM','District 1','Ward 1','123 Le Loi',false,30,2,1,0,1,true,true,'ACTIVE','00000000-0000-0000-0000-000000000100'),
+
+ ('00000000-0000-0000-0000-000000001011','Security Engineer','Protect platform and data through proactive security engineering and threat modeling','Security',
+  '["Lead threat modeling and secure design reviews for new features; implement defensive programming patterns, data encryption at rest and in transit, and secure authentication and authorization mechanisms.","Monitor for suspicious activity, implement detection rules and automate incident response workflows to reduce mean time to detect and remediate security issues.","Collaborate with infrastructure and dev teams to enforce security-as-code practices, automated testing for vulnerabilities and robust dependency scanning."]',
+  '["5+ years of security engineering experience with hands-on familiarity with threat modeling, secure coding practices and incident response.","Practical experience with security tools for static/dynamic analysis, container scanning and vulnerability management.","Knowledge of compliance frameworks and ability to work with auditors to demonstrate controls."]',
+  '["Degree in Computer Science or strong equivalent experience; security certifications (CISSP, OSCP) are a plus.","Track record of improving system security posture through engineering rather than manual processes.","Effective communicator who can translate security requirements to engineering teams."]',
+  '["Competitive compensation and security bonus; dedicated security training budget and mentorship from senior security leaders.","Flexible work options and opportunity to shape security program for a growing company.","Comprehensive benefits, including mental health support and wellness programs."]',
+  '1600-3200',4,12,'SENIOR','FULL_TIME','ENGINEER','BACHELORS_DEGREE','2025-12-01','2026-09-01',1,'security@careergraph.com','+84-28-1111-2222','paid','HCM','District 1','Ward 1','123 Le Loi',false,40,4,2,1,1,true,true,'ACTIVE','00000000-0000-0000-0000-000000000100'),
+
+ ('00000000-0000-0000-0000-000000001012','Technical Writer','Create clear product documentation, API guides and end-user help content','Documentation',
+  '["Write comprehensive and approachable API reference docs, developer guides and SDK examples that reduce onboarding time for external integrators and internal teams.","Collaborate with engineers and product managers to craft tutorials, release notes and in-product help content that are discoverable and maintainable.","Establish documentation standards, content templates and review processes to ensure accuracy and consistency across product docs."]',
+  '["3+ years writing technical content for developer-facing products or SaaS platforms; strong ability to distill complex concepts into clear, actionable documentation.","Familiarity with API documentation tools and knowledge of developer workflows.","Experience managing docs repositories and contribution workflows (Markdown, docs-as-code)."]',
+  '["Degree in Communications, Technical Writing or equivalent experience; portfolio of published technical content preferred.","Ability to collaborate closely with engineering to keep documentation accurate and timely.","Comfort with lightweight engineering tasks to generate reproducible code samples and snippets."]',
+  '["Flexible working with training budgets for conferences; the role sits at the intersection of product and engineering enabling strong cross-functional exposure.","Health benefits and competitive compensation; opportunities to influence product adoption through quality documentation.","Supportive editorial and peer-review culture with mentorship for writers."]',
+  '700-1400',2,6,'MIDDLE','FULL_TIME','EDUCATION','BACHELORS_DEGREE','2025-12-05','2026-05-01',1,'docs@careergraph.com','+84-28-1212-3434','free','HCM','District 1','Ward 1','123 Le Loi',false,10,1,0,0,1,true,true,'ACTIVE','00000000-0000-0000-0000-000000000100'),
+
+ ('00000000-0000-0000-0000-000000001013','Site Reliability Engineer','Improve reliability and automation for production services','Infrastructure',
+  '["Develop automation for incident remediation, capacity management, and deploy-time validation to reduce manual toil and improve mean time to recovery.","Create and maintain service-level objectives and error budgets; work with product teams to balance feature velocity against reliability targets.","Design resilient service topologies and run chaos engineering experiments to proactively find and mitigate systemic weaknesses."]',
+  '["4+ years of SRE or infrastructure engineering experience with operating large-scale services; expertise in monitoring, alerting and incident response.","Experience running containerized workloads and automating operations using infrastructure-as-code.","Strong programming/scripting skills to implement robust automation and tooling."]',
+  '["Degree in Computer Science or equivalent; strong experience in operating large web platforms.","Track record of measurable reliability improvements and incident reduction.","Good communication skills to translate technical risk to product stakeholders."]',
+  '["Generous compensation with on-call rotations and incident payment policies; training budget for relevant certifications and conferences.","Remote-friendly and flexible hours; opportunity to shape platform reliability at scale.","Comprehensive benefits including mental health and family support programs."]',
+  '1400-3000',4,10,'SENIOR','FULL_TIME','ENGINEER','BACHELORS_DEGREE','2025-12-10','2026-06-01',1,'sre@careergraph.com','+84-28-1313-4545','paid','HCM','District 1','Ward 1','123 Le Loi',true,35,6,3,1,1,true,true,'ACTIVE','00000000-0000-0000-0000-000000000100'),
+
+ ('00000000-0000-0000-0000-000000001014','Growth Engineer','Experiment and build features to grow user engagement and activation metrics','Growth',
+  '["Design and implement growth experiments with instrumentation to measure impact on funnel metrics; build reliable experiments that can be rolled out and analyzed with statistical rigor.","Implement scalable backend features to support targeted campaigns, personalization and real-time messaging while respecting user privacy and opt-out preferences.","Work cross-functionally with marketing, product and analytics to prioritize growth initiatives that deliver high ROI and sustainable growth."]',
+  '["3+ years in growth or product engineering roles with experience in A/B testing frameworks, analytics and feature flagging systems.","Strong SQL and data analysis skills to evaluate experiment results and derive actionable insights.","Comfort shipping quick iterations while ensuring the codebase remains maintainable and secure."]',
+  '["Degree in Computer Science, Engineering or related field preferred; track record of experiments that moved key metrics.","Experience with experimentation platforms and data pipelines for near-real-time evaluation.","Good cross-functional communication and documentation skills."]',
+  '["Competitive compensation with performance bonuses; flexible work and training budget for growth tooling and analytics certifications.","Opportunity to work closely with leadership on high-impact growth levers and to influence product direction.","Comprehensive benefits and remote working options."]',
+  '1000-2200',2,6,'MIDDLE','FULL_TIME','BUSINESS','BACHELORS_DEGREE','2025-12-15','2026-07-01',2,'growth@careergraph.com','+84-28-1414-5656','free','HCM','District 1','Ward 1','123 Le Loi',false,18,3,1,0,1,true,true,'ACTIVE','00000000-0000-0000-0000-000000000100'),
+
+ ('00000000-0000-0000-0000-000000001015','HR Business Partner','Support hiring and organizational development across engineering teams','People',
+  '["Partner with engineering leaders to create hiring plans, source diverse candidates and run structured interviews; build inclusive recruitment practices that scale with hiring demand.","Design and implement onboarding and career development programs that improve new-hire time-to-productivity and long-term retention.","Collaborate with leadership on compensation strategy, performance review cycles and culture initiatives that maintain high engagement and accountability."]',
+  '["5+ years experience in HR or talent roles with technical recruitment exposure; strong interpersonal and program management skills.","Experience scaling people operations in fast-growing engineering organizations.","Comfort with data-driven HR practices and HRIS tools."]',
+  '["Degree in HR, Business or related field preferred; experience working with engineering or product organizations is a plus.","Strong privacy and labor law awareness for hiring and people operations.","Ability to operate as a trusted partner to leadership while delivering scalable programs."]',
+  '["Competitive compensation and benefits; strong focus on career development and leadership coaching programs.","Flexible work arrangements and generous leave policies; remote-friendly roles where appropriate.","Access to budget for hiring events and employer branding initiatives."]',
+  '1200-2400',3,8,'SENIOR','FULL_TIME','ADMINISTRATION','BACHELORS_DEGREE','2025-12-20','2026-06-30',1,'hrbp@careergraph.com','+84-28-1515-6767','free','HCM','District 1','Ward 1','123 Le Loi',false,8,1,0,0,1,true,true,'ACTIVE','00000000-0000-0000-0000-000000000100'),
+
+ ('00000000-0000-0000-0000-000000001016','Intern - Software Engineering','Hands-on internship for students to learn full-stack engineering practices and ship real features','Engineering',
+  '["Contribute to user-facing and backend features under mentorship; write code with test coverage and participate in code reviews to learn engineering best practices.","Work on small, well-scoped projects that deliver measurable value and help improve platform stability and user experience.","Participate in team rituals, design discussions and retrospective learning to build real-world software development experience."]',
+  '["Open to students with foundational knowledge of programming and eagerness to learn; projects should show code samples or school projects.","Ability to collaborate and communicate effectively with mentors and peers.","Interest in learning backend and frontend technologies and a growth mindset."]',
+  '["Enrolled in a degree program or recently graduated; proactive learner with passion for software development.","Willingness to rotate through different areas to gain broad exposure.","Good teamwork and communication skills."]',
+  '["Paid internship with mentorship and structured learning plan; potential to convert to full-time based on performance.","Access to training materials and conference support; flexible work schedule for students.","Opportunity to work on production systems under guidance and receive structured feedback."]',
+  '400-800',0,1,'INTERN','PART_TIME','ENGINEER','BACHELORS_DEGREE','2026-01-01','2026-06-30',3,'interns@careergraph.com','+84-28-1616-7878','free','HCM','District 1','Ward 1','123 Le Loi',true,5,0,0,0,1,true,true,'ACTIVE','00000000-0000-0000-0000-000000000100'),
+
+ ('00000000-0000-0000-0000-000000001017','Engineering Manager','Lead a team of engineers to deliver product outcomes and develop technical capabilities','Engineering',
+  '["Manage and coach a team of engineers, set technical priorities and unblock execution while fostering an inclusive and high-performance culture; balance operational excellence with delivery of strategic initiatives.","Drive technical strategy, architecture decisions and career development for direct reports; work with stakeholders to align team work with product and company goals.","Ensure healthy engineering practices, consistent delivery and maintainable codebases through good engineering hygiene and strong technical mentorship."]',
+  '["6+ years of engineering experience with prior people management; strong background in shipping and operating production systems.","Demonstrated ability to hire and grow engineering talent; experience conducting performance reviews and career development conversations.","Comfortable making tradeoffs and communicating technical decisions to non-engineering stakeholders."]',
+  '["Degree in Computer Science or relevant experience; proven managerial successes and technical credibility.","Experience scaling teams and processes in high-growth environments.","Demonstrated leadership in cross-functional initiatives."]',
+  '["Competitive compensation with management bonus and equity; structured leadership development and executive coaching programs.","Comprehensive benefits and strong parental leave policy.","Opportunity to influence organization-wide engineering culture and hiring strategy."]',
+  '2500-5000',8,15,'SENIOR','FULL_TIME','BUSINESS','BACHELORS_DEGREE','2025-12-28','2026-12-31',1,'eng-managers@careergraph.com','+84-28-1717-8989','paid','HCM','District 1','Ward 1','123 Le Loi',false,12,2,1,1,1,true,true,'ACTIVE','00000000-0000-0000-0000-000000000100'),
+
+ ('00000000-0000-0000-0000-000000001018','UX Researcher','Carry out user research and usability studies to guide product decisions and design improvements','Design',
+  '["Plan and execute user qualitative and quantitative research studies to uncover user needs and pain points; synthesize findings into actionable insights for product and design teams.","Partner with designers and product managers to shape research questions, recruitment criteria and testing protocols that lead to impactful product changes.","Translate research into prioritized recommendations, journey maps and metrics that inform roadmap decisions and design priorities."]',
+  '["3+ years experience in UX research or product research with proven impact on product direction; strong facilitation and synthesis skills.","Comfort working with mixed-methods research, including usability testing, interviews and survey design.","Ability to present insights to stakeholders and influence product decisions."]',
+  '["Degree in HCI, Psychology or related field preferred; strong portfolio of research studies and artifacts.","Experience recruiting participants and running moderated/unmoderated tests.","Excellent storytelling skills to communicate research outcomes."]',
+  '["Competitive benefits and flexibility to work remotely; budget for participant incentives and research tools; collaborative environment with product and design.","Opportunity to shape product direction and influence multiple product areas based on research evidence.","Learning budget for conferences and research training."]',
+  '900-1800',2,5,'MIDDLE','FULL_TIME','ART_MUSIC','BACHELORS_DEGREE','2025-12-30','2026-08-01',1,'ux@careergraph.com','+84-28-1818-9090','free','HCM','District 1','Ward 1','123 Le Loi',false,6,1,0,0,1,true,true,'ACTIVE','00000000-0000-0000-0000-000000000100')
+ON CONFLICT (id) DO NOTHING;
 
 -- 12) Applications: candidates apply to jobs
 INSERT INTO applications (id, cover_letter, resume_url, rating, notes, applied_date, current_stage, stage_changed_at, current_stage_note, candidate_id, job_id, status)
 VALUES
- ('00000000-0000-0000-0000-000000010001','I am very interested in this role','/resumes/200.pdf',NULL,'Strong Java background','2025-11-02','APPLIED',NULL,NULL,'00000000-0000-0000-0000-000000000200','00000000-0000-0000-0000-000000001001','ACTIVE'),
- ('00000000-0000-0000-0000-000000010002','Looking forward to contribute to frontend','/resumes/201.pdf',NULL,'React projects included','2025-11-06','SCREENING',NULL,NULL,'00000000-0000-0000-0000-000000000201','00000000-0000-0000-0000-000000001002','ACTIVE'),
- ('00000000-0000-0000-0000-000000010003','DevOps and infra experience','/resumes/202.pdf',NULL,'Experience with Kubernetes','2025-11-08','INTERVIEW',NULL,NULL,'00000000-0000-0000-0000-000000000202','00000000-0000-0000-0000-000000001003','ACTIVE');
+ -- Applications batch (multiple candidates applying to many jobs)
+ ('00000000-0000-0000-0000-000000010001','I am very interested in this role and excited to contribute to backend platform improvements, particularly in building scalable microservices that improve system reliability and user experience.','/resumes/200.pdf',NULL,'Strong Java background with microservices and testing','2025-11-02','APPLIED',NULL,NULL,'00000000-0000-0000-0000-000000000200','00000000-0000-0000-0000-000000001001','ACTIVE'),
+ ('00000000-0000-0000-0000-000000010002','Looking forward to contribute to frontend engineering efforts by building accessible and high-performance web applications, optimizing first paint and interactive time, and collaborating closely with designers.','/resumes/201.pdf',NULL,'React and TypeScript projects included, portfolio available on request','2025-11-06','SCREENING',NULL,NULL,'00000000-0000-0000-0000-000000000201','00000000-0000-0000-0000-000000001002','ACTIVE'),
+ ('00000000-0000-0000-0000-000000010003','DevOps and infra experience across container orchestration and cloud infrastructure; excited to help improve CI/CD automation and observability for production systems.','/resumes/202.pdf',NULL,'Experience with Kubernetes and Terraform','2025-11-08','INTERVIEW',NULL,NULL,'00000000-0000-0000-0000-000000000202','00000000-0000-0000-0000-000000001003','ACTIVE'),
+ ('00000000-0000-0000-0000-000000010004','I have led backend efforts to reduce latency and improve throughput; I would like to join as Senior Backend Engineer to help shape system architecture and mentor engineers.','/resumes/203.pdf',NULL,'Strong distributed systems background','2025-11-11','APPLIED',NULL,NULL,'00000000-0000-0000-0000-000000000204','00000000-0000-0000-0000-000000001004','ACTIVE'),
+ ('00000000-0000-0000-0000-000000010005','Experienced Android developer seeking to build delightful mobile experiences with attention to performance, offline behavior and testability.','/resumes/204.pdf',NULL,'Mobile apps shipped to Play Store','2025-11-12','APPLIED',NULL,NULL,'00000000-0000-0000-0000-000000000208','00000000-0000-0000-0000-000000001005','ACTIVE'),
+ ('00000000-0000-0000-0000-000000010006','I enjoy building robust data pipelines and enabling data-driven decisions through clean ETL, strong testing and monitoring.','/resumes/205.pdf',NULL,'Spark and Airflow experience','2025-11-15','APPLIED',NULL,NULL,'00000000-0000-0000-0000-000000000203','00000000-0000-0000-0000-000000001006','ACTIVE'),
+ ('00000000-0000-0000-0000-000000010007','Product-minded engineer with history of shipping features end-to-end and working with designers to improve user activation and retention through well-instrumented experiments.','/resumes/206.pdf',NULL,'Product focus and analytics','2025-11-16','APPLIED',NULL,NULL,'00000000-0000-0000-0000-000000000205','00000000-0000-0000-0000-000000001007','ACTIVE'),
+ ('00000000-0000-0000-0000-000000010008','QA automation specialist with experience building stable test frameworks and improving CI feedback loops to reduce regressions and shorten release cycles.','/resumes/207.pdf',NULL,'Automation frameworks and flaky test reduction','2025-11-18','APPLIED',NULL,NULL,'00000000-0000-0000-0000-000000000206','00000000-0000-0000-0000-000000001008','ACTIVE'),
+ ('00000000-0000-0000-0000-000000010009','Applied ML engineer with production model deployment experience, interested in improving recommendation quality and scaling experimentation infrastructure.','/resumes/208.pdf',NULL,'Model deployment and feature stores','2025-11-19','SCREENING',NULL,NULL,'00000000-0000-0000-0000-000000000207','00000000-0000-0000-0000-000000001009','ACTIVE'),
+ ('00000000-0000-0000-0000-000000010010','Customer-focused professional with experience improving onboarding flows and retention; excited to partner with product and engineering to drive customer outcomes.','/resumes/209.pdf',NULL,'Customer success and analytics','2025-11-20','APPLIED',NULL,NULL,'00000000-0000-0000-0000-000000000209','00000000-0000-0000-0000-000000001010','ACTIVE'),
+ ('00000000-0000-0000-0000-000000010011','Security-minded engineer with hands-on experience implementing detection rules and automated incident response workflows for cloud platforms.','/resumes/210.pdf',NULL,'Security engineering and threat detection','2025-11-21','APPLIED',NULL,NULL,'00000000-0000-0000-0000-000000000200','00000000-0000-0000-0000-000000001011','ACTIVE'),
+ ('00000000-0000-0000-0000-000000010012','Technical writer with experience documenting APIs and developer flows to reduce onboarding time and support self-service developer integration.','/resumes/211.pdf',NULL,'Docs and API guides portfolio','2025-11-22','APPLIED',NULL,NULL,'00000000-0000-0000-0000-000000000201','00000000-0000-0000-0000-000000001012','ACTIVE'),
+ ('00000000-0000-0000-0000-000000010013','SRE candidate interested in reducing toil through automation and improving incident response playbooks; strong background in post-incident analysis.','/resumes/212.pdf',NULL,'SRE and automation','2025-11-23','APPLIED',NULL,NULL,'00000000-0000-0000-0000-000000000202','00000000-0000-0000-0000-000000001013','ACTIVE'),
+ ('00000000-0000-0000-0000-000000010014','Growth engineer with experience designing experiments and shipping features that improve activation; able to work on both frontend and backend growth hooks.','/resumes/213.pdf',NULL,'A/B testing and growth hacking','2025-11-24','APPLIED',NULL,NULL,'00000000-0000-0000-0000-000000000203','00000000-0000-0000-0000-000000001014','ACTIVE'),
+ ('00000000-0000-0000-0000-000000010015','HR partner candidate focused on scaling hiring practices and improving onboarding experience for engineering teams; strong program management skills.','/resumes/214.pdf',NULL,'HR programs and hiring metrics','2025-11-25','APPLIED',NULL,NULL,'00000000-0000-0000-0000-000000000204','00000000-0000-0000-0000-000000001015','ACTIVE'),
+ ('00000000-0000-0000-0000-000000010016','Intern candidate eager to learn backend and frontend technologies and contribute to small but meaningful tasks under mentorship.','/resumes/215.pdf',NULL,'School projects and internships','2025-11-26','APPLIED',NULL,NULL,'00000000-0000-0000-0000-000000000205','00000000-0000-0000-0000-000000001016','ACTIVE'),
+ ('00000000-0000-0000-0000-000000010017','Engineering manager candidate with experience growing teams and delivering technical strategy; passion for coaching and hiring top talent.','/resumes/216.pdf',NULL,'Management and technical leadership','2025-11-27','APPLIED',NULL,NULL,'00000000-0000-0000-0000-000000000206','00000000-0000-0000-0000-000000001017','ACTIVE'),
+ ('00000000-0000-0000-0000-000000010018','UX researcher with track record of running mixed-methods research to inform product decisions and design directions across multiple product lines.','/resumes/217.pdf',NULL,'UX research and usability testing','2025-11-28','APPLIED',NULL,NULL,'00000000-0000-0000-0000-000000000207','00000000-0000-0000-0000-000000001018','ACTIVE'),
+ -- Additional application records to increase volume and simulate candidates applying to multiple roles
+ ('00000000-0000-0000-0000-000000010019','Additional application for backend role to simulate multiple applications per candidate','/resumes/200.pdf',NULL,'Applying to similar backend roles','2025-11-29','APPLIED',NULL,NULL,'00000000-0000-0000-0000-000000000200','00000000-0000-0000-0000-000000001004','ACTIVE'),
+ ('00000000-0000-0000-0000-000000010020','Candidate applying to frontend and growth roles to diversify testing scenarios','/resumes/201.pdf',NULL,'Frontend and growth experience','2025-11-30','APPLIED',NULL,NULL,'00000000-0000-0000-0000-000000000201','00000000-0000-0000-0000-000000001014','ACTIVE'),
+ ('00000000-0000-0000-0000-000000010021','Applying to DevOps positions across multiple openings to test pipeline and scheduling workflows','/resumes/202.pdf',NULL,'DevOps background with Kubernetes and Terraform','2025-12-01','APPLIED',NULL,NULL,'00000000-0000-0000-0000-000000000202','00000000-0000-0000-0000-000000001003','ACTIVE'),
+ ('00000000-0000-0000-0000-000000010022','Applying to SRE and infra roles to simulate cross-functional hiring','/resumes/212.pdf',NULL,'Experienced in chaos engineering and reliability improvements','2025-12-02','SCREENING',NULL,NULL,'00000000-0000-0000-0000-000000000202','00000000-0000-0000-0000-000000001013','ACTIVE'),
+ ('00000000-0000-0000-0000-000000010023','Second application by candidate 3 to a different DevOps opening to test duplicate application handling','/resumes/202.pdf',NULL,'Additional DevOps experience examples','2025-12-03','APPLIED',NULL,NULL,'00000000-0000-0000-0000-000000000202','00000000-0000-0000-0000-000000001004','ACTIVE'),
+ ('00000000-0000-0000-0000-000000010024','Candidate interested in ML engineering roles, submitting application with research and production experience','/resumes/218.pdf',NULL,'ML model deployment and feature engineering','2025-12-04','APPLIED',NULL,NULL,'00000000-0000-0000-0000-000000000207','00000000-0000-0000-0000-000000001009','ACTIVE'),
+ ('00000000-0000-0000-0000-000000010025','Follow-up application to Customer Success role referencing previous collaborations and measurable success in retention efforts','/resumes/219.pdf',NULL,'Customer retention programs and playbooks','2025-12-05','SCREENING',NULL,NULL,'00000000-0000-0000-0000-000000000209','00000000-0000-0000-0000-000000001010','ACTIVE'),
+ ('00000000-0000-0000-0000-000000010026','Application to Security Engineer role, focusing on practical threat hunting and automated response playbooks','/resumes/220.pdf',NULL,'Security operations and automation','2025-12-06','APPLIED',NULL,NULL,'00000000-0000-0000-0000-000000000200','00000000-0000-0000-0000-000000001011','ACTIVE'),
+ ('00000000-0000-0000-0000-000000010027','Applying to Technical Writer role with examples of API docs and developer guides that reduced onboarding time for integrators','/resumes/211.pdf',NULL,'Docs portfolio available','2025-12-07','APPLIED',NULL,NULL,'00000000-0000-0000-0000-000000000201','00000000-0000-0000-0000-000000001012','ACTIVE'),
+ ('00000000-0000-0000-0000-000000010028','Application to growth engineering to run experiments and implement personalization features that increased activation metrics at previous company','/resumes/213.pdf',NULL,'Experimentation and analytics','2025-12-08','APPLIED',NULL,NULL,'00000000-0000-0000-0000-000000000203','00000000-0000-0000-0000-000000001014','ACTIVE'),
+ ('00000000-0000-0000-0000-000000010029','Applying to HR BP role with focus on scaling hiring operations and building onboarding programs for technical hires','/resumes/214.pdf',NULL,'Hiring program leadership','2025-12-09','APPLIED',NULL,NULL,'00000000-0000-0000-0000-000000000204','00000000-0000-0000-0000-000000001015','ACTIVE')
+ON CONFLICT (id) DO NOTHING;
 
 -- 13) Application stage histories (simulate progression)
 INSERT INTO application_stage_history (id, application_id, from_stage, to_stage, note, changed_by, changed_at, status)
 VALUES
+ -- initial submission histories for many applications
  ('00000000-0000-0000-0000-000000020001','00000000-0000-0000-0000-000000010001',NULL,'APPLIED','Candidate submitted application','00000000-0000-0000-0000-000000000210',CURRENT_TIMESTAMP,'ACTIVE'),
  ('00000000-0000-0000-0000-000000020002','00000000-0000-0000-0000-000000010002',NULL,'APPLIED','Candidate submitted application','00000000-0000-0000-0000-000000000211',CURRENT_TIMESTAMP,'ACTIVE'),
- ('00000000-0000-0000-0000-000000020003','00000000-0000-0000-0000-000000010002','APPLIED','SCREENING','Profile matched basic requirements','00000000-0000-0000-0000-000000000001',CURRENT_TIMESTAMP,'ACTIVE'),
+ ('00000000-0000-0000-0000-000000020003','00000000-0000-0000-0000-000000010002','APPLIED','SCREENING','Profile matched basic requirements during initial resume review','00000000-0000-0000-0000-000000000001',CURRENT_TIMESTAMP,'ACTIVE'),
  ('00000000-0000-0000-0000-000000020004','00000000-0000-0000-0000-000000010003',NULL,'APPLIED','Candidate submitted application','00000000-0000-0000-0000-000000000212',CURRENT_TIMESTAMP,'ACTIVE'),
- ('00000000-0000-0000-0000-000000020005','00000000-0000-0000-0000-000000010003','APPLIED','SCREENING','Initial screen passed','00000000-0000-0000-0000-000000000001',CURRENT_TIMESTAMP,'ACTIVE'),
- ('00000000-0000-0000-0000-000000020006','00000000-0000-0000-0000-000000010003','SCREENING','INTERVIEW','Scheduled interview with hiring manager','00000000-0000-0000-0000-000000000001',CURRENT_TIMESTAMP,'ACTIVE');
+ ('00000000-0000-0000-0000-000000020005','00000000-0000-0000-0000-000000010003','APPLIED','SCREENING','Initial screen passed based on infra and cloud experience','00000000-0000-0000-0000-000000000001',CURRENT_TIMESTAMP,'ACTIVE'),
+ ('00000000-0000-0000-0000-000000020006','00000000-0000-0000-0000-000000010003','SCREENING','INTERVIEW','Scheduled interview with hiring manager to assess system design and incident handling','00000000-0000-0000-0000-000000000001',CURRENT_TIMESTAMP,'ACTIVE'),
+ ('00000000-0000-0000-0000-000000020007','00000000-0000-0000-0000-000000010004',NULL,'APPLIED','Candidate applied for Senior Backend Engineer position','00000000-0000-0000-0000-000000000214',CURRENT_TIMESTAMP,'ACTIVE'),
+ ('00000000-0000-0000-0000-000000020008','00000000-0000-0000-0000-000000010005',NULL,'APPLIED','Mobile developer applied with published apps and strong UX focus','00000000-0000-0000-0000-000000000218',CURRENT_TIMESTAMP,'ACTIVE'),
+ ('00000000-0000-0000-0000-000000020009','00000000-0000-0000-0000-000000010006',NULL,'APPLIED','Candidate applied to Data Engineer role with production ETL experience','00000000-0000-0000-0000-000000000203',CURRENT_TIMESTAMP,'ACTIVE'),
+ ('00000000-0000-0000-0000-000000020010','00000000-0000-0000-0000-000000010007',NULL,'APPLIED','Product-minded engineer applied to PM adjacent role','00000000-0000-0000-0000-000000000205',CURRENT_TIMESTAMP,'ACTIVE'),
+ ('00000000-0000-0000-0000-000000020011','00000000-0000-0000-0000-000000010009',NULL,'APPLIED','Applied for ML Engineer role with model production experience','00000000-0000-0000-0000-000000000207',CURRENT_TIMESTAMP,'ACTIVE'),
+ ('00000000-0000-0000-0000-000000020012','00000000-0000-0000-0000-000000010022',NULL,'APPLIED','Candidate applied to SRE role and passed initial screening','00000000-0000-0000-0000-000000000202',CURRENT_TIMESTAMP,'ACTIVE'),
+ ('00000000-0000-0000-0000-000000020013','00000000-0000-0000-0000-000000010025',NULL,'APPLIED','Candidate applied to Customer Success role and provided case studies in retention','00000000-0000-0000-0000-000000000209',CURRENT_TIMESTAMP,'ACTIVE'),
+ ('00000000-0000-0000-0000-000000020014','00000000-0000-0000-0000-000000010026',NULL,'APPLIED','Security engineer application submitted with practical threat-hunting examples','00000000-0000-0000-0000-000000000200',CURRENT_TIMESTAMP,'ACTIVE'),
+ ('00000000-0000-0000-0000-000000020015','00000000-0000-0000-0000-000000010019',NULL,'APPLIED','Second backend application for candidate to simulate multiple submissions','00000000-0000-0000-0000-000000000200',CURRENT_TIMESTAMP,'ACTIVE'),
+ ('00000000-0000-0000-0000-000000020016','00000000-0000-0000-0000-000000010020',NULL,'APPLIED','Applied to growth and frontend role to test cross-role applications','00000000-0000-0000-0000-000000000201',CURRENT_TIMESTAMP,'ACTIVE')
+ON CONFLICT (id) DO NOTHING;
 
 -- 14) Connections (sample)
-INSERT INTO connections (id, note, connection_type, has_seen, disable_notification, candidate_id, connected_company_id, status)
+INSERT INTO connections (id, note, connection_type, has_seen, disable_notification, candidate_id, connected_company_id, created_date, last_modified_date, status)
 VALUES
- ('00000000-0000-0000-0000-000000030001','Following CareerGraph','FOLLOW',true,false,'00000000-0000-0000-0000-000000000200','00000000-0000-0000-0000-000000000100','ACTIVE');
+ ('00000000-0000-0000-0000-000000030001','Following CareerGraph','FOLLOWED',true,false,'00000000-0000-0000-0000-000000000200','00000000-0000-0000-0000-000000000100',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,'ACTIVE')
+ON CONFLICT (id) DO NOTHING;
 
 -- End of mock data
 

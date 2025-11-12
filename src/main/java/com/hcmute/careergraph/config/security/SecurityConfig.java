@@ -14,10 +14,12 @@ import org.springframework.security.web.SecurityFilterChain;
 @Configuration
 public class SecurityConfig {
 
-    private final String[] PUBLIC_ENDPOINTS = {
-            "auth/**",
-            "jobs/**",
-            "companies/**"
+    private static final String[] PUBLIC_ENDPOINTS = {
+            "/auth/**",
+            "/jobs/**",
+            "/companies/**",
+            "/swagger-ui/**",
+            "/v3/api-docs/**"
     };
 
     @Autowired
@@ -35,11 +37,8 @@ public class SecurityConfig {
 
                 // Auth
                 .authorizeHttpRequests(authorizeRequests -> authorizeRequests
-                        .requestMatchers(HttpMethod.POST, PUBLIC_ENDPOINTS).permitAll()
-                        .requestMatchers(HttpMethod.GET, PUBLIC_ENDPOINTS).permitAll()
-                        .requestMatchers(HttpMethod.PUT, PUBLIC_ENDPOINTS).permitAll()
-                        .requestMatchers(HttpMethod.PATCH, PUBLIC_ENDPOINTS).permitAll()
-                        .requestMatchers(HttpMethod.DELETE, PUBLIC_ENDPOINTS).permitAll()
+                        .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
+                        .requestMatchers(PUBLIC_ENDPOINTS).permitAll()
                         .anyRequest().authenticated())
 
                 // Custom exception
