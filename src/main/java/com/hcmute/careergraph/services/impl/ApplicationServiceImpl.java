@@ -161,11 +161,11 @@ public class ApplicationServiceImpl implements ApplicationService {
 
     @Override
     public Application updateApplicationStage(String id, ApplicationStageUpdateRequest request) {
-        log.info("Updating application {} stage to {}", id, request.stage());
+        log.info("Updating application {} stage to {}", id, request.getStage());
         Application application = applicationRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Application not found with id: " + id));
 
-        ApplicationStage targetStage = request.stage();
+        ApplicationStage targetStage = request.getStage();
         ApplicationStage currentStage = application.getCurrentStage();
 
         if (targetStage == null) {
@@ -173,8 +173,8 @@ public class ApplicationServiceImpl implements ApplicationService {
         }
 
         if (currentStage == targetStage) {
-            if (StringUtils.hasText(request.note())) {
-                application.setCurrentStageNote(request.note().trim());
+            if (StringUtils.hasText(request.getNote())) {
+                application.setCurrentStageNote(request.getNote().trim());
                 application.setStageChangedAt(LocalDateTime.now());
                 applicationRepository.save(application);
             }
@@ -185,8 +185,8 @@ public class ApplicationServiceImpl implements ApplicationService {
         validateStageTransition(currentStage, targetStage, id);
 
         LocalDateTime now = LocalDateTime.now();
-        String note = resolveStageNote(targetStage, request.note());
-        String actor = resolveActorLabel(request.changedBy(), application.getCandidate());
+        String note = resolveStageNote(targetStage, request.getNote());
+        String actor = resolveActorLabel(request.getChangeBy(), application.getCandidate());
 
         application.setCurrentStage(targetStage);
         application.setStageChangedAt(now);
@@ -227,6 +227,7 @@ public class ApplicationServiceImpl implements ApplicationService {
         return switch (stage) {
             case APPLIED -> SUBMISSION_NOTE;
             case SCREENING -> "We are reviewing your profile.";
+            case INTERVIEW -> "Your interview has been send. Pls check your email.";
             case HR_CONTACTED -> "Our HR team will reach out shortly.";
             case INTERVIEW_SCHEDULED -> "Your interview has been scheduled.";
             case INTERVIEW_COMPLETED -> "Your interview is complete and under evaluation.";

@@ -28,10 +28,39 @@
 
         <tr>
           <td class="mobile-padding" style="padding:40px; text-align:center;">
-            <h2 style="margin:0 0 8px 0; font-size:22px; font-weight:600; color:#111827;">Bạn có tin nhắn mới</h2>
-            <p style="margin:0 0 12px 0; color:#6b7280;" th:text="'Xin chào ' + ${username} + ','">Xin chào John,</p>
-            <p style="margin:0 0 16px 0; color:#374151;">Bạn có <span style="font-size:36px; font-weight:700; color:#3b82f6;" th:text="${unreadCount}">3</span> tin nhắn chưa đọc.</p>
-            <p><a th:href="${messagesUrl}" style="color:#3b82f6; font-weight:500;">Xem ngay</a></p>
+      <h2 style="margin:0 0 8px 0; font-size:22px; font-weight:600; color:#111827;">Bạn có tin nhắn mới</h2>
+      <p style="margin:0 0 12px 0; color:#6b7280;" th:text="'Xin chào ' + ${username} + ','">Xin chào John,</p>
+
+      <!-- Intro message box -->
+      <div style="background-color:#f9fafb; border-radius:8px; padding:20px; margin-bottom:24px; border-left:4px solid #3b82f6;">
+        <p style="margin:0; color:#374151;">Chúng tôi ghi nhận hoạt động mới trong hộp thư của bạn. Vui lòng kiểm tra các tin nhắn quan trọng.</p>
+      </div>
+
+      <!-- Centered count card (OTP style) -->
+      <div style="text-align:center; margin:24px 0;">
+        <div style="background-color:#f8fafc; border:2px solid #e5e7eb; border-radius:12px; padding:30px; display:inline-block; min-width:220px;">
+          <p style="margin:0 0 8px 0; font-size:12px; color:#6b7280; font-weight:600; text-transform:uppercase; letter-spacing:1px;">TIN NHẮN CHƯA ĐỌC</p>
+          <div style="font-family:'Courier New', monospace; font-size:36px; font-weight:600; color:#1f2937; letter-spacing:6px;" th:text="${unreadCount}">3</div>
+          <p style="margin:12px 0 0 0; font-size:13px; color:#6b7280;">Mở để xem chi tiết</p>
+        </div>
+      </div>
+
+      <p style="margin-top:12px;"><a th:href="${messagesUrl}" style="color:#3b82f6; font-weight:500;">Xem ngay</a></p>
+
+      <!-- Optional notice -->
+      <div th:if="${notice}" style="background-color:#fef3c7; border:1px solid #f59e0b; border-radius:6px; padding:16px; margin:32px 0;">
+        <p style="margin:0; font-size:14px; color:#92400e; text-align:center;"><strong>⚠️ Lưu ý:</strong> <span th:text="${notice}">Thông tin quan trọng</span></p>
+      </div>
+
+      <!-- Help section -->
+      <div style="text-align:center; margin-top:40px; padding-top:32px; border-top:1px solid #e5e7eb;">
+        <p style="margin:0 0 16px 0; font-size:14px; color:#6b7280;">Cần hỗ trợ? Liên hệ với chúng tôi</p>
+        <p style="margin:0;">
+          <a th:href="'mailto:' + ${supportEmail}" style="color:#3b82f6; text-decoration:none; font-weight:500;" th:text="${supportEmail}">support@careergraph.com</a>
+          <span style="color:#d1d5db; margin:0 8px;">|</span>
+          <a th:href="${helpCenterUrl}" target="_blank" style="color:#3b82f6; text-decoration:none; font-weight:500;">Trung tâm hỗ trợ</a>
+        </p>
+      </div>
           </td>
         </tr>
 

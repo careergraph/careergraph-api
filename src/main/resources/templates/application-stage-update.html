@@ -30,9 +30,20 @@
                     <td class="mobile-padding" style="padding:40px;">
                         <p style="margin:0 0 12px 0; color:#6b7280;" th:text="'Dear ' + ${candidateName} + ','">Dear Candidate,</p>
 
-                        <p style="color:#374151;">We wanted to let you know that your application for the <strong th:text="${jobTitle}">position</strong> role at <strong th:text="${companyName}">our company</strong> is now at the <span style="color:#2563eb; font-weight:600;" th:text="${stageLabel}">current stage</span>.</p>
+                        <!-- Message box like OTP -->
+                        <div style="background-color:#f9fafb; border-radius:8px; padding:20px; margin-bottom:20px; border-left:4px solid #3b82f6;">
+                            <p style="margin:0; color:#374151;">We wanted to let you know that your application for the <strong th:text="${jobTitle}">position</strong> role at <strong th:text="${companyName}">our company</strong> is now at the <span style="color:#2563eb; font-weight:600;" th:text="${stageLabel}">current stage</span>.</p>
+                        </div>
 
-                        <p th:if="${note}" th:text="${note}" style="margin-top:12px;">Stage update note.</p>
+                        <div th:if="${note}" th:text="${note}" style="margin-top:12px;">Stage update note.</div>
+
+                        <!-- Centered stage card -->
+                        <div style="text-align:center; margin:24px 0;">
+                            <div style="background-color:#f8fafc; border:2px solid #e5e7eb; border-radius:12px; padding:24px; display:inline-block; min-width:220px;">
+                                <p style="margin:0 0 8px 0; font-size:12px; color:#6b7280; font-weight:600; text-transform:uppercase;">Giai đoạn hiện tại</p>
+                                <div style="font-size:20px; font-weight:700; color:#1f2937;" th:text="${stageLabel}">Interview</div>
+                            </div>
+                        </div>
 
                         <p th:if="${terminal}" style="margin-top:12px;">This stage concludes the recruitment process. Our team will be in touch with any final details shortly.</p>
                         <p th:if="${!terminal}" style="margin-top:12px;">Our team will keep you updated as the next steps are scheduled. You can always follow your progress by signing in to your candidate dashboard.</p>
