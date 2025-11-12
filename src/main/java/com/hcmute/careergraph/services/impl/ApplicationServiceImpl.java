@@ -231,7 +231,7 @@ public class ApplicationServiceImpl implements ApplicationService {
             case HR_CONTACTED -> "Our HR team will reach out shortly.";
             case INTERVIEW_SCHEDULED -> "Your interview has been scheduled.";
             case INTERVIEW_COMPLETED -> "Your interview is complete and under evaluation.";
-            case TRIAL_PERIOD -> "A trial or probationary period has started.";
+            case TRIAL -> "A trial or probationary period has started.";
             case OFFER_EXTENDED -> "We have extended an offer.";
             case OFFER_ACCEPTED -> "You have accepted our offer.";
             case OFFER_DECLINED -> "You declined the offer.";
