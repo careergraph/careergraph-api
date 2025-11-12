@@ -46,7 +46,7 @@ public class ApplicationController {
         return RestResponse.<ApplicationResponse>builder()
                 .status(HttpStatus.CREATED)
                 .message("Application created successfully")
-                .data(applicationMapper.toResponse(application))
+                .data(applicationMapper.toResponse(application, false))
                 .build();
     }
 
@@ -65,7 +65,7 @@ public class ApplicationController {
         return RestResponse.<List<ApplicationResponse>>builder()
                 .status(HttpStatus.CREATED)
                 .message("Application created successfully")
-                .data(applicationMapper.toResponseList(applications))
+                .data(applicationMapper.toResponseList(applications, true))
                 .build();
     }
 
@@ -75,27 +75,7 @@ public class ApplicationController {
         return RestResponse.<ApplicationResponse>builder()
                 .status(HttpStatus.OK)
                 .message("Application retrieved successfully")
-                .data(applicationMapper.toResponse(application))
-                .build();
-    }
-
-    @GetMapping("/candidate/{candidateId}")
-    public RestResponse<Page<ApplicationResponse>> getApplicationsByCandidate(@PathVariable String candidateId, Pageable pageable) {
-        Page<Application> applications = applicationService.getApplicationsByCandidate(candidateId, pageable);
-        return RestResponse.<Page<ApplicationResponse>>builder()
-                .status(HttpStatus.OK)
-                .message("Applications retrieved successfully")
-                .data(applications.map(applicationMapper::toResponse))
-                .build();
-    }
-
-    @GetMapping("/job/{jobId}")
-    public RestResponse<Page<ApplicationResponse>> getApplicationsByJob(@PathVariable String jobId, Pageable pageable) {
-        Page<Application> applications = applicationService.getApplicationsByJob(jobId, pageable);
-        return RestResponse.<Page<ApplicationResponse>>builder()
-                .status(HttpStatus.OK)
-                .message("Applications retrieved successfully")
-                .data(applications.map(applicationMapper::toResponse))
+                .data(applicationMapper.toResponse(application, true))
                 .build();
     }
 
@@ -105,7 +85,7 @@ public class ApplicationController {
         return RestResponse.<ApplicationResponse>builder()
                 .status(HttpStatus.OK)
                 .message("Application updated successfully")
-                .data(applicationMapper.toResponse(application))
+                .data(applicationMapper.toResponse(application, false))
                 .build();
     }
 
@@ -139,7 +119,7 @@ public class ApplicationController {
         return RestResponse.<ApplicationResponse>builder()
                 .status(HttpStatus.OK)
                 .message("Application stage updated successfully")
-                .data(applicationMapper.toResponse(application))
+                .data(applicationMapper.toResponse(application, false))
                 .build();
     }
 }

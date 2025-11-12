@@ -490,7 +490,7 @@ public class JobController {
         return RestResponse.<ApplicationResponse>builder()
                 .status(HttpStatus.CREATED)
                 .message("Application created successfully")
-                .data(applicationMapper.toResponse(application))
+                .data(applicationMapper.toResponse(application, false))
                 .build();
     }
 
