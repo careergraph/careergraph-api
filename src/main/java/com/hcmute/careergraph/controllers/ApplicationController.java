@@ -15,6 +15,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.Authentication;
+import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -45,7 +46,7 @@ public class ApplicationController {
         return RestResponse.<ApplicationResponse>builder()
                 .status(HttpStatus.CREATED)
                 .message("Application created successfully")
-                .data(applicationMapper.toResponse(application))
+                .data(applicationMapper.toResponse(application, false))
                 .build();
     }
 
@@ -64,7 +65,7 @@ public class ApplicationController {
         return RestResponse.<List<ApplicationResponse>>builder()
                 .status(HttpStatus.CREATED)
                 .message("Application created successfully")
-                .data(applicationMapper.toResponseList(applications))
+                .data(applicationMapper.toResponseList(applications, true))
                 .build();
     }
 
@@ -74,27 +75,7 @@ public class ApplicationController {
         return RestResponse.<ApplicationResponse>builder()
                 .status(HttpStatus.OK)
                 .message("Application retrieved successfully")
-                .data(applicationMapper.toResponse(application))
-                .build();
-    }
-
-    @GetMapping("/candidate/{candidateId}")
-    public RestResponse<Page<ApplicationResponse>> getApplicationsByCandidate(@PathVariable String candidateId, Pageable pageable) {
-        Page<Application> applications = applicationService.getApplicationsByCandidate(candidateId, pageable);
-        return RestResponse.<Page<ApplicationResponse>>builder()
-                .status(HttpStatus.OK)
-                .message("Applications retrieved successfully")
-                .data(applications.map(applicationMapper::toResponse))
-                .build();
-    }
-
-    @GetMapping("/job/{jobId}")
-    public RestResponse<Page<ApplicationResponse>> getApplicationsByJob(@PathVariable String jobId, Pageable pageable) {
-        Page<Application> applications = applicationService.getApplicationsByJob(jobId, pageable);
-        return RestResponse.<Page<ApplicationResponse>>builder()
-                .status(HttpStatus.OK)
-                .message("Applications retrieved successfully")
-                .data(applications.map(applicationMapper::toResponse))
+                .data(applicationMapper.toResponse(application, true))
                 .build();
     }
 
@@ -104,7 +85,7 @@ public class ApplicationController {
         return RestResponse.<ApplicationResponse>builder()
                 .status(HttpStatus.OK)
                 .message("Application updated successfully")
-                .data(applicationMapper.toResponse(application))
+                .data(applicationMapper.toResponse(application, false))
                 .build();
     }
 
@@ -120,13 +101,25 @@ public class ApplicationController {
     @PutMapping("/{id}/stage")
     public RestResponse<ApplicationResponse> updateApplicationStage(
             @PathVariable String id,
-            @Valid @RequestBody ApplicationStageUpdateRequest request
+            @Valid @RequestBody ApplicationStageUpdateRequest request,
+            Authentication authentication
     ) {
+        if (!StringUtils.hasText(id)) {
+            throw new BadRequestException("Application ID invalid");
+        }
+
+        String changeBy = securityUtils.extractCompanyId(authentication);
+        if (!StringUtils.hasText(changeBy)) {
+            throw new BadRequestException("ID of HR change stage is required");
+        }
+
+        request.setChangeBy(changeBy);
+
         Application application = applicationService.updateApplicationStage(id, request);
         return RestResponse.<ApplicationResponse>builder()
                 .status(HttpStatus.OK)
                 .message("Application stage updated successfully")
-                .data(applicationMapper.toResponse(application))
+                .data(applicationMapper.toResponse(application, false))
                 .build();
     }
 }
