@@ -1,227 +1,254 @@
 package com.hcmute.careergraph.config.app;
 
-import com.github.javafaker.Faker;
-import com.hcmute.careergraph.repositories.*;
-import lombok.RequiredArgsConstructor;
-import org.springframework.boot.CommandLineRunner;
+import javax.sql.DataSource;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.boot.ApplicationArguments;
+import org.springframework.boot.ApplicationRunner;
+import org.springframework.core.io.Resource;
+import org.springframework.core.io.ResourceLoader;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.jdbc.datasource.init.DatabasePopulatorUtils;
+import org.springframework.jdbc.datasource.init.ResourceDatabasePopulator;
 import org.springframework.stereotype.Component;
-import org.springframework.transaction.annotation.Transactional;
 
+/**
+ * DataSeeder: on application start, checks if critical data exists and executes
+ * the SQL seed script `init-scripts/mock-data.sql` if needed.
+ *
+ * Behavior:
+ * - Tries to query `jobs` table count. If count > 0, seeding is skipped.
+ * - If the table is missing or empty, it attempts to load the SQL script from
+ *   classpath `init-scripts/mock-data.sql` first, then from filesystem
+ *   `init-scripts/mock-data.sql` relative to the working directory.
+ * - The script is executed via Spring's ResourceDatabasePopulator; errors
+ *   continue execution so partial seeds do not abort the app startup.
+ */
 @Component
-@RequiredArgsConstructor
-public class DataSeeder implements CommandLineRunner {
+public class DataSeeder implements ApplicationRunner {
 
-    private final CompanyRepository companyRepository;
-    private final CandidateRepository candidateRepository;
-    private final SkillRepository skillRepository;
-    private final JobRepository jobRepository;
-    private final ApplicationRepository applicationRepository;
-    private final Faker faker = new Faker();
+    private final Logger logger = LoggerFactory.getLogger(DataSeeder.class);
+    private final JdbcTemplate jdbcTemplate;
+    private final ResourceLoader resourceLoader;
+    private final DataSource dataSource;
 
-    @Transactional
-    /*public void seed() {
-        if (companyRepository.count() > 0 || candidateRepository.count() > 0 || jobRepository.count() > 0) {
-            return;
-        }
-        // Seed Skills
-        List<Skill> skills = new ArrayList<>();
-        for (int i = 0; i < 20; i++) {
-            Skill skill = Skill.builder()
-                    .name(faker.job().keySkills())
-                    .category(faker.job().field())
-                    .description(faker.lorem().sentence())
-                    .build();
-            skills.add(skill);
-        }
-        skillRepository.saveAll(skills);
-
-        // Seed Companies
-        List<Company> companies = new ArrayList<>();
-        for (int i = 0; i < 10; i++) {
-            Company company = Company.builder()
-                    .tagname(faker.company().name())
-                    .avatar(faker.company().logo())
-                    .cover(faker.internet().image())
-                    .noOfFollowers(faker.number().numberBetween(10, 1000))
-                    .noOfFollowing(faker.number().numberBetween(5, 100))
-                    .noOfConnections(faker.number().numberBetween(5, 100))
-                    .size(faker.options().option("Small", "Medium", "Large"))
-                    .website(faker.internet().url())
-                    .ceoName(faker.name().fullName())
-                    .noOfMembers(faker.number().numberBetween(10, 1000))
-                    .yearFounded(faker.number().numberBetween(1980, 2022))
-                    .build();
-            // Seed Contact cho Company
-            Set<Contact> contacts = new HashSet<>();
-            for (int c = 0; c < 2; c++) {
-                Contact contact = Contact.builder()
-                        .value(faker.internet().emailAddress())
-                        .verified(faker.bool().bool())
-                        .isPrimary(c == 0)
-                        .type(ContactType.EMAIL)
-                        .party(company)
-                        .build();
-                contacts.add(contact);
-            }
-            company.setContacts(contacts);
-            // Seed Address cho Company
-            Set<Address> addresses = new HashSet<>();
-            for (int a = 0; a < 1; a++) {
-                Address address = Address.builder()
-                        .name(faker.address().streetAddress())
-                        .country(faker.address().country())
-                        .province(faker.address().state())
-                        .district(faker.address().city())
-                        .ward(faker.address().streetName())
-                        .isPrimary(true)
-                        .party(company)
-                        .build();
-                addresses.add(address);
-            }
-//            company.setAddresses(addresses);
-            companies.add(company);
-        }
-        companyRepository.saveAll(companies);
-
-        // Seed Candidates
-        List<Candidate> candidates = new ArrayList<>();
-        for (int i = 0; i < 20; i++) {
-            Candidate candidate = Candidate.builder()
-                    .tagname(faker.name().username())
-                    .avatar(faker.avatar().image())
-                    .cover(faker.internet().image())
-                    .noOfFollowers(faker.number().numberBetween(10, 1000))
-                    .noOfFollowing(faker.number().numberBetween(5, 100))
-                    .noOfConnections(faker.number().numberBetween(5, 100))
-                    .firstName(faker.name().firstName())
-                    .lastName(faker.name().lastName())
-                    .dateOfBirth(faker.date().birthday(20, 40).toString())
-                    .gender(faker.options().option("Male", "Female", "Other"))
-                    .currentJobTitle(faker.job().title())
-                    .currentCompany(faker.company().name())
-                    .industry(faker.job().field())
-                    .yearsOfExperience(faker.number().numberBetween(1, 20))
-                    .workLocation(faker.address().city())
-                    .isOpenToWork(faker.bool().bool())
-                    .build();
-            // Seed Contact cho Candidate
-            Set<Contact> contacts = new HashSet<>();
-            for (int c = 0; c < 2; c++) {
-                Contact contact = Contact.builder()
-                        .value(faker.internet().emailAddress())
-                        .verified(faker.bool().bool())
-                        .isPrimary(c == 0)
-                        .type(ContactType.EMAIL)
-                        .party(candidate)
-                        .build();
-                contacts.add(contact);
-            }
-            candidate.setContacts(contacts);
-            // Seed Address cho Candidate
-            Set<Address> addresses = new HashSet<>();
-            for (int a = 0; a < 1; a++) {
-                Address address = Address.builder()
-                        .name(faker.address().streetAddress())
-                        .country(faker.address().country())
-                        .province(faker.address().state())
-                        .district(faker.address().city())
-                        .ward(faker.address().streetName())
-//                        .isPrimary(true)
-                        .party(candidate)
-                        .build();
-                addresses.add(address);
-            }
-//            candidate.setAddresses(addresses);
-            candidates.add(candidate);
-        }
-        candidateRepository.saveAll(candidates);
-
-        // Seed Jobs
-        List<Job> jobs = new ArrayList<>();
-        Random random = new Random();
-        for (int i = 0; i < 80; i++) {
-            Company company = companies.get(random.nextInt(companies.size()));
-//            Job job = Job.builder()
-//                    .title(faker.job().title())
-//                    .description(faker.lorem().paragraph())
-//                    .salaryRange(faker.options().option("10-20M", "20-30M", "30-50M"))
-//                    .workArrangement(faker.options().option("Onsite", "Remote", "Hybrid"))
-//                    .postedDate(faker.date().past(30, java.util.concurrent.TimeUnit.DAYS).toString())
-//                    .expiryDate(faker.date().future(60, java.util.concurrent.TimeUnit.DAYS).toString())
-//                    .numberOfPositions(faker.number().numberBetween(1, 10))
-//                    .workLocation(faker.address().city())
-//                    .employmentType(EmploymentType.values()[random.nextInt(EmploymentType.values().length)])
-//                    .status(Status.ACTIVE)
-//                    .isUrgent(faker.bool().bool())
-//                    .jobCategory(i % 2 == 0 ? JobCategory.ENGINEER : JobCategory.BUSINESS)
-//                    .company(company)
-//                    .build();
-//            jobs.add(job);
-        }
-        jobRepository.saveAll(jobs);
-
-        // Seed JobSkill
-        List<JobSkill> jobSkills = new ArrayList<>();
-        for (Job job : jobs) {
-            Set<Skill> jobSkillSet = new HashSet<>();
-            int skillCount = faker.number().numberBetween(3, 6);
-            while (jobSkillSet.size() < skillCount) {
-                jobSkillSet.add(skills.get(random.nextInt(skills.size())));
-            }
-            for (Skill skill : jobSkillSet) {
-                JobSkill jobSkill = JobSkill.builder()
-                        .job(job)
-                        .skill(skill)
-                        .proficiencyLevel(faker.options().option("Beginner", "Intermediate", "Advanced"))
-                        .yearsOfExperience(faker.number().numberBetween(1, 5))
-                        .isRequired(faker.bool().bool())
-                        .build();
-                jobSkills.add(jobSkill);
-            }
-        }
-        jobSkillRepository.saveAll(jobSkills);
-
-        // Seed Applications
-        List<Application> applications = new ArrayList<>();
-        for (int i = 0; i < 100; i++) {
-            Candidate candidate = candidates.get(random.nextInt(candidates.size()));
-            Job job = jobs.get(random.nextInt(jobs.size()));
-            Application application = Application.builder()
-                    .coverLetter(faker.lorem().paragraph())
-                    .resumeUrl(faker.internet().url())
-                    .rating(faker.number().numberBetween(1, 5))
-                    .notes(faker.lorem().sentence())
-                    .appliedDate(faker.date().past(10, java.util.concurrent.TimeUnit.DAYS).toString())
-                    .status(Status.ACTIVE)
-                    .candidate(candidate)
-                    .job(job)
-                    .build();
-            applications.add(application);
-        }
-        applicationRepository.saveAll(applications);
-    }*/
+    public DataSeeder(JdbcTemplate jdbcTemplate, ResourceLoader resourceLoader, DataSource dataSource) {
+        this.jdbcTemplate = jdbcTemplate;
+        this.resourceLoader = resourceLoader;
+        this.dataSource = dataSource;
+    }
 
     @Override
-    public void run(String... args) {
+    public void run(ApplicationArguments args) throws Exception {
+        boolean shouldSeed = false;
 
-        /**
-        List<Job> jobs = jobRepository.findAll();
-        Random random = new Random();
+        try {
+            Integer count = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM jobs", Integer.class);
+            if (count == null || count == 0) {
+                logger.info("Jobs table exists but is empty (count={}), will run seed script.", count);
+                shouldSeed = true;
+            } else {
+                logger.info("Jobs table already has data (count={}), skipping seed.", count);
+            }
+        } catch (Exception ex) {
+            // If the table doesn't exist or query fails, attempt to run seed
+            logger.info("Could not query jobs table (it may not exist yet): {}", ex.getMessage());
+            shouldSeed = true;
+        }
 
-        jobs.stream()
-                .filter(job -> job.getJobCategory() == null)
-                .forEach(job -> {
-                    JobCategory[] categories = JobCategory.values();
-                    JobCategory randomCategory = categories[random.nextInt(categories.length)];
-                    job.setJobCategory(randomCategory);
-                });
-
-        jobRepository.saveAll(jobs);*/
-
-        if (companyRepository.count() > 0 || candidateRepository.count() > 0 || jobRepository.count() > 0) {
+        if (!shouldSeed) {
             return;
         }
 
-        // seed();
+        // Try classpath first, then filesystem relative path
+        Resource resource = resourceLoader.getResource("classpath:init-scripts/mock-data.sql");
+        if (!resource.exists()) {
+            resource = resourceLoader.getResource("file:init-scripts/mock-data.sql");
+        }
+
+        if (!resource.exists()) {
+            logger.warn("Seed file not found at 'classpath:init-scripts/mock-data.sql' or 'init-scripts/mock-data.sql'. Skipping data seeding.");
+            return;
+        }
+
+        // Ensure created_date/last_modified_date have DB defaults so plain INSERTs without
+        // those columns will succeed. This helps when the schema includes NOT NULL and
+        // JPA populates timestamps on persist (but SQL inserts bypass JPA lifecycle).
+        String[] alterDefaults = new String[] {
+            "ALTER TABLE parties ALTER COLUMN created_date SET DEFAULT CURRENT_TIMESTAMP",
+            "ALTER TABLE parties ALTER COLUMN last_modified_date SET DEFAULT CURRENT_TIMESTAMP",
+            "ALTER TABLE companies ALTER COLUMN created_date SET DEFAULT CURRENT_TIMESTAMP",
+            "ALTER TABLE companies ALTER COLUMN last_modified_date SET DEFAULT CURRENT_TIMESTAMP",
+            "ALTER TABLE candidates ALTER COLUMN created_date SET DEFAULT CURRENT_TIMESTAMP",
+            "ALTER TABLE candidates ALTER COLUMN last_modified_date SET DEFAULT CURRENT_TIMESTAMP",
+            "ALTER TABLE accounts ALTER COLUMN created_date SET DEFAULT CURRENT_TIMESTAMP",
+            "ALTER TABLE accounts ALTER COLUMN last_modified_date SET DEFAULT CURRENT_TIMESTAMP",
+            "ALTER TABLE contacts ALTER COLUMN created_date SET DEFAULT CURRENT_TIMESTAMP",
+            "ALTER TABLE contacts ALTER COLUMN last_modified_date SET DEFAULT CURRENT_TIMESTAMP",
+            "ALTER TABLE addresses ALTER COLUMN created_date SET DEFAULT CURRENT_TIMESTAMP",
+            "ALTER TABLE addresses ALTER COLUMN last_modified_date SET DEFAULT CURRENT_TIMESTAMP",
+            "ALTER TABLE skills ALTER COLUMN created_date SET DEFAULT CURRENT_TIMESTAMP",
+            "ALTER TABLE skills ALTER COLUMN last_modified_date SET DEFAULT CURRENT_TIMESTAMP",
+            "ALTER TABLE candidate_skill ALTER COLUMN created_date SET DEFAULT CURRENT_TIMESTAMP",
+            "ALTER TABLE candidate_skill ALTER COLUMN last_modified_date SET DEFAULT CURRENT_TIMESTAMP",
+            "ALTER TABLE educations ALTER COLUMN created_date SET DEFAULT CURRENT_TIMESTAMP",
+            "ALTER TABLE educations ALTER COLUMN last_modified_date SET DEFAULT CURRENT_TIMESTAMP",
+            "ALTER TABLE candidate_education ALTER COLUMN created_date SET DEFAULT CURRENT_TIMESTAMP",
+            "ALTER TABLE candidate_education ALTER COLUMN last_modified_date SET DEFAULT CURRENT_TIMESTAMP",
+            "ALTER TABLE candidate_experience ALTER COLUMN created_date SET DEFAULT CURRENT_TIMESTAMP",
+            "ALTER TABLE candidate_experience ALTER COLUMN last_modified_date SET DEFAULT CURRENT_TIMESTAMP",
+            "ALTER TABLE jobs ALTER COLUMN created_date SET DEFAULT CURRENT_TIMESTAMP",
+            "ALTER TABLE jobs ALTER COLUMN last_modified_date SET DEFAULT CURRENT_TIMESTAMP",
+            "ALTER TABLE applications ALTER COLUMN created_date SET DEFAULT CURRENT_TIMESTAMP",
+            "ALTER TABLE applications ALTER COLUMN last_modified_date SET DEFAULT CURRENT_TIMESTAMP",
+            "ALTER TABLE application_stage_history ALTER COLUMN created_date SET DEFAULT CURRENT_TIMESTAMP",
+            "ALTER TABLE application_stage_history ALTER COLUMN last_modified_date SET DEFAULT CURRENT_TIMESTAMP",
+            "ALTER TABLE connections ALTER COLUMN created_date SET DEFAULT CURRENT_TIMESTAMP",
+            "ALTER TABLE connections ALTER COLUMN last_modified_date SET DEFAULT CURRENT_TIMESTAMP"
+        };
+
+        for (String alt : alterDefaults) {
+            try {
+                jdbcTemplate.execute(alt);
+            } catch (Exception ex) {
+                // Non-fatal: table or column may not exist in all versions; log and continue
+                logger.debug("Could not apply alter default (ignored): {} -> {}", alt, ex.getMessage());
+            }
+        }
+
+        // Read all SQL statements and execute them grouped by table in a deterministic order
+        int successCount = 0;
+        int failCount = 0;
+        try (java.io.InputStream is = resource.getInputStream();
+             java.io.BufferedReader reader = new java.io.BufferedReader(new java.io.InputStreamReader(is))) {
+
+            // 1) Collect statements
+            java.util.List<String> statements = new java.util.ArrayList<>();
+            {
+                StringBuilder sb = new StringBuilder();
+                String line;
+                while ((line = reader.readLine()) != null) {
+                    String trimmed = line.trim();
+                    if (trimmed.startsWith("--") || trimmed.startsWith("/*") || trimmed.isEmpty()) {
+                        continue;
+                    }
+                    sb.append(line).append('\n');
+                    if (trimmed.endsWith(";")) {
+                        String stmt = sb.toString().trim();
+                        if (stmt.endsWith(";")) {
+                            stmt = stmt.substring(0, stmt.length() - 1);
+                        }
+                        statements.add(stmt);
+                        sb.setLength(0);
+                    }
+                }
+                if (sb.length() > 0) {
+                    String trailing = sb.toString().trim();
+                    if (!trailing.isEmpty()) {
+                        statements.add(trailing);
+                    }
+                }
+            }
+
+            // 2) Group by table (works for INSERT INTO ... only)
+            java.util.Map<String, java.util.List<String>> tableToStmts = new java.util.HashMap<>();
+            java.util.regex.Pattern p = java.util.regex.Pattern.compile("(?i)^\\s*INSERT\\s+INTO\\s+([a-zA-Z_][a-zA-Z0-9_]*)\\b");
+            for (String stmt : statements) {
+                java.util.regex.Matcher m = p.matcher(stmt);
+                if (m.find()) {
+                    String table = m.group(1).toLowerCase();
+                    tableToStmts.computeIfAbsent(table, k -> new java.util.ArrayList<>()).add(stmt);
+                } else {
+                    // Non-INSERT statements (if any) execute first
+                    tableToStmts.computeIfAbsent("__misc__", k -> new java.util.ArrayList<>()).add(stmt);
+                }
+            }
+
+            // 3) Deterministic execution order to respect foreign keys
+            String[] order = new String[] {
+                "__misc__",
+                "parties",
+                "companies",
+                "candidates",
+                "accounts",
+                "contacts",
+                "addresses",
+                "skills",
+                "candidate_skill",
+                "educations",
+                "candidate_education",
+                "candidate_experience",
+                "jobs",
+                "applications",
+                "application_stage_history",
+                "connections"
+            };
+
+            for (String table : order) {
+                java.util.List<String> stmts = tableToStmts.get(table);
+                if (stmts == null || stmts.isEmpty()) continue;
+
+                // Log pre-count if table is a real table
+                if (!"__misc__".equals(table)) {
+                    try {
+                        Integer before = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM " + table, Integer.class);
+                        logger.info("Seeding table '{}' (before count={})", table, before);
+                    } catch (Exception ignore) {
+                        logger.info("Seeding table '{}' (count unavailable)", table);
+                    }
+                } else {
+                    logger.info("Executing non-INSERT statements ({} stmts)", stmts.size());
+                }
+
+                for (String stmt : stmts) {
+                    try {
+                        logger.debug("Executing [{}]: {}", table, shorten(stmt, 800));
+                        jdbcTemplate.execute(stmt);
+                        successCount++;
+                    } catch (Exception ex) {
+                        failCount++;
+                        logger.warn("Statement failed for table '{}'(continuing). Error: {}\nStatement: {}", table, ex.getMessage(), shorten(stmt, 1200));
+                    }
+                }
+
+                if (!"__misc__".equals(table)) {
+                    try {
+                        Integer after = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM " + table, Integer.class);
+                        logger.info("Done table '{}' (after count={})", table, after);
+                    } catch (Exception ex) {
+                        logger.info("Done table '{}' (after count unavailable: {})", table, ex.getMessage());
+                    }
+                }
+            }
+
+            logger.info("Seed script executed with {} successful statements and {} failed statements.", successCount, failCount);
+
+        } catch (Exception e) {
+            logger.error("Failed to read/execute seed script: {}", e.getMessage(), e);
+            // As a fallback, try ResourceDatabasePopulator to maximize compatibility
+            try {
+                ResourceDatabasePopulator populator = new ResourceDatabasePopulator(resource);
+                populator.setContinueOnError(true);
+                DatabasePopulatorUtils.execute(populator, dataSource);
+                logger.info("Executed seed script with fallback populator: {}", resource.getDescription());
+            } catch (Exception ex) {
+                logger.error("Fallback populator also failed: {}", ex.getMessage(), ex);
+            }
+        }
+
+        // Re-query job count to confirm seeding effect
+        try {
+            Integer newCount = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM jobs", Integer.class);
+            logger.info("Jobs table count after seeding: {}", newCount);
+        } catch (Exception ex) {
+            logger.warn("Could not query jobs table after seeding: {}", ex.getMessage());
+        }
+    }
+
+    private String shorten(String s, int max) {
+        if (s == null) return null;
+        if (s.length() <= max) return s;
+        return s.substring(0, max) + "...[truncated]";
     }
 }

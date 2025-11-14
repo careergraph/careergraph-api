@@ -1,8 +1,8 @@
 spring:
   datasource:
-    url: ${SPRING_DATASOURCE_URL:}
-    username: ${SPRING_DATASOURCE_USERNAME:}
-    password: ${SPRING_DATASOURCE_PASSWORD:}
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://ep-orange-block-adzbr3pn-pooler.c-2.us-east-1.aws.neon.tech:5432/careergraph?sslmode=require&channel_binding=require}
+    username: ${SPRING_DATASOURCE_USERNAME:neondb_owner}
+    password: ${SPRING_DATASOURCE_PASSWORD:npg_9zips3WrwKxU}
     driver-class-name: org.postgresql.Driver
     hikari:
       maximum-pool-size: 20
@@ -16,7 +16,7 @@ spring:
 
   jpa:
     database-platform: org.hibernate.dialect.PostgreSQLDialect
-    show-sql: false          # Không log SQL ở prod
+    show-sql: true          # Không log SQL ở prod
     hibernate:
       ddl-auto: update
       format_sql: false

@@ -6,6 +6,7 @@ import jakarta.mail.internet.MimeMessage;
 import lombok.RequiredArgsConstructor;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.MimeMessageHelper;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.thymeleaf.context.Context;
 import org.thymeleaf.spring6.SpringTemplateEngine;
@@ -21,6 +22,7 @@ public class MailServiceImpl implements MailService {
     private final SpringTemplateEngine templateEngine;
 
     @Override
+    @Async
     public void sendOtp(String toEmail, String otp) {
         try {
             MimeMessage message = mailSender.createMimeMessage();
@@ -51,6 +53,7 @@ public class MailServiceImpl implements MailService {
     }
 
     @Override
+    @Async
     public void sendApplicationStageUpdateEmail(String toEmail,
                                                 String candidateName,
                                                 String jobTitle,
