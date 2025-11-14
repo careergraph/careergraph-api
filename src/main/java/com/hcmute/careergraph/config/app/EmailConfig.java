@@ -28,7 +28,6 @@ public class EmailConfig {
         props.put("mail.smtp.starttls.enable", String.valueOf(emailProperties.isStarttlsEnable()));
         props.put("mail.transport.protocol", emailProperties.getTransportProtocol());
         props.put("mail.debug", String.valueOf(emailProperties.isDebug()));
-
         return mailSender;
     }
 }

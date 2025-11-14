@@ -153,8 +153,6 @@ public class CandidateController {
                 .build();
     }
 
-
-
     @DeleteMapping("/educations/{educationId}")
     public RestResponse<List<CandidateClientResponse.CandidateEducationResponse>> deleteEducation(@PathVariable String educationId) throws ChangeSetPersister.NotFoundException{
         Candidate candidate = candidateService.deleteEducation(securityUtils.getCandidateId().get(), educationId);

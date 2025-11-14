@@ -1,5 +1,6 @@
 package com.hcmute.careergraph.services.impl;
 
+import com.hcmute.careergraph.enums.common.Role;
 import com.hcmute.careergraph.persistence.models.Account;
 import com.hcmute.careergraph.services.RedisService;
 import com.hcmute.careergraph.services.JwtTokenService;

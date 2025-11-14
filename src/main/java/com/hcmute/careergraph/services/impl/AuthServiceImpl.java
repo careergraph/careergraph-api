@@ -70,7 +70,6 @@ public class AuthServiceImpl implements AuthService {
                 .role(isHR ? Role.HR : Role.USER)
                 .emailVerified(false)
                 .build();
-
         if (!isHR) {
             // Create candidate
             Candidate candidate = Candidate.builder()
@@ -97,7 +96,8 @@ public class AuthServiceImpl implements AuthService {
     private void sendOtp(String email) {
         String otp = generateOtp();
         redisService.setObject(otpKey(email), otp, TIME_OTP_EXPIRED);
-        mailService.sendOtp(email, otp);
+        System.out.println("OTP has been sent to " + otp);
+//        mailService.sendOtp(email, otp);
     }
 
     @Override
@@ -144,9 +144,13 @@ public class AuthServiceImpl implements AuthService {
     public AuthResponses.TokenResponse login(AuthRequests.LoginRequest request) {
         Account account = accountRepository.findByEmail(request.getEmail())
                 .orElseThrow(() -> new AppException(ErrorType.NOT_FOUND, "Account not found"));
+        if(!account.getRole().toString().equalsIgnoreCase(request.getRole())) {
+            throw new AppException(ErrorType.UNAUTHORIZED, "You do not have permission to log in to this account");
+        }
         if (!passwordEncoder.matches(request.getPassword(), account.getPasswordHash())) {
             throw new AppException(ErrorType.UNAUTHORIZED, "Invalid password");
         }
+
 
         if(!account.isEmailVerified()) {
             sendOtp(request.getEmail());
@@ -200,7 +204,6 @@ public class AuthServiceImpl implements AuthService {
             String accountId = jwt.getSubject();
             Account account = accountRepository.findById(accountId)
                     .orElseThrow(() -> new AppException(ErrorType.NOT_FOUND, "Account not found"));
-            
             // Generate new tokens
             String newAccessToken = jwtTokenService.generateAccessToken(account);
             String newRefreshToken = jwtTokenService.generateRefreshToken(account);
@@ -226,7 +229,8 @@ public class AuthServiceImpl implements AuthService {
             throw new AppException(ErrorType.NOT_FOUND, "User not registered yet");
         String otp = generateOtp();
 
-        mailService.sendOtp(request.getEmail(), otp);
+//        mailService.sendOtp(request.getEmail(), otp);
+        System.out.println("otp: " + otp);
         redisService.setObject(otpKey(request.getEmail()), otp, TIME_OTP_EXPIRED);
         return TIME_OTP_EXPIRED;
     }
