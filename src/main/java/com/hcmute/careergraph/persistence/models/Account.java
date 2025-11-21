@@ -4,9 +4,11 @@ import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.hcmute.careergraph.enums.common.Role;
 import jakarta.persistence.*;
+import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+import lombok.ToString;
 import lombok.experimental.SuperBuilder;
 
 @Entity
@@ -15,6 +17,8 @@ import lombok.experimental.SuperBuilder;
 @Setter
 @SuperBuilder
 @NoArgsConstructor
+@ToString(callSuper = true, exclude = {"candidate", "company"})
+@EqualsAndHashCode(callSuper = true, exclude = {"candidate", "company"})
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class Account extends BaseEntity {
 

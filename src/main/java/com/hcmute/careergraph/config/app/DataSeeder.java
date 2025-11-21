@@ -47,14 +47,15 @@ public class DataSeeder implements ApplicationRunner {
             Integer count = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM jobs", Integer.class);
             if (count == null || count == 0) {
                 logger.info("Jobs table exists but is empty (count={}), will run seed script.", count);
-                shouldSeed = true;
+                // CHANGE HERE
+                shouldSeed = false;
             } else {
                 logger.info("Jobs table already has data (count={}), skipping seed.", count);
             }
         } catch (Exception ex) {
             // If the table doesn't exist or query fails, attempt to run seed
             logger.info("Could not query jobs table (it may not exist yet): {}", ex.getMessage());
-            shouldSeed = true;
+            shouldSeed = false;
         }
 
         if (!shouldSeed) {

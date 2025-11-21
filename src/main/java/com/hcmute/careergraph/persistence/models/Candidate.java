@@ -3,12 +3,13 @@ package com.hcmute.careergraph.persistence.models;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.hcmute.careergraph.helper.JsonUtils;
 import jakarta.persistence.*;
+import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+import lombok.ToString;
 import lombok.experimental.SuperBuilder;
 import org.hibernate.annotations.JdbcTypeCode;
-import org.hibernate.procedure.internal.Util;
 import org.hibernate.type.SqlTypes;
 
 import java.util.ArrayList;
@@ -21,6 +22,8 @@ import java.util.Set;
 @Setter
 @SuperBuilder
 @NoArgsConstructor
+@ToString(callSuper = true, exclude = {"account", "connections", "educations", "experiences", "skills", "applications", "contacts", "addresses"})
+@EqualsAndHashCode(callSuper = true, exclude = {"account", "connections", "educations", "experiences", "skills", "applications"})
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class Candidate extends Party {
 
