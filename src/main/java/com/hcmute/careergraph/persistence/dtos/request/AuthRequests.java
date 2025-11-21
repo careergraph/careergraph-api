@@ -54,6 +54,8 @@ public class AuthRequests {
 
         @NotBlank
         private String password;
+
+        private String role;
     }
 
     @Data

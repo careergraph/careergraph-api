@@ -2,6 +2,7 @@ package com.hcmute.careergraph.services;
 
 import com.hcmute.careergraph.enums.common.FileType;
 import com.hcmute.careergraph.persistence.dtos.request.CandidateRequest;
+import com.hcmute.careergraph.persistence.dtos.response.CandidateClientResponse;
 import com.hcmute.careergraph.persistence.models.Candidate;
 import com.hcmute.careergraph.persistence.models.Skill;
 import org.springframework.data.crossstore.ChangeSetPersister;
@@ -36,5 +37,7 @@ public interface CandidateService {
     Candidate deleteEducation(String candidateId, String educationId) throws ChangeSetPersister.NotFoundException;
 
     Candidate replaceSkillsForUser(String candidateId, CandidateRequest.ReplaceSkillsRequest request) throws ChangeSetPersister.NotFoundException;
+    List<CandidateClientResponse.AppliedJobs> getAppliedJobs(String candidateId) throws ChangeSetPersister.NotFoundException;
+    List<CandidateClientResponse.AppliedJobs> getAppliedJobs(String candidateId, String status) throws ChangeSetPersister.NotFoundException;
 
 }
