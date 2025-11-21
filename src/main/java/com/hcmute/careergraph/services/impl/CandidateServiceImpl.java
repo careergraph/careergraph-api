@@ -1,5 +1,6 @@
 package com.hcmute.careergraph.services.impl;
 
+import com.hcmute.careergraph.enums.application.ApplicationStage;
 import com.hcmute.careergraph.enums.candidate.AddressType;
 import com.hcmute.careergraph.enums.candidate.ContactType;
 import com.hcmute.careergraph.enums.common.FileType;
@@ -7,7 +8,9 @@ import com.hcmute.careergraph.enums.common.Status;
 import com.hcmute.careergraph.helper.SecurityUtils;
 import com.hcmute.careergraph.mapper.CandidateEducationMapper;
 import com.hcmute.careergraph.mapper.CandidateExperienceMapper;
+import com.hcmute.careergraph.persistence.dtos.projection.AppliedJobsProjection;
 import com.hcmute.careergraph.persistence.dtos.request.CandidateRequest;
+import com.hcmute.careergraph.persistence.dtos.response.CandidateClientResponse;
 import com.hcmute.careergraph.persistence.models.*;
 import com.hcmute.careergraph.repositories.*;
 import com.hcmute.careergraph.services.CandidateService;
@@ -16,6 +19,10 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.logging.log4j.util.InternalException;
 import org.springframework.data.crossstore.ChangeSetPersister;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
@@ -46,6 +53,10 @@ public class CandidateServiceImpl implements CandidateService {
     private static final int MAX = 20;
     private final SkillRepository skillRepository;
     private final CandidateSkillRepository candidateSkillRepository;
+
+    private final ApplicationServiceImpl applicationServiceImpl;
+    private final ApplicationRepository applicationRepository;
+    private final JobRepository jobRepository;
 
 
     @Override
@@ -398,7 +409,53 @@ public class CandidateServiceImpl implements CandidateService {
         return candidate;
     }
 
+    @Override
+    public List<CandidateClientResponse.AppliedJobs> getAppliedJobs(String candidateId) throws ChangeSetPersister.NotFoundException {
+        List<CandidateClientResponse.AppliedJobs> list = new ArrayList<>();
+        Pageable pageable = PageRequest.of(0, 20, Sort.by("appliedDate").descending());
+        Page<Application> page = applicationServiceImpl.getApplicationsByCandidateWithJob(candidateId, pageable);
+        page.getContent().forEach(application -> {
+            list.add(CandidateClientResponse.AppliedJobs.builder()
+                    .jobName(application.getJob().getTitle())
+                    .companyName(application.getJob().getCompany().getName())
+                    .jobId(application.getJob().getId())
+                    .appliedAt(application.getAppliedDate())
+                    .deadline(application.getJob().getExpiryDate())
+                    .linkResume(application.getResumeUrl())
+                    .status(application.getCurrentStage().toString())
+                    .build()
+            );
+        });
+        return list;
 
+
+    }
+
+    @Override
+    public List<CandidateClientResponse.AppliedJobs> getAppliedJobs(String candidateId, String status) throws ChangeSetPersister.NotFoundException {
+        Pageable pageable = PageRequest.of(0, 5, Sort.by("appliedDate").descending());
+        ApplicationStage aStatus  = null;
+        if(!status.trim().isEmpty()){
+            try {
+                aStatus = ApplicationStage.valueOf(status);
+            }catch (IllegalArgumentException e){
+//                aStatus  = null;
+            }
+        }
+        Page<AppliedJobsProjection> page = applicationRepository.findAppliedJobsAll( aStatus, pageable);
+        return page.getContent().stream()
+                .map(p -> CandidateClientResponse.AppliedJobs.builder()
+                        .jobName(p.getJobName())
+                        .companyName(p.getCompanyName())
+                        .jobId(p.getJobId())
+                        .appliedAt(p.getAppliedAt())
+                        .deadline(p.getDeadline())
+                        .linkResume(p.getLinkResume())
+                        .status(p.getStatus().toString())
+                        .build()
+                )
+                .toList();
+    }
 
 
 }

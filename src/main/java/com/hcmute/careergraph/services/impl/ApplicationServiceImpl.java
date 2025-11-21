@@ -35,6 +35,8 @@ public class ApplicationServiceImpl implements ApplicationService {
     private final JobRepository jobRepository;
     private final MailService mailService;
 
+
+
     private static final String SUBMISSION_NOTE = "Application submitted by candidate";
 
     @Override
@@ -108,6 +110,19 @@ public class ApplicationServiceImpl implements ApplicationService {
     public Page<Application> getApplicationsByCandidate(String candidateId, Pageable pageable) {
         log.info("Getting applications by candidate id: {}", candidateId);
         return applicationRepository.findByCandidateId(candidateId, pageable);
+    }
+    @Override
+    @Transactional(readOnly = true)
+    public Page<Application> getApplicationsByCandidateWithJob(String candidateId, Pageable pageable) {
+//        return applicationRepository.getApplicationsByCandidateWithJob(candidateId, pageable);
+        return applicationRepository.findByJobId("00000000-0000-0000-0000-000000001007", pageable);
+    }
+    @Override
+    @Transactional(readOnly = true)
+    public Page<Application> getApplicationsByCandidateWithJobWithStatus(String candidateId, Pageable pageable, ApplicationStage status) {
+//        return applicationRepository.getApplicationsByCandidateWithJob(candidateId, pageable);
+//        return applicationRepository.getApplicationsByCandidateWithJobWithStatus("00000000-0000-0000-0000-000000001007", pageable,status);
+        return applicationRepository.getAllApplicationsWithStatus(pageable,status);
     }
 
     @Override
