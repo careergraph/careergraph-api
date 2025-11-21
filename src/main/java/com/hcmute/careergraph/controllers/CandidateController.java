@@ -17,6 +17,7 @@ import com.hcmute.careergraph.services.CandidateService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.crossstore.ChangeSetPersister;
+import org.springframework.data.repository.query.Param;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
@@ -153,8 +154,6 @@ public class CandidateController {
                 .build();
     }
 
-
-
     @DeleteMapping("/educations/{educationId}")
     public RestResponse<List<CandidateClientResponse.CandidateEducationResponse>> deleteEducation(@PathVariable String educationId) throws ChangeSetPersister.NotFoundException{
         Candidate candidate = candidateService.deleteEducation(securityUtils.getCandidateId().get(), educationId);
@@ -170,6 +169,14 @@ public class CandidateController {
         return RestResponse.<List<CandidateSkillResponse>>builder()
                 .status(HttpStatus.OK)
                 .data(candidateSkillMapper.toResponseList(candidate.getSkills()))
+                .build();
+    }
+
+    @GetMapping("/applied-jobs")
+    public RestResponse<List<CandidateClientResponse.AppliedJobs>> appliedJobs (@RequestParam(value="status" ,required = false) String status) throws ChangeSetPersister.NotFoundException{
+        return RestResponse.<List<CandidateClientResponse.AppliedJobs>>builder()
+                .status(HttpStatus.OK)
+                .data(candidateService.getAppliedJobs(securityUtils.getCandidateId().get(), status))
                 .build();
     }
 }

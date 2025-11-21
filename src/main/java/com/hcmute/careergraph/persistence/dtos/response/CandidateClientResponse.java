@@ -109,4 +109,15 @@ public final class CandidateClientResponse {
     ) {
     }
 
+    @Builder
+    public record AppliedJobs(
+            String jobName,
+            String jobId,
+            String companyName,
+            String linkResume,
+            String appliedAt,
+            String deadline,
+            String status
+    ){}
+
 }
