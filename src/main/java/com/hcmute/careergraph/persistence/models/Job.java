@@ -7,9 +7,11 @@ import com.hcmute.careergraph.enums.job.JobCategory;
 import com.hcmute.careergraph.enums.common.Status;
 import com.hcmute.careergraph.helper.JsonUtils;
 import jakarta.persistence.*;
+import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+import lombok.ToString;
 import lombok.experimental.SuperBuilder;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
@@ -25,6 +27,8 @@ import java.util.Set;
 @Setter
 @SuperBuilder
 @NoArgsConstructor
+@ToString(callSuper = true, exclude = {"company", "applications"})
+@EqualsAndHashCode(callSuper = true, exclude = {"company", "applications"})
 public class Job extends BaseEntity {
 
     @Column(name = "title", nullable = false, columnDefinition = "TEXT")

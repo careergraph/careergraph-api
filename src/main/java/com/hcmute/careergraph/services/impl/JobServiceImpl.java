@@ -324,6 +324,19 @@ public class JobServiceImpl implements JobService {
         if (type == PartyType.COMPANY) {
             jobs = jobRepository.searchJobForCompany(partyId, statuses, jobCategories, employmentTypes, query, pageable);
         } else {
+
+            /**
+             * 1. API Search nhận input: keyword + filters
+             * 2. Ghi vào bảng candidate_search_history
+             * Tạo embedding → lưu vào cột embedding
+             * 3. Khi trả kết quả:
+             * Personalization service lấy lịch sử để:
+             * Re-rank job
+             * Suggest keyword
+             * Recommend job trên landing page
+             */
+
+
             jobs = jobRepository.searchJobForCandidate(partyId, city, jobCategories, employmentTypes,
                     experienceLevels, educationTypes, query, pageable);
         }
