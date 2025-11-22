@@ -12,6 +12,7 @@ import java.time.Instant;
 @Setter
 @AllArgsConstructor
 public class FileResponse{
+        String id;
         String url;
         String publicId;
         String createdAt;

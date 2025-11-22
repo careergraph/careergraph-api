@@ -29,4 +29,5 @@ public interface ApplicationService {
 
     Page<Application> getApplicationsByCandidateWithJob(String candidateId, Pageable pageable);
     Page<Application> getApplicationsByCandidateWithJobWithStatus(String candidateId, Pageable pageable, ApplicationStage status);
+    boolean existsApplicationsByJobIdAndCandidateId(String jobId, String candidateId);
 }

@@ -85,4 +85,7 @@ public interface ApplicationRepository extends JpaRepository<Application, String
             @Param("status") ApplicationStage status,
             Pageable pageable
     );
+
+
+    boolean existsApplicationsByJobIdAndCandidateId(String jobId, String candidateId);
 }

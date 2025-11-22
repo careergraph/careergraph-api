@@ -89,7 +89,7 @@ public class CloudinaryServiceImpl implements CloudinaryService {
 
             com.hcmute.careergraph.persistence.models.File fileEntity = fileMapper.toFile(result);
             fileEntity.setOwnerId(idd);
-            fileEntity.setOwnerType(PartyType.valueOf(ownerType));
+            fileEntity.setOwnerType(PartyType.fromLabel(ownerType));
             fileEntity.setFileType(fileType);
             fileRepository.save(fileEntity);
 
