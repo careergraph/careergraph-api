@@ -7,6 +7,7 @@ import jakarta.persistence.Converter;
 
 import java.io.IOException;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 
 public class JsonUtils {
@@ -94,4 +95,33 @@ public class JsonUtils {
         }
     }
 
+    @Converter
+    public static class HashMapConverter implements AttributeConverter<HashMap<String, Object>, String> {
+
+        private final ObjectMapper objectMapper = new ObjectMapper();
+
+        @Override
+        public String convertToDatabaseColumn(HashMap<String, Object> attribute) {
+            if (attribute == null || attribute.isEmpty()) {
+                return null;
+            }
+            try {
+                return objectMapper.writeValueAsString(attribute);
+            } catch (Exception e) {
+                throw new IllegalArgumentException("Error converting HashMap to JSON", e);
+            }
+        }
+
+        @Override
+        public HashMap<String, Object> convertToEntityAttribute(String dbData) {
+            if (dbData == null || dbData.isBlank()) {
+                return new HashMap<>();
+            }
+            try {
+                return objectMapper.readValue(dbData, new TypeReference<HashMap<String, Object>>() {});
+            } catch (Exception e) {
+                throw new IllegalArgumentException("Error converting JSON to HashMap", e);
+            }
+        }
+    }
 }

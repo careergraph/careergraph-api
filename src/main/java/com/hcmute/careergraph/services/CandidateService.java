@@ -12,8 +12,6 @@ import java.util.List;
 
 public interface CandidateService {
 
-    String updateResource(String candidateId, MultipartFile file, FileType fileType) throws ChangeSetPersister.NotFoundException;
-
     String getResource(String candidateId, FileType fileType) throws ChangeSetPersister.NotFoundException;
 
     Candidate getMyProfile(String candidateId) throws ChangeSetPersister.NotFoundException;
@@ -37,7 +35,9 @@ public interface CandidateService {
     Candidate deleteEducation(String candidateId, String educationId) throws ChangeSetPersister.NotFoundException;
 
     Candidate replaceSkillsForUser(String candidateId, CandidateRequest.ReplaceSkillsRequest request) throws ChangeSetPersister.NotFoundException;
+
     List<CandidateClientResponse.AppliedJobs> getAppliedJobs(String candidateId) throws ChangeSetPersister.NotFoundException;
+
     List<CandidateClientResponse.AppliedJobs> getAppliedJobs(String candidateId, String status) throws ChangeSetPersister.NotFoundException;
 
 }

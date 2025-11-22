@@ -4,6 +4,7 @@ public enum Role {
     USER,
     ADMIN,
     HR,
+    ASSISTANT
 }
 
 
