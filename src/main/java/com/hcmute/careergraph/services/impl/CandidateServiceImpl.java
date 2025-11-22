@@ -1,5 +1,6 @@
 package com.hcmute.careergraph.services.impl;
 
+import com.cloudinary.utils.ObjectUtils;
 import com.hcmute.careergraph.enums.application.ApplicationStage;
 import com.hcmute.careergraph.enums.candidate.AddressType;
 import com.hcmute.careergraph.enums.candidate.ContactType;
@@ -8,14 +9,18 @@ import com.hcmute.careergraph.enums.common.Status;
 import com.hcmute.careergraph.helper.SecurityUtils;
 import com.hcmute.careergraph.mapper.CandidateEducationMapper;
 import com.hcmute.careergraph.mapper.CandidateExperienceMapper;
+import com.hcmute.careergraph.mapper.CloudFileMapper;
+import com.hcmute.careergraph.mapper.FileMapper;
 import com.hcmute.careergraph.persistence.dtos.projection.AppliedJobsProjection;
 import com.hcmute.careergraph.persistence.dtos.request.CandidateRequest;
 import com.hcmute.careergraph.persistence.dtos.response.CandidateClientResponse;
+import com.hcmute.careergraph.persistence.dtos.response.FileResponse;
 import com.hcmute.careergraph.persistence.models.*;
 import com.hcmute.careergraph.repositories.*;
 import com.hcmute.careergraph.services.CandidateService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.logging.log4j.util.InternalException;
 import org.springframework.data.crossstore.ChangeSetPersister;
 import org.springframework.data.domain.Page;
@@ -26,6 +31,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.io.IOException;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -54,6 +60,8 @@ public class CandidateServiceImpl implements CandidateService {
     private final ApplicationServiceImpl applicationServiceImpl;
     private final ApplicationRepository applicationRepository;
     private final JobRepository jobRepository;
+    private final FileRepository fileRepository;
+    private final FileMapper fileMapper;
 
 
     @Override
@@ -413,6 +421,23 @@ public class CandidateServiceImpl implements CandidateService {
                         .build()
                 )
                 .toList();
+    }
+
+    @Override
+    public List<FileResponse> listFile(String idd, FileType fileType) throws ChangeSetPersister.NotFoundException {
+        List<File> list = fileRepository.findByOwnerIdAndStatus(idd,Status.ACTIVE);
+        return fileMapper.toFileResponses(list);
+    }
+
+    @Override
+    public void deleteByFileId(String candidateId, String fileId) throws ChangeSetPersister.NotFoundException {
+        File file = fileRepository.findById(fileId)
+                .orElseThrow(ChangeSetPersister.NotFoundException::new);
+        if(!Objects.equals(file.getOwnerId(), candidateId)){
+            throw new InternalException("You do not have permission to get this this resource");
+        }
+        file.setStatus(Status.DELETED);
+        fileRepository.save(file);
     }
 
 
