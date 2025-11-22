@@ -15,6 +15,7 @@ import com.hcmute.careergraph.persistence.dtos.response.ApplicationResponse;
 import com.hcmute.careergraph.persistence.dtos.response.JobResponse;
 import com.hcmute.careergraph.persistence.models.Application;
 import com.hcmute.careergraph.persistence.models.Job;
+import com.hcmute.careergraph.repositories.ApplicationRepository;
 import com.hcmute.careergraph.services.ApplicationService;
 import com.hcmute.careergraph.services.JobService;
 import jakarta.validation.Valid;
@@ -44,6 +45,7 @@ public class JobController {
     private final JobMapper jobMapper;
     private final ApplicationMapper applicationMapper;
     private final SecurityUtils securityUtils;
+    private final ApplicationRepository applicationRepository;
 
     // ============================ JOB MANAGEMENT ============================
 
@@ -88,6 +90,14 @@ public class JobController {
 
         Job job = jobService.getJobById(id);
 
+        String candidateId = securityUtils.getCandidateId()
+                .orElse(null);
+
+        boolean applied=false;
+        if(candidateId!=null) {
+            applied = applicationService.existsApplicationsByJobIdAndCandidateId(id,candidateId);
+        }
+        JobResponse jobResponse = jobMapper.toResponse(job);
         return RestResponse.<JobResponse>builder()
                 .status(HttpStatus.OK)
                 .message("Job retrieved successfully")
