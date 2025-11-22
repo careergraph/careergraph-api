@@ -14,7 +14,6 @@ import com.hcmute.careergraph.persistence.dtos.response.CandidateClientResponse;
 import com.hcmute.careergraph.persistence.models.*;
 import com.hcmute.careergraph.repositories.*;
 import com.hcmute.careergraph.services.CandidateService;
-import com.hcmute.careergraph.services.S3StorageService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.logging.log4j.util.InternalException;
@@ -36,8 +35,6 @@ import java.util.stream.Collectors;
 @Slf4j
 public class CandidateServiceImpl implements CandidateService {
 
-    private final S3StorageService storageService;
-
     private final CandidateRepository candidateRepository;
     private final SecurityUtils securityUtils;
 
@@ -58,45 +55,6 @@ public class CandidateServiceImpl implements CandidateService {
     private final ApplicationRepository applicationRepository;
     private final JobRepository jobRepository;
 
-
-    @Override
-    public String updateResource(String candidateId, MultipartFile file, FileType fileType) {
-
-        Candidate candidate = candidateRepository.findById(candidateId)
-                .orElseThrow(() -> new InternalException("Candidate not found"));
-
-        // Check permission
-        if (!securityUtils.getCandidateId().get().equals(candidateId)) {
-            throw new InternalException("You do not have permission to update this candidate");
-        }
-        S3StorageService.StoredFile storedFile;
-        try {
-            storedFile = storageService.uploadCandidateFile(candidateId, fileType, file);
-        } catch (Exception e) {
-            throw new InternalException("Unable to upload candidate resource");
-        }
-
-        String objectKey = storedFile.key();
-
-        if (fileType == FileType.RESUME) {
-            List<String> resumes = candidate.getResumes();
-            if (resumes == null) {
-                resumes = new java.util.ArrayList<>();
-            }
-            resumes.add(objectKey);
-            candidate.setResumes(resumes);
-        }
-        if (fileType == FileType.AVATAR) {
-            candidate.setAvatar(objectKey);
-        }
-        if (fileType == FileType.COVER) {
-            candidate.setCover(objectKey);
-        }
-
-        candidateRepository.save(candidate);
-
-        return storedFile.url();
-    }
 
     @Override
     public String getResource(String candidateId, FileType fileType)

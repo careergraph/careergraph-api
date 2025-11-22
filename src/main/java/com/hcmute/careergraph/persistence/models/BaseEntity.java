@@ -39,11 +39,11 @@ public abstract class BaseEntity {
 
     @CreatedBy
     @Column(name = "created_by")
-    private Long createdBy;
+    private String createdBy;
 
     @LastModifiedBy
     @Column(name = "last_modified_by")
-    private Long lastModifiedBy;
+    private String lastModifiedBy;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false, length = 20, columnDefinition = "varchar(20) default 'ACTIVE'")

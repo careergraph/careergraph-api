@@ -43,11 +43,11 @@ public class CandidateController {
             @RequestParam("type") FileType type,
             @RequestParam("file") MultipartFile file) throws ChangeSetPersister.NotFoundException {
 
-        String objectName = candidateService.updateResource(id, file, type);
+        // String objectName = candidateService.updateResource(id, file, type);
         return RestResponse.<String>builder()
                 .status(HttpStatus.CREATED)
                 .message("Update resource successfully")
-                .data(objectName)
+                .data(null)
                 .build();
     }
 
