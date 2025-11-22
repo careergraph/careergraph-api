@@ -2,6 +2,7 @@ package com.hcmute.careergraph.services;
 
 import com.hcmute.careergraph.enums.common.FileType;
 import com.hcmute.careergraph.persistence.dtos.response.CloudFileResponse;
+import com.hcmute.careergraph.persistence.dtos.response.FileResponse;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
@@ -19,7 +20,7 @@ public interface CloudinaryService {
     /**
      * Upload generic file (cv, document...) and attach metadata (ownerType, idd, fileType).
      */
-    String uploadFile(MultipartFile file, String ownerType, String idd, FileType fileType) throws IOException;
+    FileResponse uploadFile(MultipartFile file, String ownerType, String idd, FileType fileType) throws IOException;
 
     /**
      * Upload video (resource_type = "video"), with owner metadata.
@@ -35,5 +36,5 @@ public interface CloudinaryService {
     /**
      * Delete a file by its public_id (the full Cloudinary public id, e.g. "candidates/123/avatar/uuid_name").
      */
-    boolean deleteByPublicId(String publicId) throws IOException;
+    boolean deleteByPublicId(String candidateId, String publicId) throws IOException;
 }

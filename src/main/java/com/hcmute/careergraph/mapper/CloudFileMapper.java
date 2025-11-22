@@ -5,6 +5,7 @@ import com.hcmute.careergraph.persistence.dtos.response.CloudFileResponse;
 
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
+import java.time.Instant;
 import java.util.*;
 
 /**
@@ -49,7 +50,6 @@ public final class CloudFileMapper {
         r.setSecureUrl(Objects.toString(resource.get("secure_url"), null));
         r.setFormat(Objects.toString(resource.get("format"), null));
         r.setResourceType(Objects.toString(resource.get("resource_type"), null));
-
         Object bytesObj = resource.get("bytes");
         if (bytesObj instanceof Number) {
             r.setBytes(((Number) bytesObj).longValue());
