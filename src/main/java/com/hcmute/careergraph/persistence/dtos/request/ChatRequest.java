@@ -25,4 +25,14 @@ public class ChatRequest {
 
     @JsonProperty("previous_messages")
     private List<String> previousMessages;
+
+    // Request send from UI web
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class ChatMessageRequest {
+        private String message;
+        private String conversationId;
+    }
 }
