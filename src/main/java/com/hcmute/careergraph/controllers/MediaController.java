@@ -1,7 +1,9 @@
 package com.hcmute.careergraph.controllers;
 
 import com.hcmute.careergraph.enums.common.FileType;
+import com.hcmute.careergraph.helper.SecurityUtils;
 import com.hcmute.careergraph.persistence.dtos.response.CloudFileResponse;
+import com.hcmute.careergraph.persistence.dtos.response.FileResponse;
 import com.hcmute.careergraph.services.CloudinaryService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -19,6 +21,7 @@ import java.util.Map;
 public class MediaController {
 
     private final CloudinaryService cloudinaryService;
+    private final SecurityUtils securityUtils;
 
     /**
      * Upload an image (avatar/cover...). Required request params:
@@ -67,19 +70,14 @@ public class MediaController {
      * Upload a generic file (cv, document...). Use fileType e.g. "cv".
      */
     @PostMapping("/file")
-    public ResponseEntity<Map<String, String>> uploadFile(
+    public ResponseEntity<FileResponse> uploadFile(
             @RequestParam("file") MultipartFile file,
             @RequestParam("ownerType") String ownerType,
             @RequestParam("idd") String idd,
             @RequestParam("fileType") FileType fileType
     ) throws IOException {
-        String url = cloudinaryService.uploadFile(file, ownerType, idd, fileType);
-        Map<String, String> response = new HashMap<>();
-        response.put("url", url);
-        response.put("ownerType", ownerType);
-        response.put("idd", idd);
-        response.put("fileType", fileType.name());
-        return ResponseEntity.ok(response);
+        FileResponse result = cloudinaryService.uploadFile(file, ownerType, idd, fileType);
+        return ResponseEntity.ok(result);
     }
 
     /**
@@ -103,7 +101,8 @@ public class MediaController {
      */
     @DeleteMapping
     public ResponseEntity<Map<String, Object>> deleteByPublicId(@RequestParam("publicId") String publicId) throws IOException {
-        boolean deleted = cloudinaryService.deleteByPublicId(publicId);
+        String candidateId = securityUtils.getCandidateId().get();
+        boolean deleted = cloudinaryService.deleteByPublicId(candidateId,publicId);
         Map<String, Object> resp = new HashMap<>();
         resp.put("publicId", publicId);
         resp.put("deleted", deleted);
