@@ -1,0 +1,58 @@
+package com.hcmute.careergraph.persistence.models;
+
+
+import com.hcmute.careergraph.enums.common.FileType;
+import com.hcmute.careergraph.enums.common.PartyType;
+import com.hcmute.careergraph.enums.common.Status;
+import jakarta.mail.Folder;
+import jakarta.persistence.*;
+import lombok.*;
+import org.hibernate.type.EntityType;
+import java.util.Date;
+
+@Getter
+@Setter
+@ToString(callSuper = true, exclude = {})
+@EqualsAndHashCode(callSuper = true, exclude = {})
+@Entity
+@Table(name = "file")
+public class File extends BaseEntity {
+    @Enumerated(EnumType.STRING)
+    @Column(name = "file_type")
+    private FileType fileType;
+
+    @Column(name = "file_path")
+    private String filePath;
+
+    @Column(name = "thumbnail")
+    private String thumbnail;
+
+    @Column(name = "file_name")
+    private String fileName;
+
+    @Column(name = "share_to_find_job")
+    private Boolean shareToFindJob = false; // để kiểm tra là cv này có share để hr tìm không
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "owner_type")
+    private PartyType ownerType;
+
+    @Column (name = "owner_id")
+    private String ownerId;
+
+    @Column (name = "public_id")
+    private String publicId;
+
+    @Column(name = "size_bytes")
+    private Long sizeBytes;
+
+    @Column(name = "mime_type")
+    private String mimeType;   // ví dụ application/pdf
+
+    @Column(name = "resource_type")
+    private String resourceType; // image / video / raw...
+
+    @Column(name = "original_file_name")
+    private String originalFileName;
+
+}
