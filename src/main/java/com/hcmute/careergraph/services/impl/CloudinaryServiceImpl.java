@@ -3,9 +3,15 @@ package com.hcmute.careergraph.services.impl;
 import com.cloudinary.Cloudinary;
 import com.cloudinary.utils.ObjectUtils;
 import com.hcmute.careergraph.enums.common.FileType;
+import com.hcmute.careergraph.enums.common.PartyType;
 import com.hcmute.careergraph.mapper.CloudFileMapper;
+import com.hcmute.careergraph.mapper.FileMapper;
 import com.hcmute.careergraph.persistence.dtos.response.CloudFileResponse;
+import com.hcmute.careergraph.persistence.dtos.response.FileResponse;
+import com.hcmute.careergraph.repositories.FileRepository;
 import com.hcmute.careergraph.services.CloudinaryService;
+import lombok.AllArgsConstructor;
+import lombok.RequiredArgsConstructor;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
@@ -15,6 +21,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.Instant;
 import java.util.*;
 
 /**
@@ -25,30 +32,29 @@ import java.util.*;
  * - upload methods still return secure URL, and store files under folder: {ownerType}/{idd}/{fileType}/
  */
 @Service
+@RequiredArgsConstructor
 public class CloudinaryServiceImpl implements CloudinaryService {
 
     private final Cloudinary cloudinary;
-
-    public CloudinaryServiceImpl(Cloudinary cloudinary) {
-        this.cloudinary = cloudinary;
-    }
+    private final FileRepository fileRepository;
+    private final FileMapper fileMapper;
 
     @Override
     public String uploadImage(MultipartFile file, String ownerType, String idd, FileType fileType) throws IOException {
-        return upload(file, ownerType, idd, fileType, "image", false);
+        return upload(file, ownerType, idd, fileType, "image", false).getUrl();
     }
 
     @Override
     public String uploadVideo(MultipartFile file, String ownerType, String idd, FileType fileType) throws IOException {
-        return upload(file, ownerType, idd, fileType, "video", true);
+        return upload(file, ownerType, idd, fileType, "video", true).getUrl();
     }
 
     @Override
-    public String uploadFile(MultipartFile file, String ownerType, String idd, FileType fileType) throws IOException {
+    public FileResponse uploadFile(MultipartFile file, String ownerType, String idd, FileType fileType) throws IOException {
         return upload(file, ownerType, idd, fileType, "auto", false);
     }
 
-    private String upload(MultipartFile file,
+    private FileResponse upload(MultipartFile file,
                           String ownerType,
                           String idd,
                           FileType fileType,
@@ -80,17 +86,21 @@ public class CloudinaryServiceImpl implements CloudinaryService {
         try {
             @SuppressWarnings("unchecked")
             Map<String, Object> result = cloudinary.uploader().upload(uploadFile, uploadOptions);
-            String secureUrl = Objects.toString(result.get("secure_url"), null);
-            if (secureUrl != null) {
-                return secureUrl;
-            }
+
+            com.hcmute.careergraph.persistence.models.File fileEntity = fileMapper.toFile(result);
+            fileEntity.setOwnerId(idd);
+            fileEntity.setOwnerType(PartyType.valueOf(ownerType));
+            fileEntity.setFileType(fileType);
+            fileRepository.save(fileEntity);
+
             // fallback: construct url from public id
-            String fullPublicId = folder + "/" + publicIdBase;
-            if (useResourceType) {
-                return cloudinary.url().resourceType(resourceType).generate(fullPublicId);
-            } else {
-                return cloudinary.url().generate(fullPublicId);
-            }
+//            String fullPublicId = folder + "/" + publicIdBase;
+//            String generatedUrl = useResourceType
+//                    ? cloudinary.url().resourceType(resourceType).generate(fullPublicId)
+//                    : cloudinary.url().generate(fullPublicId);
+
+            return fileMapper.toFileResponse(fileEntity);
+
         } finally {
             cleanDisk(uploadFile);
         }
@@ -126,10 +136,31 @@ public class CloudinaryServiceImpl implements CloudinaryService {
     }
 
     @Override
-    public boolean deleteByPublicId(String publicId) throws IOException {
-        if (StringUtils.isBlank(publicId)) {
-            throw new IllegalArgumentException("publicId is required");
+    public boolean deleteByPublicId(String candidateId, String publicId) throws IOException {
+        if (StringUtils.isAnyBlank(candidateId, publicId)) {
+            throw new IllegalArgumentException("candidateId and publicId are required");
         }
+
+        // Ví dụ publicId:
+        // candidates/{candidateId}/RESUME/uuid_safeName
+        String[] parts = publicId.split("/");
+        if (parts.length < 3) {
+            throw new IllegalArgumentException("Invalid publicId format");
+        }
+
+        String ownerType = parts[0];   // "candidates"
+        String ownerId   = parts[1];   // a8655fcc-...
+
+        // 1) bắt buộc đúng ownerType
+        if (!"candidates".equals(ownerType)) {
+            throw new SecurityException("You are not allowed to delete this resource");
+        }
+
+        // 2) ownerId trong publicId phải trùng candidateId của user đang xóa
+        if (!candidateId.equals(ownerId)) {
+            throw new SecurityException("You are not allowed to delete this file");
+        }
+
         try {
             @SuppressWarnings("unchecked")
             Map<String, Object> res = cloudinary.uploader().destroy(publicId, ObjectUtils.emptyMap());
