@@ -24,9 +24,9 @@ spring:
       hibernate.jdbc.time_zone: UTC
 
   redis:
-    host: ${SPRING_REDIS_HOST:}
+    host: ${SPRING_REDIS_HOST:skilled-badger-17572.upstash.io}
     port: ${SPRING_REDIS_PORT:6379}
-    password: ${SPRING_REDIS_PASSWORD:}
+    password: ${SPRING_REDIS_PASSWORD:AUSkAAIncDI4MTFjYzEzNGJhMjc0NjMyYWMzYWU2YTQxZGM0OTJlNnAyMTc1NzI}
     ssl: ${SPRING_REDIS_SSL:true}
     timeout: 2000ms
     database: 0
