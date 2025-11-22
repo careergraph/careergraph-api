@@ -3,11 +3,13 @@ package com.hcmute.careergraph.services;
 import com.hcmute.careergraph.enums.common.FileType;
 import com.hcmute.careergraph.persistence.dtos.request.CandidateRequest;
 import com.hcmute.careergraph.persistence.dtos.response.CandidateClientResponse;
+import com.hcmute.careergraph.persistence.dtos.response.FileResponse;
 import com.hcmute.careergraph.persistence.models.Candidate;
 import com.hcmute.careergraph.persistence.models.Skill;
 import org.springframework.data.crossstore.ChangeSetPersister;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.io.IOException;
 import java.util.List;
 
 public interface CandidateService {
@@ -40,4 +42,7 @@ public interface CandidateService {
 
     List<CandidateClientResponse.AppliedJobs> getAppliedJobs(String candidateId, String status) throws ChangeSetPersister.NotFoundException;
 
+    List<FileResponse> listFile(String idd, FileType fileType) throws ChangeSetPersister.NotFoundException;
+
+    void deleteByFileId(String candidateId, String fileId) throws ChangeSetPersister.NotFoundException;
 }

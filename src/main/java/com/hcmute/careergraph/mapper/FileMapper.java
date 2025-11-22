@@ -2,16 +2,14 @@ package com.hcmute.careergraph.mapper;
 
 import com.cloudinary.utils.StringUtils;
 import com.hcmute.careergraph.persistence.dtos.response.FileResponse;
+import com.hcmute.careergraph.persistence.models.CandidateEducation;
 import com.hcmute.careergraph.persistence.models.File;
 import org.springframework.stereotype.Component;
 
-import java.time.Instant;
-import java.time.LocalDate;
-import java.time.LocalDateTime;
-import java.time.ZoneId;
-import java.util.Date;
-import java.util.Map;
-import java.util.Objects;
+import java.time.*;
+import java.time.format.DateTimeFormatter;
+import java.util.*;
+import java.util.stream.Collectors;
 
 @Component
 public class FileMapper {
@@ -94,6 +92,7 @@ public class FileMapper {
         }
 
         return FileResponse.builder()
+                .id(file.getId())
                 // URL file trên Cloudinary (hoặc nơi lưu trữ)
                 .url(file.getFilePath())
 
@@ -128,5 +127,13 @@ public class FileMapper {
                 .shareToFileJob(Boolean.TRUE.equals(file.getShareToFindJob()))
 
                 .build();
+    }
+
+    public List<FileResponse> toFileResponses(List<File> files) {
+        if(files==null || files.isEmpty()) return null;
+        return  files.stream()
+                .sorted(Comparator.comparing(File::getCreatedDate).reversed())
+                .map(this::toFileResponse)
+                .collect(Collectors.toList());
     }
 }

@@ -19,11 +19,15 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.data.crossstore.ChangeSetPersister;
 import org.springframework.data.repository.query.Param;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.io.IOException;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("candidates")
@@ -178,5 +182,13 @@ public class CandidateController {
                 .status(HttpStatus.OK)
                 .data(candidateService.getAppliedJobs(securityUtils.getCandidateId().get(), status))
                 .build();
+    }
+    @DeleteMapping("/media")
+    public ResponseEntity<Map<String, Object>> deleteByPublicId(@RequestParam("fileId") String fileId) throws IOException, ChangeSetPersister.NotFoundException {
+        String candidateId = securityUtils.getCandidateId().get();
+        candidateService.deleteByFileId(candidateId,fileId);
+        Map<String, Object> resp = new HashMap<>();
+        resp.put("fileId", fileId);
+        return ResponseEntity.ok(resp);
     }
 }

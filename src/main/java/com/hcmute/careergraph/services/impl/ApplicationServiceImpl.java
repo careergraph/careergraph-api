@@ -126,6 +126,11 @@ public class ApplicationServiceImpl implements ApplicationService {
     }
 
     @Override
+    public boolean existsApplicationsByJobIdAndCandidateId(String jobId, String candidateId) {
+        return applicationRepository.existsApplicationsByJobIdAndCandidateId(jobId, candidateId);
+    }
+
+    @Override
     @Transactional(readOnly = true)
     public Page<Application> getApplicationsByJob(String jobId, Pageable pageable) {
         log.info("Getting applications by job id: {}", jobId);
