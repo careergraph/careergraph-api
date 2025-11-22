@@ -1,6 +1,7 @@
 package com.hcmute.careergraph.persistence.models;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.hcmute.careergraph.enums.common.PartyType;
 import jakarta.persistence.*;
 import lombok.*;
 import lombok.experimental.SuperBuilder;
@@ -26,10 +27,13 @@ public class ChatConversation extends BaseEntity {
     @Column(name = "last_message_at")
     private LocalDateTime lastMessageAt;
 
-    @Column(name = "total_messages")
-    @Builder.Default
-    private Integer totalMessages = 0;
-
     @OneToMany(mappedBy = "chatConversation", orphanRemoval = true, cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     private List<ChatMessage> messages = new ArrayList<>();
+
+    @Column(name = "party_type")
+    @Enumerated(EnumType.STRING)
+    private PartyType partyType;
+
+    @Column(name = "party_id")
+    private String partyId;
 }

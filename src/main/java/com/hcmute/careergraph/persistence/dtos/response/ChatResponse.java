@@ -23,6 +23,10 @@ public class ChatResponse {
     @JsonProperty("related_jobs")
     private List<RelatedJobResponse> relatedJobs;
 
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
     public static class RelatedJobResponse {
         @JsonProperty("job_id")
         private String jobId;

@@ -2,6 +2,7 @@ package com.hcmute.careergraph.mapper;
 
 import com.hcmute.careergraph.enums.common.Status;
 import com.hcmute.careergraph.persistence.dtos.request.JobCreationRequest;
+import com.hcmute.careergraph.persistence.dtos.response.ChatResponse;
 import com.hcmute.careergraph.persistence.dtos.response.JobResponse;
 import com.hcmute.careergraph.persistence.models.Company;
 import com.hcmute.careergraph.persistence.models.Job;
@@ -172,5 +173,21 @@ public class JobMapper {
         return jobs.stream()
                 .map(this::toResponse)
                 .collect(Collectors.toList());
+    }
+
+    public List<ChatResponse.RelatedJobResponse> toRelatedJobResponse(Job relatedJob) {
+        if (relatedJob == null) {
+            return null;
+        }
+
+        return (List<ChatResponse.RelatedJobResponse>) ChatResponse.RelatedJobResponse.builder()
+                .jobId(relatedJob.getId())
+                .salary(relatedJob.getSalaryRange())
+                .location(relatedJob.getCity())
+                .title(relatedJob.getTitle())
+                .company(relatedJob.getCompany().getName())
+                .description(relatedJob.getDescription())
+                .requirements(relatedJob.getResponsibilities())
+                .build();
     }
 }
