@@ -45,4 +45,6 @@ public interface CandidateService {
     List<FileResponse> listFile(String idd, FileType fileType) throws ChangeSetPersister.NotFoundException;
 
     void deleteByFileId(String candidateId, String fileId) throws ChangeSetPersister.NotFoundException;
+
+    CandidateClientResponse.CandidateProfileResponse getOverview(String candidateId) throws ChangeSetPersister.NotFoundException;
 }
