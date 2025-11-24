@@ -440,5 +440,12 @@ public class CandidateServiceImpl implements CandidateService {
         fileRepository.save(file);
     }
 
+    @Override
+    public CandidateClientResponse.CandidateProfileResponse getOverview(String candidateId) throws ChangeSetPersister.NotFoundException {
+//        return candidateRepository.findById(candidateId)
+//                .orElseThrow(ChangeSetPersister.NotFoundException::new);;
+        return null;
+    }
+
 
 }

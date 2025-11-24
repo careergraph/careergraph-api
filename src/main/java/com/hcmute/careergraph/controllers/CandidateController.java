@@ -25,6 +25,9 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
+import java.time.LocalDate;
+import java.time.Period;
+import java.time.YearMonth;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -183,6 +186,35 @@ public class CandidateController {
                 .data(candidateService.getAppliedJobs(securityUtils.getCandidateId().get(), status))
                 .build();
     }
+    @GetMapping("/{candidateId}/overview")
+    public RestResponse<CandidateClientResponse.Overview> getOverview (@PathVariable(value="candidateId") String candidateId) throws ChangeSetPersister.NotFoundException{
+        Candidate candidate = candidateService.getMyProfile(candidateId);
+
+        CandidateClientResponse.Overview overview = CandidateClientResponse.Overview.builder()
+                .profile(candidateMapper.toProfileResponse(candidate))
+                .jobCriteria(candidateMapper.toJobCriteriaResponse(candidate))
+                .skills(candidateSkillMapper.toResponseList(candidate.getSkills()))
+                .educations(candidateEducationMapper.toResponses(candidate.getEducations()))
+                .build();
+        return RestResponse.<CandidateClientResponse.Overview>builder()
+                .status(HttpStatus.OK)
+                .data(overview)
+                .build();
+    }
+    @GetMapping("/{candidateId}/experience")
+    public RestResponse<CandidateClientResponse.OverviewExperience> getExperience (@PathVariable(value="candidateId") String candidateId) throws ChangeSetPersister.NotFoundException{
+        Candidate candidate = candidateService.getMyProfile(candidateId);
+        List<CandidateClientResponse.CandidateExperienceResponse> exs = candidateExperienceMapper.toResponses(candidate.getExperiences());
+        CandidateClientResponse.OverviewExperience overviewExperience =  CandidateClientResponse.OverviewExperience.builder()
+                .experiences(exs)
+                .totalYear(calcTotalYearsSimple(exs))
+                .build();
+        return RestResponse.<CandidateClientResponse.OverviewExperience>builder()
+                .status(HttpStatus.OK)
+                .data(overviewExperience)
+                .build();
+    }
+
     @DeleteMapping("/media")
     public ResponseEntity<Map<String, Object>> deleteByPublicId(@RequestParam("fileId") String fileId) throws IOException, ChangeSetPersister.NotFoundException {
         String candidateId = securityUtils.getCandidateId().get();
@@ -191,4 +223,29 @@ public class CandidateController {
         resp.put("fileId", fileId);
         return ResponseEntity.ok(resp);
     }
+
+    private double calcTotalYearsSimple(List<CandidateClientResponse.CandidateExperienceResponse> exps) {
+        if (exps == null || exps.isEmpty()) return 0;
+
+        long totalMonths = 0;
+
+        for (var exp : exps) {
+            if (exp.startDate() == null) continue;
+
+            YearMonth start = YearMonth.parse(exp.startDate());
+            YearMonth end = Boolean.TRUE.equals(exp.isCurrent())
+                    ? YearMonth.now()
+                    : YearMonth.parse(exp.endDate() == null || exp.endDate().isBlank()
+                    ? YearMonth.now().toString()
+                    : exp.endDate());
+
+            long months = end.getYear() * 12 + end.getMonthValue()
+                    - (start.getYear() * 12 + start.getMonthValue());
+
+            totalMonths += Math.max(0, months);
+        }
+
+        return Math.round((totalMonths / 12.0) * 10) / 10.0;
+    }
+
 }
