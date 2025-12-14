@@ -16,8 +16,11 @@ import com.hcmute.careergraph.persistence.dtos.response.JobResponse;
 import com.hcmute.careergraph.persistence.models.Application;
 import com.hcmute.careergraph.persistence.models.Job;
 import com.hcmute.careergraph.repositories.ApplicationRepository;
+import com.hcmute.careergraph.repositories.SavedJobRepository;
 import com.hcmute.careergraph.services.ApplicationService;
+import com.hcmute.careergraph.services.CandidateService;
 import com.hcmute.careergraph.services.JobService;
+import com.hcmute.careergraph.services.SavedJobService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -35,9 +38,9 @@ import java.util.List;
 import java.util.Map;
 
 @RestController
-@RequestMapping("jobs")
 @RequiredArgsConstructor
 @Slf4j
+@RequestMapping("jobs")
 public class JobController {
 
     private final JobService jobService;
@@ -46,6 +49,8 @@ public class JobController {
     private final ApplicationMapper applicationMapper;
     private final SecurityUtils securityUtils;
     private final ApplicationRepository applicationRepository;
+    private final SavedJobService savedJobService;
+    private final CandidateService candidateService;
 
     // ============================ JOB MANAGEMENT ============================
 
@@ -84,26 +89,29 @@ public class JobController {
      * @param id Job ID
      * @return RestResponse<JobResponse>
      */
-    @GetMapping("/{id}")
-    public RestResponse<JobResponse> getJobById(@PathVariable String id) {
-        log.info("GET /api/v1/jobs/{} - Fetching job", id);
+        @GetMapping("/{id}")
+        public RestResponse<JobResponse> getJobById(@PathVariable String id) {
+            log.info("GET /api/v1/jobs/{} - Fetching job", id);
 
-        Job job = jobService.getJobById(id);
+            Job job = jobService.getJobById(id);
 
-        String candidateId = securityUtils.getCandidateId()
-                .orElse(null);
+            String candidateId = securityUtils.getCandidateId().orElse(null);
 
-        boolean applied=false;
-        if(candidateId!=null) {
-            applied = applicationService.existsApplicationsByJobIdAndCandidateId(id,candidateId);
+            boolean applied=false;
+            if(candidateId!=null) {
+                applied = applicationService.existsApplicationsByJobIdAndCandidateId(id,candidateId);
+            }
+            boolean idSaved = false;
+            if(candidateId!=null) {
+                idSaved =savedJobService.existsByCandidateIdAndJobId(candidateId,id);
+            }
+            JobResponse jobResponse = jobMapper.toResponseWithStatusAppliedAndLiked(job, applied,idSaved);
+            return RestResponse.<JobResponse>builder()
+                    .status(HttpStatus.OK)
+                    .message("Job retrieved successfully")
+                    .data(jobResponse)
+                    .build();
         }
-        JobResponse jobResponse = jobMapper.toResponse(job);
-        return RestResponse.<JobResponse>builder()
-                .status(HttpStatus.OK)
-                .message("Job retrieved successfully")
-                .data(jobMapper.toResponse(job))
-                .build();
-    }
 
     /**
      * GET /api/v1/jobs
@@ -503,10 +511,37 @@ public class JobController {
                 .data(applicationMapper.toResponse(application, false))
                 .build();
     }
+    @PostMapping("/{candidateId}/{jobId}")
+    public RestResponse<Void> saveJob(
+            @PathVariable("candidateId") String candidateId,
+            @PathVariable("jobId") String jobId){
+        savedJobService.saveJob(candidateId, jobId);
+        return RestResponse.<Void>builder()
+                .status(HttpStatus.OK)
+                .message("Lưu công việc thành công")
+                .build();
+    }
+    @DeleteMapping("/{candidateId}/{jobId}")
+    public RestResponse<Void> unsavedJob(
+            @PathVariable("candidateId") String candidateId,
+            @PathVariable("jobId") String  jobId){
+        savedJobService.unsaveJob(candidateId, jobId);
+        return RestResponse.<Void>builder()
+                .status(HttpStatus.OK)
+                .message("Hủy lưu công việc thành công")
+                .build();
 
+    }
+    @GetMapping("/candidate/{candidateId}")
+    public RestResponse<List<JobResponse>> getSavedJobs(@PathVariable String candidateId) {
+        List<Job> list = candidateService.getSavedJobs(candidateId);
+        return RestResponse.<List<JobResponse>>builder()
+                .status(HttpStatus.OK)
+                .data(jobMapper.toResponseListWithStatusSaved(list))
+                .build();
+    }
 
     // ============================ HELPER METHOD ============================
-
     // Helper method to map to response page
     private Page<JobResponse> mapToJobResponsePage(Page<Job> jobPage, Pageable pageable) {
         List<JobResponse> jobResponses = jobPage.stream()

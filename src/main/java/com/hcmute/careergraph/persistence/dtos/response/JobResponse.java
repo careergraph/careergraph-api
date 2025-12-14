@@ -22,6 +22,9 @@ public record JobResponse(
         String companyAvatar,
         String companyName,
 
+        boolean isApplied,
+        boolean isSaved,
+
         // Arrays
         List<String> responsibilities,
         List<String> qualifications,

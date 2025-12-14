@@ -15,6 +15,7 @@ public enum ApplicationStage {
     SCREENING("Profile screening"),
     INTERVIEW("Interview"),
     HR_CONTACTED("HR contacted"),
+    SCHEDULED("Scheduled"),
     INTERVIEW_SCHEDULED("Interview scheduled"),
     INTERVIEW_COMPLETED("Interview completed"),
     TRIAL("Trial period"),

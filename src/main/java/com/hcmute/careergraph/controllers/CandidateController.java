@@ -4,15 +4,14 @@ import com.hcmute.careergraph.enums.common.FileType;
 import com.hcmute.careergraph.exception.BadRequestException;
 import com.hcmute.careergraph.helper.RestResponse;
 import com.hcmute.careergraph.helper.SecurityUtils;
-import com.hcmute.careergraph.mapper.CandidateEducationMapper;
-import com.hcmute.careergraph.mapper.CandidateExperienceMapper;
-import com.hcmute.careergraph.mapper.CandidateMapper;
-import com.hcmute.careergraph.mapper.CandidateSkillMapper;
+import com.hcmute.careergraph.mapper.*;
 import com.hcmute.careergraph.persistence.dtos.request.CandidateRequest;
 import com.hcmute.careergraph.persistence.dtos.response.CandidateClientResponse;
 import com.hcmute.careergraph.persistence.dtos.response.CandidateResponse;
 import com.hcmute.careergraph.persistence.dtos.response.CandidateSkillResponse;
+import com.hcmute.careergraph.persistence.dtos.response.JobResponse;
 import com.hcmute.careergraph.persistence.models.Candidate;
+import com.hcmute.careergraph.persistence.models.Job;
 import com.hcmute.careergraph.services.CandidateService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -28,6 +27,7 @@ import java.io.IOException;
 import java.time.LocalDate;
 import java.time.Period;
 import java.time.YearMonth;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -43,6 +43,7 @@ public class CandidateController {
     private final CandidateExperienceMapper candidateExperienceMapper;
     private final CandidateEducationMapper candidateEducationMapper;
     private final CandidateSkillMapper candidateSkillMapper;
+    private final JobMapper jobMapper;
 
     @PostMapping("/{id}/files")
     public RestResponse<String> uploadFile(
@@ -184,6 +185,18 @@ public class CandidateController {
         return RestResponse.<List<CandidateClientResponse.AppliedJobs>>builder()
                 .status(HttpStatus.OK)
                 .data(candidateService.getAppliedJobs(securityUtils.getCandidateId().get(), status))
+                .build();
+    }
+    @GetMapping("/saved-jobs")
+    public RestResponse<List<JobResponse>> savedJobs () throws ChangeSetPersister.NotFoundException{
+
+        List<Job> list = candidateService.getSavedJobs(securityUtils.getCandidateId().get());
+        List<JobResponse> listResponse = list.stream()
+                .map( j -> jobMapper.toResponseWithStatusAppliedAndLiked(j, false,true))
+                .toList();
+        return RestResponse.<List<JobResponse>>builder()
+                .status(HttpStatus.OK)
+                .data(listResponse)
                 .build();
     }
     @GetMapping("/{candidateId}/overview")
