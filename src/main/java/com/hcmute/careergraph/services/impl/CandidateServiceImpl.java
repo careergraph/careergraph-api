@@ -39,7 +39,7 @@ import java.util.stream.Collectors;
 @Transactional
 @RequiredArgsConstructor
 @Slf4j
-public class CandidateServiceImpl implements CandidateService {
+public  class CandidateServiceImpl implements CandidateService {
 
     private final CandidateRepository candidateRepository;
     private final SecurityUtils securityUtils;
