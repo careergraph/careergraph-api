@@ -22,7 +22,7 @@ import java.util.Set;
 @Setter
 @SuperBuilder
 @NoArgsConstructor
-@ToString(callSuper = true, exclude = {"account", "connections", "educations", "experiences", "skills", "applications", "contacts", "addresses"})
+@ToString(callSuper = true, exclude = {"account", "connections", "educations", "experiences", "skills", "applications", "contacts", "addresses", "saved_jobs"})
 @EqualsAndHashCode(callSuper = true, exclude = {"account", "connections", "educations", "experiences", "skills", "applications"})
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class Candidate extends Party {
@@ -123,5 +123,8 @@ public class Candidate extends Party {
     private List<String> workTypes = new ArrayList<>();
 
 
+    @OneToMany(mappedBy = "candidate", cascade = CascadeType.ALL, orphanRemoval = true)
+    @Column(name = "saved_jobs")
+    private List<SavedJob> savedJobs = new ArrayList<>();
 
 }

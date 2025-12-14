@@ -86,6 +86,22 @@ public interface ApplicationRepository extends JpaRepository<Application, String
             Pageable pageable
     );
 
+    @Query("""
+        SELECT
+            j.title          AS jobName,
+            c.name           AS companyName,
+            j.id             AS jobId,
+            a.appliedDate    AS appliedAt,
+            j.expiryDate     AS deadline,
+            a.resumeUrl      AS linkResume,
+            a.currentStage   AS status
+        FROM Application a
+        JOIN a.job j
+        JOIN j.company c
+        WHERE a.candidate.id =:candidateId and (:status IS NULL OR a.currentStage = :status)
+    """)
+    Page<AppliedJobsProjection> findAppliedJobsAllByCandidateId(@Param("candidateId") String candidateId,@Param("status") ApplicationStage status, Pageable pageable);
+
 
     boolean existsApplicationsByJobIdAndCandidateId(String jobId, String candidateId);
 }
