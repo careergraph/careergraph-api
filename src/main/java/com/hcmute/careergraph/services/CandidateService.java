@@ -5,6 +5,7 @@ import com.hcmute.careergraph.persistence.dtos.request.CandidateRequest;
 import com.hcmute.careergraph.persistence.dtos.response.CandidateClientResponse;
 import com.hcmute.careergraph.persistence.dtos.response.FileResponse;
 import com.hcmute.careergraph.persistence.models.Candidate;
+import com.hcmute.careergraph.persistence.models.Job;
 import com.hcmute.careergraph.persistence.models.Skill;
 import org.springframework.data.crossstore.ChangeSetPersister;
 import org.springframework.web.multipart.MultipartFile;
@@ -47,4 +48,6 @@ public interface CandidateService {
     void deleteByFileId(String candidateId, String fileId) throws ChangeSetPersister.NotFoundException;
 
     CandidateClientResponse.CandidateProfileResponse getOverview(String candidateId) throws ChangeSetPersister.NotFoundException;
+
+    List<Job> getSavedJobs(String candidateId);
 }

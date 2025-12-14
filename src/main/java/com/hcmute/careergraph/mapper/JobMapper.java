@@ -162,6 +162,81 @@ public class JobMapper {
                 .build();
     }
 
+    public JobResponse toResponseWithStatusAppliedAndLiked(Job job, boolean isApplied, boolean isSaved) {
+        if (job == null) {
+            return null;
+        }
+
+        return JobResponse.builder()
+                // Basic Info
+                .id(job.getId())
+                .title(job.getTitle())
+                .description(job.getDescription())
+                .department(job.getDepartment())
+
+                // Basic info company
+                .companyId(job.getCompany().getId())
+                .companyAvatar(job.getCompany().getAvatar())
+                .companyName(job.getCompany().getName())
+
+                // Arrays
+                .responsibilities(job.getResponsibilities())
+                .qualifications(job.getQualifications())
+                .minimumQualifications(job.getMinimumQualifications())
+                .benefits(job.getBenefits())
+
+                // Experience
+                .minExperience(job.getMinExperience())
+                .maxExperience(job.getMaxExperience())
+                .experienceLevel(job.getExperienceLevel())
+
+                // Job Type & Category
+                .employmentType(job.getEmploymentType())
+                .type(job.getEmploymentType()) // UI dùng 'type' thay vì 'employmentType'
+                .jobCategory(job.getJobCategory())
+                .education(job.getEducation())
+
+                // Location
+                .state(job.getState())
+                .city(job.getCity())
+                .district(job.getDistrict())
+                .specific(job.getAddress()) // Map 'address' -> 'specific' cho UI
+                .remoteJob(job.isRemoteJob())
+
+                // Skills
+                .skills(Collections.emptyList())
+
+                // Compensation & Contact
+                .salaryRange(job.getSalaryRange())
+                .contactEmail(job.getContactEmail())
+                .contactPhone(job.getContactPhone())
+
+                // Posting Info
+                .postedDate(job.getPostedDate())
+                .expiryDate(job.getExpiryDate())
+                .numberOfPositions(job.getNumberOfPositions())
+                .promotionType(job.getPromotionType())
+                .status(job.getStatus())
+
+                // Stats
+                .views(job.getViews())
+                .applicants(job.getApplications().size())
+                .saved(job.getSaved())
+                .likes(job.getLiked())
+                .shares(job.getShared())
+
+                // Application recruiment
+                .resume(job.getResume())
+                .coverLetter(job.getCoverLetter())
+
+                // Timeline - null for now, có thể implement sau
+                .timeline(null)
+                .isApplied(isApplied)
+                .isSaved(isSaved)
+
+                .build();
+    }
+
     /**
      * Convert list of Job entities sang list JobResponse
      */
@@ -172,6 +247,15 @@ public class JobMapper {
 
         return jobs.stream()
                 .map(this::toResponse)
+                .collect(Collectors.toList());
+    }
+    public List<JobResponse> toResponseListWithStatusSaved(List<Job> jobs) {
+        if (jobs == null || jobs.isEmpty()) {
+            return Collections.emptyList();
+        }
+
+        return jobs.stream()
+                .map(job -> toResponseWithStatusAppliedAndLiked(job, false, true))
                 .collect(Collectors.toList());
     }
 

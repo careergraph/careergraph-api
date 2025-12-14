@@ -246,6 +246,7 @@ public class ApplicationServiceImpl implements ApplicationService {
 
         return switch (stage) {
             case APPLIED -> SUBMISSION_NOTE;
+            case SCHEDULED -> "Your interview has been scheduled.";
             case SCREENING -> "We are reviewing your profile.";
             case INTERVIEW -> "Your interview has been send. Pls check your email.";
             case HR_CONTACTED -> "Our HR team will reach out shortly.";

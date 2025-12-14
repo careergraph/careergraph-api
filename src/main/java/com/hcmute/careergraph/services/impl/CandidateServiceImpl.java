@@ -62,6 +62,7 @@ public class CandidateServiceImpl implements CandidateService {
     private final JobRepository jobRepository;
     private final FileRepository fileRepository;
     private final FileMapper fileMapper;
+    private final SavedJobRepository savedJobRepository;
 
 
     @Override
@@ -399,7 +400,8 @@ public class CandidateServiceImpl implements CandidateService {
 
     @Override
     public List<CandidateClientResponse.AppliedJobs> getAppliedJobs(String candidateId, String status) throws ChangeSetPersister.NotFoundException {
-        Pageable pageable = PageRequest.of(0, 5, Sort.by("appliedDate").descending());
+//        Pageable pageable = PageRequest.of(0, 5, Sort.by("appliedDate").descending());
+        Pageable pageable = PageRequest.of(0, 100, Sort.by("appliedDate").descending());
         ApplicationStage aStatus  = null;
         if(!status.trim().isEmpty()){
             try {
@@ -408,7 +410,7 @@ public class CandidateServiceImpl implements CandidateService {
 //                aStatus  = null;
             }
         }
-        Page<AppliedJobsProjection> page = applicationRepository.findAppliedJobsAll( aStatus, pageable);
+        Page<AppliedJobsProjection> page = applicationRepository.findAppliedJobsAllByCandidateId(candidateId,aStatus, pageable);
         return page.getContent().stream()
                 .map(p -> CandidateClientResponse.AppliedJobs.builder()
                         .jobName(p.getJobName())
@@ -445,6 +447,11 @@ public class CandidateServiceImpl implements CandidateService {
 //        return candidateRepository.findById(candidateId)
 //                .orElseThrow(ChangeSetPersister.NotFoundException::new);;
         return null;
+    }
+
+    @Override
+    public List<Job> getSavedJobs(String candidateId) {
+        return savedJobRepository.findAllByCandidateId(candidateId);
     }
 
 
