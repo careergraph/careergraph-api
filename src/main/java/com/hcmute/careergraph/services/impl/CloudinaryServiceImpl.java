@@ -8,28 +8,27 @@ import com.hcmute.careergraph.mapper.CloudFileMapper;
 import com.hcmute.careergraph.mapper.FileMapper;
 import com.hcmute.careergraph.persistence.dtos.response.CloudFileResponse;
 import com.hcmute.careergraph.persistence.dtos.response.FileResponse;
+import com.hcmute.careergraph.persistence.models.File;
 import com.hcmute.careergraph.repositories.FileRepository;
 import com.hcmute.careergraph.services.CloudinaryService;
-import lombok.AllArgsConstructor;
 import lombok.RequiredArgsConstructor;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
+import com.cloudinary.AuthToken;
 
-import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.time.Instant;
 import java.util.*;
 
 /**
- * Cloudinary service implementation updated to use CloudFileMapper and CloudFileResponse.
+ * Cloudinary service implementation
  *
- * - Method parameter name for owner id is "idd" (as requested).
- * - listFiles(...) now returns mapped CloudFileResponse objects using CloudFileMapper.
- * - upload methods still return secure URL, and store files under folder: {ownerType}/{idd}/{fileType}/
+ * - Upload image / video / raw (PDF, DOCX...)
+ * - ALWAYS use secure_url returned by Cloudinary
+ * - Store resource_type to avoid wrong URL generation (401)
  */
 @Service
 @RequiredArgsConstructor
@@ -39,82 +38,118 @@ public class CloudinaryServiceImpl implements CloudinaryService {
     private final FileRepository fileRepository;
     private final FileMapper fileMapper;
 
-    @Override
-    public String uploadImage(MultipartFile file, String ownerType, String idd, FileType fileType) throws IOException {
-        return upload(file, ownerType, idd, fileType, "image", false).getUrl();
-    }
+    /* ================= UPLOAD IMAGE ================= */
 
     @Override
-    public String uploadVideo(MultipartFile file, String ownerType, String idd, FileType fileType) throws IOException {
-        return upload(file, ownerType, idd, fileType, "video", true).getUrl();
+    public String uploadImage(MultipartFile file, String ownerType, String idd, FileType fileType)
+            throws IOException {
+        return uploadInternal(file, ownerType, idd, fileType, "image").getUrl();
     }
+
+    /* ================= UPLOAD VIDEO ================= */
 
     @Override
-    public FileResponse uploadFile(MultipartFile file, String ownerType, String idd, FileType fileType) throws IOException {
-        return upload(file, ownerType, idd, fileType, "auto", false);
+    public String uploadVideo(MultipartFile file, String ownerType, String idd, FileType fileType)
+            throws IOException {
+        return uploadInternal(file, ownerType, idd, fileType, "video").getUrl();
     }
 
-    private FileResponse upload(MultipartFile file,
-                          String ownerType,
-                          String idd,
-                          FileType fileType,
-                          String resourceType,
-                          boolean useResourceType) throws IOException {
+    /* ================= UPLOAD FILE (PDF / DOCX) ================= */
 
-        if (file == null || file.isEmpty()) {
-            throw new IOException("File is null or empty");
+    @Override
+    public FileResponse uploadFile(MultipartFile file, String ownerType, String idd, FileType fileType)
+            throws IOException {
+        return uploadInternal(file, ownerType, idd, fileType, "raw");
+    }
+
+    /* ================= CORE ================= */
+
+    private FileResponse uploadInternal(
+            MultipartFile multipart,
+            String ownerType,
+            String idd,
+            FileType fileType,
+            String resourceType
+    ) throws IOException {
+
+        if (multipart == null || multipart.isEmpty()) {
+            throw new IllegalArgumentException("File is empty");
         }
         if (StringUtils.isAnyBlank(ownerType, idd) || fileType == null) {
-            throw new IllegalArgumentException("ownerType, idd and fileType are required");
+            throw new IllegalArgumentException("Invalid params");
         }
 
-        String originalFilename = file.getOriginalFilename();
-        assert originalFilename != null;
+        String folder = ownerType + "/" + idd + "/" + fileType.name();
+        String original = Objects.requireNonNull(multipart.getOriginalFilename());
+        String safeName = original.replaceAll("[^a-zA-Z0-9.\\-_]", "_");
+        String publicId = UUID.randomUUID() + "_" + safeName;
 
-        String folder = StringUtils.join(ownerType, "/", idd, "/", fileType.name());
-        String safeName = sanitizeFilename(getBaseName(originalFilename));
-        String publicIdBase = StringUtils.join(UUID.randomUUID().toString(), "_", safeName);
-        File uploadFile = convertToTempFile(file, getExtension(originalFilename));
-
-        Map<String, Object> uploadOptions = ObjectUtils.asMap(
-                "folder", folder,
-                "public_id", publicIdBase,
-                "resource_type", resourceType,
-                "tags", String.join(",", buildTags(ownerType, idd, fileType))
-        );
+        Path tmp = Files.createTempFile("upload_", "_" + safeName);
+        multipart.transferTo(tmp);
 
         try {
+            Map<String, Object> options = ObjectUtils.asMap(
+                    "resource_type", resourceType,   // image | video | raw
+                    "folder", folder,
+                    "public_id", publicId,
+                    "overwrite", false,
+                    "access_mode", "public"          // 🔥 BẮT BUỘC → KHÔNG 401
+            );
+
             @SuppressWarnings("unchecked")
-            Map<String, Object> result = cloudinary.uploader().upload(uploadFile, uploadOptions);
+            Map<String, Object> result =
+                    cloudinary.uploader().upload(tmp.toFile(), options);
 
-            com.hcmute.careergraph.persistence.models.File fileEntity = fileMapper.toFile(result);
-            fileEntity.setOwnerId(idd);
-            fileEntity.setOwnerType(PartyType.fromLabel(ownerType));
-            fileEntity.setFileType(fileType);
-            fileRepository.save(fileEntity);
+            File entity = fileMapper.toFile(result);
+            entity.setOwnerId(idd);
+            entity.setOwnerType(PartyType.fromLabel(ownerType));
+            entity.setFileType(fileType);
 
-            // fallback: construct url from public id
-//            String fullPublicId = folder + "/" + publicIdBase;
-//            String generatedUrl = useResourceType
-//                    ? cloudinary.url().resourceType(resourceType).generate(fullPublicId)
-//                    : cloudinary.url().generate(fullPublicId);
-
-            return fileMapper.toFileResponse(fileEntity);
+            fileRepository.save(entity);
+            return fileMapper.toFileResponse(entity);
 
         } finally {
-            cleanDisk(uploadFile);
+            Files.deleteIfExists(tmp);
         }
     }
 
+    /* ================= DELETE ================= */
+
     @Override
-    public List<CloudFileResponse> listFiles(String ownerType, String idd, FileType fileType) throws IOException {
+    public boolean deleteByPublicId(String candidateId, String publicId) throws IOException {
+
+        if (StringUtils.isAnyBlank(candidateId, publicId)) {
+            throw new IllegalArgumentException("Invalid params");
+        }
+
+        if (!publicId.startsWith("candidate/" + candidateId + "/")) {
+            throw new SecurityException("Not allowed");
+        }
+
+        @SuppressWarnings("unchecked")
+        Map<String, Object> res =
+                cloudinary.uploader().destroy(publicId, ObjectUtils.emptyMap());
+
+        String r = Objects.toString(res.get("result"), "");
+        return "ok".equalsIgnoreCase(r) || "deleted".equalsIgnoreCase(r);
+    }
+
+    /* ======================= LIST ======================= */
+
+    @Override
+    public List<CloudFileResponse> listFiles(
+            String ownerType,
+            String idd,
+            FileType fileType
+    ) throws IOException {
+
         if (StringUtils.isAnyBlank(ownerType, idd)) {
             throw new IllegalArgumentException("ownerType and idd are required");
         }
 
-        String prefix = (fileType == null || fileType.name().isBlank())
-                ? StringUtils.join(ownerType, "/", idd, "/")
-                : StringUtils.join(ownerType, "/", idd, "/", fileType, "/");
+        String prefix = (fileType == null)
+                ? ownerType + "/" + idd + "/"
+                : ownerType + "/" + idd + "/" + fileType.name() + "/";
 
         Map<String, Object> params = ObjectUtils.asMap(
                 "type", "upload",
@@ -127,54 +162,24 @@ public class CloudinaryServiceImpl implements CloudinaryService {
             Map<String, Object> resp = cloudinary.api().resources(params);
 
             @SuppressWarnings("unchecked")
-            List<Map<String, Object>> resources = (List<Map<String, Object>>) resp.get("resources");
-            // Map Cloudinary resource maps into CloudFileResponse using CloudFileMapper
+            List<Map<String, Object>> resources =
+                    (List<Map<String, Object>>) resp.get("resources");
+
             return CloudFileMapper.mapList(resources, ownerType, idd, fileType);
+
         } catch (Exception e) {
-            throw new IOException("Failed to list Cloudinary resources: " + e.getMessage(), e);
+            throw new IOException("Failed to list Cloudinary resources", e);
         }
     }
+    /* ======================= HELPERS ======================= */
 
-    @Override
-    public boolean deleteByPublicId(String candidateId, String publicId) throws IOException {
-        if (StringUtils.isAnyBlank(candidateId, publicId)) {
-            throw new IllegalArgumentException("candidateId and publicId are required");
-        }
+    private java.io.File convertToTempFile(MultipartFile file, String extension)
+            throws IOException {
 
-        // Ví dụ publicId:
-        // candidates/{candidateId}/RESUME/uuid_safeName
-        String[] parts = publicId.split("/");
-        if (parts.length < 3) {
-            throw new IllegalArgumentException("Invalid publicId format");
-        }
+        String suffix = (extension == null || extension.isBlank())
+                ? ""
+                : "." + extension;
 
-        String ownerType = parts[0];   // "candidates"
-        String ownerId   = parts[1];   // a8655fcc-...
-
-        // 1) bắt buộc đúng ownerType
-        if (!"candidates".equals(ownerType)) {
-            throw new SecurityException("You are not allowed to delete this resource");
-        }
-
-        // 2) ownerId trong publicId phải trùng candidateId của user đang xóa
-        if (!candidateId.equals(ownerId)) {
-            throw new SecurityException("You are not allowed to delete this file");
-        }
-
-        try {
-            @SuppressWarnings("unchecked")
-            Map<String, Object> res = cloudinary.uploader().destroy(publicId, ObjectUtils.emptyMap());
-            String result = Objects.toString(res.get("result"), "");
-            return "ok".equalsIgnoreCase(result) || "deleted".equalsIgnoreCase(result);
-        } catch (Exception e) {
-            throw new IOException("Failed to delete resource: " + e.getMessage(), e);
-        }
-    }
-
-    /* ------------------- helpers ------------------- */
-
-    private File convertToTempFile(MultipartFile file, String extension) throws IOException {
-        String suffix = (extension == null || extension.isBlank()) ? "" : "." + extension;
         Path tmp = Files.createTempFile("upload_", suffix);
         try (InputStream is = file.getInputStream()) {
             Files.copy(is, tmp, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
@@ -182,35 +187,36 @@ public class CloudinaryServiceImpl implements CloudinaryService {
         return tmp.toFile();
     }
 
-    private void cleanDisk(File file) {
+    private void cleanDisk(java.io.File file) {
         if (file == null) return;
         try {
-            Path filePath = file.toPath();
-            Files.deleteIfExists(filePath);
-        } catch (IOException e) {
-            System.err.println("Failed to delete temp file: " + e.getMessage());
+            Files.deleteIfExists(file.toPath());
+        } catch (IOException ignored) {
         }
     }
 
     private List<String> buildTags(String ownerType, String idd, FileType fileType) {
-        String typeName = (fileType == null) ? "" : fileType.name();
-        return Arrays.asList("owner:" + idd, "type:" + typeName, "ownerType:" + ownerType);
+        return List.of(
+                "owner:" + idd,
+                "ownerType:" + ownerType,
+                "type:" + fileType.name()
+        );
     }
 
     private String sanitizeFilename(String s) {
-        if (s == null) return "file";
-        return s.replaceAll("[^a-zA-Z0-9\\-_]", "_");
+        return (s == null) ? "file" : s.replaceAll("[^a-zA-Z0-9\\-_]", "_");
     }
 
     private String getBaseName(String originalName) {
-        if (originalName == null) return "file";
         int idx = originalName.lastIndexOf('.');
         return (idx == -1) ? originalName : originalName.substring(0, idx);
     }
 
     private String getExtension(String originalName) {
-        if (originalName == null) return "";
         int idx = originalName.lastIndexOf('.');
         return (idx == -1) ? "" : originalName.substring(idx + 1);
     }
+
+
+
 }
