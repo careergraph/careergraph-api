@@ -42,7 +42,8 @@ spring:
     multipart:
       max-file-size: 10MB
       max-request-size: 20MB
-
+  elasticsearch:
+    uris: http://localhost:9200
 integration:
   s3:
     endpoint: ${INTEGRATION_S3_ENDPOINT:}

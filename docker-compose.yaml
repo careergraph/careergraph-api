@@ -86,3 +86,31 @@ services:
     ports:
       - "8080:8080"
     restart: unless-stopped
+
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.15.5
+    container_name: spring_elasticsearch
+    environment:
+      - node.name=es01
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+      - cluster.name=demo-cluster
+      - bootstrap.memory_lock=true
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+      - ELASTIC_PASSWORD=elastic
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+    ports:
+      - "9200:9200"
+      - "9300:9300"
+    networks:
+      - spring-network
+    healthcheck:
+      test: [ "CMD-SHELL", "curl -s http://elasticsearch:9200/_cluster/health | grep '\"status\":\"green\\|yellow\"'" ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    volumes:
+      - es_dt:/usr/share/elasticsearch/data

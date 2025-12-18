@@ -336,7 +336,7 @@ public class JobController {
         if (candidateId == null) {
             recommendationJobs = jobService.getJobsForAnonymousUser();
         } else {
-            recommendationJobs = jobService.getJobsPersonalized(candidateId);
+            recommendationJobs = jobService.getJobsPersonalizedES(candidateId);
         }
 
         return RestResponse.<List<JobResponse>>builder()

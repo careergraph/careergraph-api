@@ -1,5 +1,7 @@
 package com.hcmute.careergraph.services.impl;
 
+import co.elastic.clients.elasticsearch.core.SearchResponse;
+import co.elastic.clients.elasticsearch.core.search.Hit;
 import com.hcmute.careergraph.enums.common.PartyType;
 import com.hcmute.careergraph.enums.common.Status;
 import com.hcmute.careergraph.enums.job.EducationType;
@@ -9,14 +11,17 @@ import com.hcmute.careergraph.enums.job.JobCategory;
 import com.hcmute.careergraph.exception.BadRequestException;
 import com.hcmute.careergraph.exception.NotFoundException;
 import com.hcmute.careergraph.mapper.JobMapper;
+import com.hcmute.careergraph.persistence.documents.JobES;
 import com.hcmute.careergraph.persistence.dtos.request.JobCreationRequest;
 import com.hcmute.careergraph.persistence.dtos.request.JobFilterRequest;
 import com.hcmute.careergraph.persistence.dtos.request.JobRecruimentRequest;
+import com.hcmute.careergraph.persistence.models.Candidate;
 import com.hcmute.careergraph.persistence.models.Company;
 import com.hcmute.careergraph.persistence.models.Job;
 import com.hcmute.careergraph.repositories.CandidateRepository;
 import com.hcmute.careergraph.repositories.CompanyRepository;
 import com.hcmute.careergraph.repositories.JobRepository;
+import com.hcmute.careergraph.services.JobESService;
 import com.hcmute.careergraph.services.JobService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -24,6 +29,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.security.core.userdetails.User;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -40,6 +46,7 @@ public class JobServiceImpl implements JobService {
     private final CompanyRepository companyRepository;
     private final CandidateRepository candidateRepository;
     private final JobMapper jobMapper;
+    private final JobESService jobESService;
 
     private final Integer PAGE_SIZE_PERSONAL_JOB = 8;
 
@@ -225,7 +232,7 @@ public class JobServiceImpl implements JobService {
         }
 
         // Check if candidate exists
-        candidateRepository.findById(userId)
+        Candidate candidate = candidateRepository.findById(userId)
                 .orElseThrow(() -> new NotFoundException("Candidate not found with id: " + userId));
 
         // Get current date for filtering expired jobs
@@ -245,6 +252,44 @@ public class JobServiceImpl implements JobService {
         result.addAll(extraJobs);
 
         return result;
+    }
+
+
+    @Transactional(readOnly = true)
+    @Override
+    public List<Job> getJobsPersonalizedES(String userId) {
+
+        // Validate userId
+        if (userId == null || userId.trim().isEmpty()) {
+            throw new IllegalArgumentException("User ID cannot be null or empty");
+        }
+
+        // Check if candidate exists
+        Candidate candidate = candidateRepository.findById(userId)
+                .orElseThrow(() -> new NotFoundException("Candidate not found with id: " + userId));
+
+        String keyword = _genKey(candidate);
+        // Get current date for filtering expired jobs
+        Pageable  pageable = PageRequest.of(0, 6);
+
+        SearchResponse<JobES> listSearch = jobESService.searchJobsByNavtiveAndFuzzy(keyword, pageable);
+
+        List<String> esIds = listSearch.hits().hits().stream()
+                .map(Hit::id)
+                .toList();
+        return  jobRepository.findAllById(esIds)
+                .stream()
+                .sorted(Comparator.comparingInt(p -> esIds.indexOf(p.getId())))
+                .toList();
+
+    }
+
+    private String _genKey(Candidate candidate) {
+        StringBuilder  sb = new StringBuilder();
+        sb.append(candidate.getLocations());
+        sb.append(candidate.getDesiredPosition());
+        sb.append(candidate.getIndustries());
+        return sb.toString();
     }
 
     @Override

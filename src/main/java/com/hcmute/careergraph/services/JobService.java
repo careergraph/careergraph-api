@@ -42,6 +42,8 @@ public interface JobService {
 
     List<Job> getJobsPersonalized(String userId);
 
+    List<Job> getJobsPersonalizedES(String userId);
+
     List<Job> getJobsForAnonymousUser();
 
     List<Job> getJobsPopular();
