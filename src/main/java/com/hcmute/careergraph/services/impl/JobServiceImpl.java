@@ -20,11 +20,12 @@ import com.hcmute.careergraph.persistence.models.Company;
 import com.hcmute.careergraph.persistence.models.Job;
 import com.hcmute.careergraph.repositories.CandidateRepository;
 import com.hcmute.careergraph.repositories.CompanyRepository;
+import com.hcmute.careergraph.repositories.JobESRepository;
 import com.hcmute.careergraph.repositories.JobRepository;
-import com.hcmute.careergraph.services.JobESService;
-import com.hcmute.careergraph.services.JobService;
+import com.hcmute.careergraph.services.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.ai.embedding.EmbeddingModel;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
@@ -49,11 +50,17 @@ public class JobServiceImpl implements JobService {
     private final JobESService jobESService;
 
     private final Integer PAGE_SIZE_PERSONAL_JOB = 8;
+    private final EmbeddingModel embeddingModel;
+    private final EmbedService embedService;
+    private final JobESRepository jobESRepository;
+    private final QueryEnrichmentService  queryEnrichmentService;
+
+    private final HuggingFaceEmbeddingService huggingFaceEmbeddingService;
 
     /**
      * Tạo job mới
      *
-     * @param request JobCreationRequest từ client
+     * @param request   JobCreationRequest từ client
      * @param companyId ID của công ty đăng job (lấy từ authenticated user)
      * @return JobResponse chứa thông tin job vừa tạo
      * @throws NotFoundException nếu company không tồn tại
@@ -69,12 +76,68 @@ public class JobServiceImpl implements JobService {
 
         // 3. Map request -> entity
         Job job = jobMapper.toEntity(request, company);
-
+//        JobES jobES = JobES.builder()
+//                .id(job.getId().toString())
+//                .title(queryEnrichmentService.normalizeToEnglish(job.getTitle()))
+////                .title(job.getTitle())
+//                .description(job.getDescription())
+//                .state(job.getState())
+////                .expiredDate(job.getExpiryDate())
+//                .embedding(embedService.embed(
+////                        """
+////                            Job title: %s.
+////                            Job description: %s.
+////                            Location: %s.
+////                            """.formatted(
+////                                job.getTitle(),
+////                                job.getDescription(),
+////                                job.getState()
+////                        )
+//                        """
+//                            %s
+//                            %s
+//                            %s
+//                            """.formatted(
+//                                job.getTitle(),
+//                                job.getDescription(),
+//                                job.getState()
+//                        )
+////                        job.getTitle() + " " +
+////                                job.getDescription() + " "
+////                                + job.getState()
+//                ))
+//                .build();
+        JobES jobES = JobES.builder()
+                .id(job.getId())
+                .title(job.getTitle())
+                .description(job.getDescription())
+                .status(job.getStatus().name())
+                .jobCategory(job.getJobCategory().name())
+                .employmentType(job.getEmploymentType().name())
+                .experienceLevel(job.getExperienceLevel().name())
+                .education(job.getEducation().name())
+                .state(job.getState())
+                .city(job.getCity())
+                .companyId(job.getCompany().getId())
+//                .expiredDate(safeParseDate(job.getExpiryDate()))
+                .embedding(embedService.embed(job.getTitle()+ " " +  job.getJobCategory().getDisplayName() + " " + job.getState()))
+                .build();
+        jobESRepository.save(jobES);
         // 4. Lưu vào database
         Job savedJob = jobRepository.save(job);
         log.info("Job created successfully with ID: {}", savedJob.getId());
 
         return savedJob;
+    }
+
+    private LocalDate safeParseDate(String date) {
+        try {
+            return (date == null || date.isBlank())
+                    ? null
+                    : LocalDate.parse(date);
+        } catch (Exception e) {
+            return null; // ES cho phép null
+        }
     }
 
     /**
@@ -152,7 +215,7 @@ public class JobServiceImpl implements JobService {
     /**
      * Publish job
      *
-     * @param jobId: ID of job
+     * @param jobId:     ID of job
      * @param companyId: ID of company
      * @return Job entity
      */
@@ -270,14 +333,14 @@ public class JobServiceImpl implements JobService {
 
         String keyword = _genKey(candidate);
         // Get current date for filtering expired jobs
-        Pageable  pageable = PageRequest.of(0, 6);
+        Pageable pageable = PageRequest.of(0, 6);
 
         SearchResponse<JobES> listSearch = jobESService.searchJobsByNavtiveAndFuzzy(keyword, pageable);
 
         List<String> esIds = listSearch.hits().hits().stream()
                 .map(Hit::id)
                 .toList();
-        return  jobRepository.findAllById(esIds)
+        return jobRepository.findAllById(esIds)
                 .stream()
                 .sorted(Comparator.comparingInt(p -> esIds.indexOf(p.getId())))
                 .toList();
@@ -285,7 +348,7 @@ public class JobServiceImpl implements JobService {
     }
 
     private String _genKey(Candidate candidate) {
-        StringBuilder  sb = new StringBuilder();
+        StringBuilder sb = new StringBuilder();
         sb.append(candidate.getLocations());
         sb.append(candidate.getDesiredPosition());
         sb.append(candidate.getIndustries());
@@ -330,7 +393,7 @@ public class JobServiceImpl implements JobService {
     /**
      * Hàm lấy ra job theo query và company ID
      *
-     * @param query Dữ liệu tìm kiếm
+     * @param query     Dữ liệu tìm kiếm
      * @param companyId ID của company
      * @return Map<ID, Job>
      */
@@ -387,4 +450,64 @@ public class JobServiceImpl implements JobService {
         }
         return jobs;
     }
+
+    @Override
+    public Page<Job> searchEmbed(JobFilterRequest filter, String partyId, String query, Pageable pageable, PartyType type) {
+        // Check company ID
+        if (type == PartyType.COMPANY && partyId == null) {
+            throw new BadRequestException("Company ID is required");
+        }
+        // Get params from filter
+        List<Status> statuses = filter.getStatuses().isEmpty() ? null : filter.getStatuses();
+        List<JobCategory> jobCategories = filter.getJobCategories().isEmpty() ? null : filter.getJobCategories();
+        List<EmploymentType> employmentTypes = filter.getEmploymentTypes().isEmpty() ? null : filter.getEmploymentTypes();
+        List<EducationType> educationTypes = filter.getEducationTypes().isEmpty() ? null : filter.getEducationTypes();
+        List<ExperienceLevel> experienceLevels = filter.getExperienceLevels().isEmpty() ? null : filter.getExperienceLevels();;;
+        String city = filter.getCity();
+
+        Page<Job> jobs = null;
+
+        if (type == PartyType.COMPANY) {
+            jobs = jobRepository.searchJobForCompany(partyId, statuses, jobCategories, employmentTypes, query, pageable);
+        } else {
+            String keyword="";
+            if(partyId==null && (query==null||query.isEmpty())) {
+                List <Job> list = getJobsForAnonymousUser();
+                return new PageImpl<>(list);
+            }
+            if(partyId != null) {
+                Candidate candidate = candidateRepository.findById(partyId)
+                        .orElse(null);
+                if(candidate != null && query.isEmpty()) {
+                    keyword = _genKey(candidate);
+                }
+            }
+
+            if(query != null) keyword = keyword + " " + query;
+//            float[] queryVector = embedService.embed(queryEnrichmentService.normalizeToEnglish(keyword));
+            float[] queryVector = embedService.embed(keyword);
+
+            SearchResponse<JobES> esResponse =
+                    jobESService.knnSearch(queryVector, filter, partyId, pageable, type);
+//            SearchResponse<JobES> esResponse =
+//                    jobESService.knnSearch(queryVector, 10);
+
+            List<String> ids = esResponse.hits().hits()
+                    .stream()
+                    .map(Hit::id)
+                    .toList();
+
+            List<Job> ljobs = jobRepository.findAllById(ids)
+                    .stream()
+                    .sorted(Comparator.comparingInt(j -> ids.indexOf(j.getId())))
+                    .toList();
+
+            assert esResponse.hits().total() != null;
+            long total = esResponse.hits().total().value();
+
+            return new PageImpl<>(ljobs, pageable, total);
+        }
+        return jobs;
+    }
+
 }

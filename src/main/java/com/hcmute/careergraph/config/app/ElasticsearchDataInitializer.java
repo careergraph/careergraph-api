@@ -4,28 +4,31 @@ import com.hcmute.careergraph.persistence.documents.JobES;
 import com.hcmute.careergraph.persistence.models.Job;
 import com.hcmute.careergraph.repositories.JobESRepository;
 import com.hcmute.careergraph.repositories.JobRepository;
+import com.hcmute.careergraph.services.HuggingFaceEmbeddingService;
+import lombok.RequiredArgsConstructor;
+import org.springframework.ai.embedding.Embedding;
+import org.springframework.ai.embedding.EmbeddingModel;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.core.annotation.Order;
 import org.springframework.data.elasticsearch.core.ElasticsearchOperations;
 import org.springframework.stereotype.Component;
 
+import java.time.LocalDate;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.IntStream;
 
 @Component
+@RequiredArgsConstructor
 @Order(1)
 public class ElasticsearchDataInitializer implements CommandLineRunner {
 
     private final JobRepository jobRepository;
     private final JobESRepository jobESRepository;
     private final ElasticsearchOperations elasticsearchOperations; // Cần dùng để kiểm tra sức khỏe ELS
-
-    // Constructor Injection
-    public ElasticsearchDataInitializer(JobRepository jobRepository, JobESRepository jobESRepository, ElasticsearchOperations elasticsearchOperations) {
-        this.jobRepository = jobRepository;
-        this.jobESRepository = jobESRepository;
-        this.elasticsearchOperations = elasticsearchOperations;
-    }
+    private final EmbeddingModel embeddingModel;
+    private final HuggingFaceEmbeddingService huggingFaceEmbeddingService;
+    private static final int EMBEDDING_BATCH_SIZE = 100;
 
     @Override
     public void run(String... args) throws Exception {
@@ -51,18 +54,89 @@ public class ElasticsearchDataInitializer implements CommandLineRunner {
 
 
                 List<Job> allJobs = jobRepository.findAll();
+                List<String> texts = allJobs.stream()
+//                        .map(job -> job.getTitle()
+                                .map(job -> """
+                            %s
+                            %s
+                            %s
+                            """.formatted(
+                                job.getTitle(),
+                                job.getJobCategory().getDisplayName(),
+                                job.getState()
+                        )
+                                )
+                        .toList();
+                System.out.println(texts);
+
+                List<float[]> vectors = new java.util.ArrayList<>();
+
+                for (int start = 0; start < texts.size(); start += EMBEDDING_BATCH_SIZE) {
+                    int end = Math.min(start + EMBEDDING_BATCH_SIZE, texts.size());
+
+                    List<String> batchTexts = texts.subList(start, end);
+
+                    System.out.printf(
+                            "Embedding batch %d - %d (%d items)%n",
+                            start,
+                            end - 1,
+                            batchTexts.size()
+                    );
+
+                    List<float[]> batchVectors =
+                            embeddingModel.embedForResponse(batchTexts)
+                                    .getResults()
+                                    .stream()
+                                    .map(Embedding::getOutput)
+                                    .toList();
+
+                    vectors.addAll(batchVectors);
+                }
+//                List<float[]> vectors =
+//                        embeddingModel.embedForResponse(texts)
+//                                .getResults()
+//                                .stream()
+//                                .map(Embedding::getOutput)
+//                                .toList();
+//                List<float[]> vectors = huggingFaceEmbeddingService.embed(texts);
 
                 // Sử dụng bulk save (saveAll) để tối ưu hiệu suất thay vì save từng cái trong forEach
-                List<JobES> postsToSave = allJobs.stream()
-                        .map(post -> JobES.builder()
-                                .id(post.getId().toString())
-                                .title(post.getTitle())
-                                .description(post.getDescription())
-                                .state(post.getState())
-                                .build())
+//                List<JobES> jobsToSave = IntStream.range(0, allJobs.size())
+//                        .mapToObj(i -> {
+//                            Job job = allJobs.get(i);
+//                            return JobES.builder()
+//                                    .id(job.getId().toString())
+//                                    .title(job.getTitle())
+//                                    .description(job.getDescription())
+//                                    .state(job.getState())
+////                                    .expiredDate(job.getExpiryDate())
+//                                    .embedding(vectors.get(i))
+//                                    .build();
+//                        })
+//                        .toList();
+                List<JobES> jobsToSave = IntStream.range(0, allJobs.size())
+                        .mapToObj(i -> {
+                            Job job = allJobs.get(i);
+                            return JobES.builder()
+                                    .id(job.getId())
+                                    .title(job.getTitle())
+                                    .description(job.getDescription())
+                                    .status(job.getStatus().name())
+                                    .jobCategory(job.getJobCategory().name())
+                                    .employmentType(job.getEmploymentType().name())
+                                    .experienceLevel(job.getExperienceLevel().name())
+                                    .education(job.getEducation().name())
+                                    .state(job.getState())
+                                    .city(job.getCity())
+                                    .companyId(job.getCompany().getId())
+//                                    .expiredDate(safeParseDate(job.getExpiryDate()))
+                                    .embedding(vectors.get(i))
+                                    .build();
+                        })
                         .toList();
 
-                jobESRepository.saveAll(postsToSave);
+
+                jobESRepository.saveAll(jobsToSave);
 
                 System.out.println("Data synchronization complete. Total posts: " + allJobs.size());
                 return; // Thành công, thoát khỏi vòng lặp
@@ -86,6 +160,16 @@ public class ElasticsearchDataInitializer implements CommandLineRunner {
                     // Bạn có thể chọn ném RuntimeException ở đây nếu muốn dừng ứng dụng hoàn toàn
                 }
             }
+        }
+    }
+
+    private LocalDate safeParseDate(String date) {
+        try {
+            return (date == null || date.isBlank())
+                    ? null
+                    : LocalDate.parse(date);
+        } catch (Exception e) {
+            return null; // ES cho phép null
         }
     }
 }
