@@ -30,6 +30,7 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.ArrayList;
@@ -473,11 +474,16 @@ public class JobController {
 
         String companyId = securityUtils.extractCompanyId(authentication);
         String candidateId = securityUtils.extractCandidateId(authentication);
+//        if (authentication != null && (authentication.getPrincipal() instanceof Jwt)){
+//            Jwt jwt = (Jwt) authentication.getPrincipal();
+//            candidateId = jwt.getClaim(candidateId).toString();
+//        }
+
 
         Pageable pageable = PageRequest.of(page, size);
         Page<Job> jobPage = (companyId != null && !companyId.isEmpty())
                 ? jobService.search(filter, companyId, query, pageable, PartyType.COMPANY)
-                : jobService.search(filter, candidateId, query, pageable, PartyType.CANDIDATE);
+                : jobService.searchEmbed(filter, candidateId, query, pageable, PartyType.CANDIDATE);
 
         return RestResponse.<Page<JobResponse>>builder()
                 .status(HttpStatus.OK)

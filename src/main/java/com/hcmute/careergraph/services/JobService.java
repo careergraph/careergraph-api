@@ -53,4 +53,5 @@ public interface JobService {
     Map<String, String> lookup(String companyId, String query);
 
     Page<Job> search(JobFilterRequest filter, String partyId, String query, Pageable pageable, PartyType type);
+    Page<Job> searchEmbed(JobFilterRequest filter, String partyId, String query, Pageable pageable, PartyType type);
 }

@@ -44,6 +44,19 @@ spring:
       max-request-size: 20MB
   elasticsearch:
     uris: http://localhost:9200
+  ai:
+    google:
+      genai:
+        api-key: ${GEMINI_API_KEY}
+        chat:
+          options:
+            model: gemini-2.5-flash
+        embedding:
+          api-key: ${GEMINI_API_KEY}
+        text:
+          options:
+            model: text-embedding-004
+
 integration:
   s3:
     endpoint: ${INTEGRATION_S3_ENDPOINT:}
@@ -76,3 +89,6 @@ management:
   endpoint:
     health:
       show-details: never
+
+huggingface:
+  api-key: ${HUGGING_FACE_KEY}
