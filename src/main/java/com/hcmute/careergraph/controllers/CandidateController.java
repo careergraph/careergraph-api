@@ -237,6 +237,17 @@ public class CandidateController {
         return ResponseEntity.ok(resp);
     }
 
+    @PutMapping("/job-search-status")
+    public RestResponse<Boolean> setJobSearchStatus () throws ChangeSetPersister.NotFoundException{
+
+        Boolean status = candidateService.setJobSearchStatus(securityUtils.getCandidateId().get());
+        return RestResponse.<Boolean>builder()
+                .status(HttpStatus.OK)
+                .message("success")
+                .data(status)
+                .build();
+    }
+
     private double calcTotalYearsSimple(List<CandidateClientResponse.CandidateExperienceResponse> exps) {
         if (exps == null || exps.isEmpty()) return 0;
 

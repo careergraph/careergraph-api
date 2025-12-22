@@ -454,5 +454,14 @@ public  class CandidateServiceImpl implements CandidateService {
         return savedJobRepository.findAllByCandidateId(candidateId);
     }
 
+    @Override
+    public Boolean setJobSearchStatus(String candidateId) throws ChangeSetPersister.NotFoundException {
+        Candidate candidate = candidateRepository.findById(candidateId)
+                .orElseThrow(ChangeSetPersister.NotFoundException::new);
+        candidate.setIsOpenToWork(!candidate.getIsOpenToWork());
+        candidateRepository.save(candidate);
+        return candidate.getIsOpenToWork();
+    }
+
 
 }
