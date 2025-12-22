@@ -37,4 +37,5 @@ public interface CloudinaryService {
      * Delete a file by its public_id (the full Cloudinary public id, e.g. "candidates/123/avatar/uuid_name").
      */
     boolean deleteByPublicId(String candidateId, String publicId) throws IOException;
+
 }
