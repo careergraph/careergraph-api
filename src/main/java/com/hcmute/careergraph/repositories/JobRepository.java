@@ -75,6 +75,7 @@ public interface JobRepository extends JpaRepository<Job, String> {
             AND (NULLIF(TRIM(:query), '') IS NULL OR
                 lower(j.title) LIKE lower(concat('%', :query, '%')) OR
                 lower(j.description) LIKE lower(concat('%', :query, '%')))
+        ORDER BY function('RANDOM')
     """)
     Page<Job> searchJobForCandidate(
             @Param("candidateId") String candidateId,
@@ -119,17 +120,14 @@ public interface JobRepository extends JpaRepository<Job, String> {
 
     @Query("""
         SELECT j
-            FROM Job j
-            JOIN Job target ON target.id = :jobId
-            WHERE j.id <> :jobId
-                AND j.status = 'ACTIVE'
-                AND j.jobCategory = target.jobCategory
-                OR (
-                    j.experienceLevel = target.experienceLevel
-                    OR (j.minExperience <= target.maxExperience
-                        AND j.maxExperience >= target.minExperience))
-                OR CAST(j.postedDate AS date) >= CURRENT_DATE
-            ORDER BY j.postedDate DESC
+        FROM Job j
+        JOIN Job target ON target.id = :jobId
+        WHERE j.id <> :jobId
+            AND j.status = 'ACTIVE'
+            AND j.jobCategory = target.jobCategory
+            AND (j.experienceLevel = target.experienceLevel
+                OR (j.minExperience <= target.maxExperience AND j.maxExperience >= target.minExperience))
+        ORDER BY function('RANDOM')
     """)
     Page<Job> findSimilarJob(@Param("jobId") String jobId, Pageable pageable);
 
