@@ -74,21 +74,12 @@ public class JobESServiceImpl implements JobESService {
                                                                     "title^10",
                                                                     "jobCategory^5",
                                                                     "state^1"
-//                                                                    ,"description"
                                                             )
                                                             .fuzziness("AUTO")
                                                             .type(TextQueryType.MostFields)
                                                     )
                                             )
-                                            // Filter job chưa hết hạn
-//                                            .filter(f -> f
-//                                                    .range(r -> r
-//                                                            .date(d -> d
-//                                                                    .field("expiredDate")
-//                                                                    .gte(today.toString()) // yyyy-MM-dd
-//                                                            )
-//                                                    )
-//                                            )
+
                                     )
                             )
                             .from((int) pageable.getOffset())
@@ -235,40 +226,6 @@ public class JobESServiceImpl implements JobESService {
             return null;
         }
     }
-//    @Override
-//    public SearchResponse<JobES> knnSearch(float[] queryVector, int k) {
-//        try {
-//            SearchResponse<JobES> response = client.search( s -> s
-//                            .index("jobs_es")
-//                            .knn(knn -> knn
-//                                    .field("embedding")
-//                                    .queryVector(toFloatList(queryVector))
-//                                    .k(k)
-//                                    .numCandidates(100)
-////                                    .filter(f-> f
-////                                            .bool(b -> b
-////                                                    .must(m -> m.term( t -> t
-////                                                            .field("isPublic")
-////                                                            .value(true))
-////                                                    )
-////                                                    .must(m -> m.term( t -> t
-////                                                            .field("isDraft")
-////                                                            .value(false)
-////                                                    ))
-////                                            )
-////                                    )
-//
-//                            ),
-//                    JobES .class
-//            );
-//
-//            return response;
-//
-//        } catch (Exception e) {
-//            e.printStackTrace();
-//            return null;
-//        }
-//    }
     private List<Float> toFloatList(float [] vector){
         List<Float> list = new ArrayList<>();
         for(float v : vector)
@@ -277,30 +234,3 @@ public class JobESServiceImpl implements JobESService {
         return list;
     }
 }
-
-//
-//@Override
-//public SearchResponse<PostES> searchPostsByNavtiveAndFuzzy(String key, Pageable pageable) {
-//    try {
-//        // Thực hiện search
-//        SearchResponse<PostES> response = client.search(s -> s
-//                        .index("posts")
-//                        .query(q -> q
-//                                .multiMatch(mm -> mm
-//                                        .query(key)
-//                                        .fields("title^5","description^1","shortDescription^1")
-//                                        .fuzziness("AUTO")
-//                                        .type(TextQueryType.MostFields)
-//                                )
-//                        )
-//                        .from((int) pageable.getOffset())
-//                        .size(pageable.getPageSize()),
-//                PostES.class
-//        );
-//        return response;
-//
-//    } catch (Exception e) {
-//        e.printStackTrace();
-//        return null;
-//    }
-//}
