@@ -12,6 +12,7 @@ public interface MailService {
                                          String companyName,
                                          ApplicationStage stage,
                                          String note);
+    void sendHtml(String to, String subject, String html);
 }
 
 

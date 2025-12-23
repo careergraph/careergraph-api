@@ -15,6 +15,7 @@ import com.hcmute.careergraph.persistence.documents.JobES;
 import com.hcmute.careergraph.persistence.dtos.request.JobCreationRequest;
 import com.hcmute.careergraph.persistence.dtos.request.JobFilterRequest;
 import com.hcmute.careergraph.persistence.dtos.request.JobRecruimentRequest;
+import com.hcmute.careergraph.persistence.event.JobCreatedEvent;
 import com.hcmute.careergraph.persistence.models.Candidate;
 import com.hcmute.careergraph.persistence.models.Company;
 import com.hcmute.careergraph.persistence.models.Job;
@@ -26,6 +27,7 @@ import com.hcmute.careergraph.services.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.embedding.EmbeddingModel;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
@@ -57,6 +59,8 @@ public class JobServiceImpl implements JobService {
 
     private final HuggingFaceEmbeddingService huggingFaceEmbeddingService;
 
+    private final ApplicationEventPublisher publisher;
+
     /**
      * Tạo job mới
      *
@@ -76,37 +80,6 @@ public class JobServiceImpl implements JobService {
 
         // 3. Map request -> entity
         Job job = jobMapper.toEntity(request, company);
-//        JobES jobES = JobES.builder()
-//                .id(job.getId().toString())
-//                .title(queryEnrichmentService.normalizeToEnglish(job.getTitle()))
-////                .title(job.getTitle())
-//                .description(job.getDescription())
-//                .state(job.getState())
-////                .expiredDate(job.getExpiryDate())
-//                .embedding(embedService.embed(
-////                        """
-////                            Job title: %s.
-////                            Job description: %s.
-////                            Location: %s.
-////                            """.formatted(
-////                                job.getTitle(),
-////                                job.getDescription(),
-////                                job.getState()
-////                        )
-//                        """
-//                            %s
-//                            %s
-//                            %s
-//                            """.formatted(
-//                                job.getTitle(),
-//                                job.getDescription(),
-//                                job.getState()
-//                        )
-////                        job.getTitle() + " " +
-////                                job.getDescription() + " "
-////                                + job.getState()
-//                ))
-//                .build();
         JobES jobES = JobES.builder()
                 .id(job.getId())
                 .title(job.getTitle())
@@ -126,7 +99,7 @@ public class JobServiceImpl implements JobService {
         // 4. Lưu vào database
         Job savedJob = jobRepository.save(job);
         log.info("Job created successfully with ID: {}", savedJob.getId());
-
+        publisher.publishEvent(new JobCreatedEvent(savedJob.getId()));
         return savedJob;
     }
 

@@ -88,4 +88,19 @@ public class MailServiceImpl implements MailService {
             throw new RuntimeException("Failed to send application stage update email", e);
         }
     }
+
+    @Override
+    public void sendHtml(String to, String subject, String html) {
+        try {
+            MimeMessage msg = mailSender.createMimeMessage();
+            MimeMessageHelper helper =
+                    new MimeMessageHelper(msg, true, "UTF-8");
+            helper.setTo(to);
+            helper.setSubject(subject);
+            helper.setText(html, true);
+            mailSender.send(msg);
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+    }
 }
