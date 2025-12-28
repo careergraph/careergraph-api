@@ -19,6 +19,7 @@ public record CandidateResponse(
         Integer yearsOfExperience,
         String workLocation,
         Boolean isOpenToWork,
+        Boolean isOpenToNotifyNewJob,
         String summary,
         String resume,
         String tagname,

@@ -239,8 +239,16 @@ public class CandidateController {
 
     @PutMapping("/job-search-status")
     public RestResponse<Boolean> setJobSearchStatus () throws ChangeSetPersister.NotFoundException{
-
         Boolean status = candidateService.setJobSearchStatus(securityUtils.getCandidateId().get());
+        return RestResponse.<Boolean>builder()
+                .status(HttpStatus.OK)
+                .message("success")
+                .data(status)
+                .build();
+    }
+    @PutMapping("/job-mail")
+    public RestResponse<Boolean> toggleJobMail () throws ChangeSetPersister.NotFoundException{
+        Boolean status = candidateService.toggleJobMail(securityUtils.getCandidateId().get());
         return RestResponse.<Boolean>builder()
                 .status(HttpStatus.OK)
                 .message("success")
