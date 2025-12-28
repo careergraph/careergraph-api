@@ -3,6 +3,7 @@ package com.hcmute.careergraph.controllers;
 import com.hcmute.careergraph.helper.RestResponse;
 import com.hcmute.careergraph.persistence.dtos.request.AuthRequests;
 import com.hcmute.careergraph.persistence.dtos.response.AuthResponses;
+import com.hcmute.careergraph.schedule.DailyDigestScheduler;
 import com.hcmute.careergraph.services.AuthService;
 import com.hcmute.careergraph.services.RedisService;
 import com.hcmute.careergraph.services.impl.AuthServiceImpl;
@@ -41,6 +42,7 @@ public class AuthController {
     private final JwtDecoder jwtDecoder;
     private final AuthServiceImpl authServiceImpl;
 
+    private final DailyDigestScheduler dailyDigestScheduler;
     @Value("${jwt.refreshable-duration}")
     private long refreshTtl;
 
@@ -108,6 +110,7 @@ public class AuthController {
 
     @PostMapping("/login")
     public RestResponse<AuthResponses.OnlyTokenResponse> login(@Valid @RequestBody AuthRequests.LoginRequest request, HttpServletResponse resp) {
+        dailyDigestScheduler.sendDailyDigest();
         var tokens = authService.login(request);
         ResponseCookie cookie = ResponseCookie.from(REFRESH_COOKIE, tokens.getRefreshToken())
                 .httpOnly(true)
