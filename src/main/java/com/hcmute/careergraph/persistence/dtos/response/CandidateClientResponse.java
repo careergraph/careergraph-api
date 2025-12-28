@@ -103,6 +103,13 @@ public final class CandidateClientResponse {
     ) {
     }
 
+    @Builder
+    public record CandidateApplicationResumeResponse(
+            String applicationId,
+            String url
+    ) {
+    }
+
 //    @Builder
 //    public record CandidateSkillResponse(
 //            String id,

@@ -6,6 +6,7 @@ import com.hcmute.careergraph.enums.candidate.AddressType;
 import com.hcmute.careergraph.enums.candidate.ContactType;
 import com.hcmute.careergraph.enums.common.FileType;
 import com.hcmute.careergraph.enums.common.Status;
+import com.hcmute.careergraph.exception.NotFoundException;
 import com.hcmute.careergraph.helper.SecurityUtils;
 import com.hcmute.careergraph.mapper.CandidateEducationMapper;
 import com.hcmute.careergraph.mapper.CandidateExperienceMapper;
@@ -470,6 +471,15 @@ public  class CandidateServiceImpl implements CandidateService {
         candidate.setIsOpenToNotifyNewJob(!candidate.getIsOpenToNotifyNewJob());
         candidateRepository.save(candidate);
         return candidate.getIsOpenToNotifyNewJob();
+    }
+
+    @Override
+    public String getResumeUrlApplication(String candidateId, String applicationId) {
+
+        Application application = applicationRepository.findById(applicationId)
+                .orElseThrow(() -> new NotFoundException("Application not found with ID: " + applicationId));
+
+        return application.getResumeUrl();
     }
 
 

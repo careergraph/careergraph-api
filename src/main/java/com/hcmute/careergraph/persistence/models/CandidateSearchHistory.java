@@ -40,8 +40,8 @@ public class CandidateSearchHistory extends BaseEntity {
     private String selectedJobId;
 
     // Embedding vector for keyword (use to RAG)
-    @Column(name = "embedding", columnDefinition = "vector(1536)")
-    private float[] embedding;
+    // @Column(name = "embedding", columnDefinition = "vector(1536)")
+    // private float[] embedding;
 
     @Column(name = "search_type")
     @Enumerated(EnumType.STRING)
