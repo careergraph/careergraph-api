@@ -33,8 +33,8 @@ public class DailyDigestScheduler {
     private final JobNotificationHistoryRepository historyRepo;
     private final MailService mailService;
 
-//    @Scheduled(cron = "0 0 8 * * *")
-    @Scheduled(cron = "0 */2 * * * ?")
+    @Scheduled(cron = "0 0 8 * * *")
+//    @Scheduled(cron = "0 */2 * * * ?")
     @Transactional
     public void sendDailyDigest() {
         System.out.println("chạy schedule");
@@ -47,7 +47,8 @@ public class DailyDigestScheduler {
                 queues.stream().collect(Collectors.groupingBy(JobNotificationQueue::getUserId));
 
         byUser.forEach((userId, items) -> {
-
+            if(!userId.equalsIgnoreCase("CAND_001"))
+                return;
             Candidate user = candidateRepo.findById(userId).orElse(null);
             if (user == null) return;
 

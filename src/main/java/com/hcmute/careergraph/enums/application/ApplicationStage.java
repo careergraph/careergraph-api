@@ -31,7 +31,7 @@ public enum ApplicationStage {
     static {
         Map<ApplicationStage, Set<ApplicationStage>> transitions = new EnumMap<>(ApplicationStage.class);
 
-        transitions.put(APPLIED, EnumSet.of(SCREENING, WITHDRAWN));
+        transitions.put(APPLIED, EnumSet.of(SCHEDULED, SCREENING, WITHDRAWN));
         transitions.put(SCREENING, EnumSet.of(HR_CONTACTED, REJECTED, WITHDRAWN, INTERVIEW));
         transitions.put(INTERVIEW, EnumSet.of(TRIAL, REJECTED));
         transitions.put(HR_CONTACTED, EnumSet.of(INTERVIEW_SCHEDULED, REJECTED, WITHDRAWN));

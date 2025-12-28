@@ -4,6 +4,8 @@ import com.hcmute.careergraph.persistence.documents.JobES;
 import com.hcmute.careergraph.persistence.event.JobCreatedEvent;
 import com.hcmute.careergraph.persistence.models.Job;
 import com.hcmute.careergraph.repositories.JobESRepository;
+import com.hcmute.careergraph.repositories.JobNotificationHistoryRepository;
+import com.hcmute.careergraph.repositories.JobNotificationQueueRepository;
 import com.hcmute.careergraph.repositories.JobRepository;
 import com.hcmute.careergraph.services.HuggingFaceEmbeddingService;
 import lombok.RequiredArgsConstructor;
@@ -32,6 +34,8 @@ public class ElasticsearchDataInitializer implements CommandLineRunner {
     private final HuggingFaceEmbeddingService huggingFaceEmbeddingService;
     private static final int EMBEDDING_BATCH_SIZE = 100;
     private final ApplicationEventPublisher publisher;
+    private final JobNotificationHistoryRepository historyRepo;
+    private final JobNotificationQueueRepository queueRepo;
     @Override
     public void run(String... args) throws Exception {
         synchronizeDataWithRetry();
@@ -78,12 +82,6 @@ public class ElasticsearchDataInitializer implements CommandLineRunner {
 
                     List<String> batchTexts = texts.subList(start, end);
 
-                    System.out.printf(
-                            "Embedding batch %d - %d (%d items)%n",
-                            start,
-                            end - 1,
-                            batchTexts.size()
-                    );
 
                     List<float[]> batchVectors =
                             embeddingModel.embedForResponse(batchTexts)
@@ -116,13 +114,23 @@ public class ElasticsearchDataInitializer implements CommandLineRunner {
 //                                    .build();
 //                        })
 //                        .toList();
+                queueRepo.deleteAll();
+                historyRepo.deleteAll();
                 List<JobES> jobsToSave = IntStream.range(0, allJobs.size())
                         .mapToObj(i -> {
                             Job job = allJobs.get(i);
-//                            if(job.getTitle().equalsIgnoreCase("Kỹ sư MEP (Điện - Nước) công trình cao tầng")){
-//                                publisher.publishEvent(new JobCreatedEvent(job.getId()));
-//                                System.out.println("Đã vào gửi");
-//                            }
+                            if(job.getId().equalsIgnoreCase("JOB_ULTRA_005")){
+                                publisher.publishEvent(new JobCreatedEvent(job.getId()));
+                                System.out.println("Đã vào gửi");
+                            }
+                            if(job.getId().equalsIgnoreCase("JOB_ULTRA_007")){
+                                publisher.publishEvent(new JobCreatedEvent(job.getId()));
+                                System.out.println("Đã vào gửi");
+                            }
+                            if(job.getId().equalsIgnoreCase("JOB_UNIQUE_006")){
+                                publisher.publishEvent(new JobCreatedEvent(job.getId()));
+                                System.out.println("Đã vào gửi");
+                            }
                             return JobES.builder()
                                     .id(job.getId())
                                     .title(job.getTitle())
