@@ -228,6 +228,24 @@ public class CandidateController {
                 .build();
     }
 
+    @GetMapping("/{candidateId}/application/{applicationId}/resume")
+    public RestResponse<CandidateClientResponse.CandidateApplicationResumeResponse> getResumeOfApplication (@PathVariable(value="candidateId") String candidateId,
+                                                                                            @PathVariable String applicationId) throws ChangeSetPersister.NotFoundException{
+        Candidate candidate = candidateService.getMyProfile(candidateId);
+        String resumeUrl = candidateService.getResumeUrlApplication(candidateId, applicationId);
+
+        CandidateClientResponse.CandidateApplicationResumeResponse result =
+                CandidateClientResponse.CandidateApplicationResumeResponse.builder()
+                        .applicationId(applicationId)
+                        .url(resumeUrl)
+                        .build();
+
+        return RestResponse.<CandidateClientResponse.CandidateApplicationResumeResponse>builder()
+                .status(HttpStatus.OK)
+                .data(result)
+                .build();
+    }
+
     @DeleteMapping("/media")
     public ResponseEntity<Map<String, Object>> deleteByPublicId(@RequestParam("fileId") String fileId) throws IOException, ChangeSetPersister.NotFoundException {
         String candidateId = securityUtils.getCandidateId().get();

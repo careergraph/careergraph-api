@@ -75,7 +75,10 @@
 #    driver: bridge
 
 # ============================ NEW COMPOSE
+
+name: careergraph-api
 version: '3.8'
+
 
 services:
   app:
@@ -87,9 +90,9 @@ services:
       - "8080:8080"
     restart: unless-stopped
 
-  elasticsearch:
+  careergraph-elasticsearch:
     image: docker.elastic.co/elasticsearch/elasticsearch:8.15.5
-    container_name: spring_elasticsearch
+    container_name: careergraph-elasticsearch
     environment:
       - node.name=es01
       - discovery.type=single-node
@@ -114,3 +117,10 @@ services:
       retries: 10
     volumes:
       - es_dt:/usr/share/elasticsearch/data
+
+networks:
+  spring-network:
+    driver: bridge
+
+volumes:
+  es_dt:
