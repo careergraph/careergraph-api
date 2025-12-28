@@ -55,4 +55,6 @@ public interface CandidateService {
     Boolean toggleJobMail(String candidateId) throws ChangeSetPersister.NotFoundException;
 
     String getResumeUrlApplication(String candidateId, String applicationId);
+
+    String updateAvatar(String id, MultipartFile file, FileType type) throws IOException;
 }

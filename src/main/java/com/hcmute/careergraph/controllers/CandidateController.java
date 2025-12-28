@@ -49,13 +49,13 @@ public class CandidateController {
     public RestResponse<String> uploadFile(
             @PathVariable String id,
             @RequestParam("type") FileType type,
-            @RequestParam("file") MultipartFile file) throws ChangeSetPersister.NotFoundException {
+            @RequestParam("file") MultipartFile file) throws ChangeSetPersister.NotFoundException, IOException {
 
-        // String objectName = candidateService.updateResource(id, file, type);
+        String objectName = candidateService.updateAvatar(id, file, type);
         return RestResponse.<String>builder()
                 .status(HttpStatus.CREATED)
                 .message("Update resource successfully")
-                .data(null)
+                .data(objectName)
                 .build();
     }
 
