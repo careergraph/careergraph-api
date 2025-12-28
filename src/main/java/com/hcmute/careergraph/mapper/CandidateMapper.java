@@ -51,6 +51,7 @@ public class CandidateMapper {
                 .yearsOfExperience(candidate.getYearsOfExperience())
                 .workLocation(candidate.getWorkLocation())
                 .isOpenToWork(candidate.getIsOpenToWork())
+                .isOpenToNotifyNewJob(candidate.getIsOpenToNotifyNewJob())
                 .summary(candidate.getSummary())
                 .resume(primaryResume(candidate.getResumes()))
                 .tagname(candidate.getTagname())

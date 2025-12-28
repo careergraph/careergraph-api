@@ -60,7 +60,9 @@ public class Candidate extends Party {
     @Column(name = "is_open_to_work")
     private Boolean isOpenToWork;
 
-    @Column(name = "is_open_to_notify_new_job")
+    @Column(name = "is_open_to_notify_new_job",
+            columnDefinition = "BOOLEAN DEFAULT FALSE"
+    )
     private Boolean isOpenToNotifyNewJob = false;
 
     @Column(name = "summary", columnDefinition = "TEXT")
