@@ -92,28 +92,6 @@ public class ElasticsearchDataInitializer implements CommandLineRunner {
 
                     vectors.addAll(batchVectors);
                 }
-//                List<float[]> vectors =
-//                        embeddingModel.embedForResponse(texts)
-//                                .getResults()
-//                                .stream()
-//                                .map(Embedding::getOutput)
-//                                .toList();
-//                List<float[]> vectors = huggingFaceEmbeddingService.embed(texts);
-
-                // Sử dụng bulk save (saveAll) để tối ưu hiệu suất thay vì save từng cái trong forEach
-//                List<JobES> jobsToSave = IntStream.range(0, allJobs.size())
-//                        .mapToObj(i -> {
-//                            Job job = allJobs.get(i);
-//                            return JobES.builder()
-//                                    .id(job.getId().toString())
-//                                    .title(job.getTitle())
-//                                    .description(job.getDescription())
-//                                    .state(job.getState())
-////                                    .expiredDate(job.getExpiryDate())
-//                                    .embedding(vectors.get(i))
-//                                    .build();
-//                        })
-//                        .toList();
                 queueRepo.deleteAll();
                 historyRepo.deleteAll();
                 List<JobES> jobsToSave = IntStream.range(0, allJobs.size())

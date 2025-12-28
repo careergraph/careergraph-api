@@ -51,4 +51,5 @@ public interface CandidateService {
 
     List<Job> getSavedJobs(String candidateId);
     Boolean setJobSearchStatus(String candidateId) throws ChangeSetPersister.NotFoundException;
+    Boolean toggleJobMail(String candidateId) throws ChangeSetPersister.NotFoundException;
 }

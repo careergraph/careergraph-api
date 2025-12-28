@@ -463,5 +463,14 @@ public  class CandidateServiceImpl implements CandidateService {
         return candidate.getIsOpenToWork();
     }
 
+    @Override
+    public Boolean toggleJobMail(String candidateId) throws ChangeSetPersister.NotFoundException {
+        Candidate candidate = candidateRepository.findById(candidateId)
+                .orElseThrow(ChangeSetPersister.NotFoundException::new);
+        candidate.setIsOpenToNotifyNewJob(!candidate.getIsOpenToNotifyNewJob());
+        candidateRepository.save(candidate);
+        return candidate.getIsOpenToNotifyNewJob();
+    }
+
 
 }
