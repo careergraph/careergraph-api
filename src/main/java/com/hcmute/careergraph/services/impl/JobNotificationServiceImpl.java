@@ -1,67 +1,62 @@
 package com.hcmute.careergraph.services.impl;
 
-import co.elastic.clients.elasticsearch.core.SearchResponse;
 import com.hcmute.careergraph.enums.common.Status;
-import com.hcmute.careergraph.enums.job.SendType;
-import com.hcmute.careergraph.enums.job.StatusSend;
-import com.hcmute.careergraph.helper.JobMailTemplateBuilder;
-import com.hcmute.careergraph.persistence.documents.JobES;
 import com.hcmute.careergraph.persistence.event.JobCreatedEvent;
-import com.hcmute.careergraph.persistence.models.Candidate;
-import com.hcmute.careergraph.persistence.models.Job;
-import com.hcmute.careergraph.persistence.models.JobNotificationHistory;
-import com.hcmute.careergraph.persistence.models.JobNotificationQueue;
-import com.hcmute.careergraph.repositories.CandidateRepository;
-import com.hcmute.careergraph.repositories.JobNotificationHistoryRepository;
-import com.hcmute.careergraph.repositories.JobNotificationQueueRepository;
-import com.hcmute.careergraph.repositories.JobRepository;
-import com.hcmute.careergraph.services.EmbedService;
-import com.hcmute.careergraph.services.JobESService;
-import com.hcmute.careergraph.services.MailService;
+import com.hcmute.careergraph.persistence.models.NewlyPostedJob;
+import com.hcmute.careergraph.repositories.NewlyPostedJobRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.event.EventListener;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
-import java.util.List;
 
+/**
+ * Service xử lý đánh dấu job mới đăng.
+ * 
+ * Flow:
+ * 1. HR tạo job → JobCreatedEvent được publish
+ * 2. onJobCreated() → Lưu jobId vào NewlyPostedJob (chỉ đánh dấu, KHÔNG đưa vào
+ * queue)
+ * 3. DailyDigestScheduler.buildQueue() → Query ES với filter từ NewlyPostedJob
+ * 4. DailyDigestScheduler.sendDailyDigest() → Gửi email + xóa NewlyPostedJob
+ */
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class JobNotificationServiceImpl {
 
-    private final CandidateRepository candidateRepo;
-    private final JobRepository jobRepo;
-    private final JobNotificationHistoryRepository historyRepo;
-    private final JobESService jobESService;
-    private final EmbedService embedService;
-    private final MailService mailService;
-    private final JobNotificationQueueRepository jobNotificationQueueRepository;
+    private final NewlyPostedJobRepository newlyPostedJobRepository;
 
+    /**
+     * Event listener khi HR tạo job mới.
+     * Chỉ đánh dấu job là "mới đăng", KHÔNG đưa vào queue.
+     * Việc match với candidate sẽ do Elasticsearch xử lý trong buildQueue().
+     */
     @EventListener
+    @Async
     @Transactional
     public void onJobCreated(JobCreatedEvent event) {
+        log.info("📌 Marking job as newly posted: {}", event.jobId());
 
-        Job job = jobRepo.findById(event.jobId()).orElse(null);
-        if (job == null) return;
-        List<Candidate> candidates =
-                candidateRepo.findAll();
+        // Kiểm tra job đã được đánh dấu chưa
+        if (newlyPostedJobRepository.existsByJobId(event.jobId())) {
+            log.debug("Job {} already marked as newly posted", event.jobId());
+            return;
+        }
 
-        for (Candidate c : candidates) {
-            try {
-                boolean sent =
-                        historyRepo.existsByJobIdAndUserId(event.jobId(), c.getId());
-                if (sent) return;
-                jobNotificationQueueRepository.save(JobNotificationQueue.builder()
-                        .userId(c.getId())
-                        .jobId(event.jobId())
-                        .sendType(SendType.DAILY)
-                        .statusSend(StatusSend.PENDING)
-                        .createdDate(LocalDateTime.now())
-                        .build());
-            } catch (Exception ignore) {
-                // duplicate → auto skip
-            }
+        try {
+            newlyPostedJobRepository.save(NewlyPostedJob.builder()
+                    .jobId(event.jobId())
+                    .postedAt(LocalDateTime.now())
+                    .status(Status.ACTIVE)
+                    .build());
+            log.info("✅ Job {} marked as newly posted", event.jobId());
+        } catch (Exception e) {
+            // Duplicate key hoặc lỗi khác → skip
+            log.warn("Failed to mark job {} as newly posted: {}", event.jobId(), e.getMessage());
         }
     }
 }
