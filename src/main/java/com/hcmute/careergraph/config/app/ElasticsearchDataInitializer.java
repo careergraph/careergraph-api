@@ -36,6 +36,30 @@ public class ElasticsearchDataInitializer implements CommandLineRunner {
     private final ApplicationEventPublisher publisher;
     private final JobNotificationHistoryRepository historyRepo;
     private final JobNotificationQueueRepository queueRepo;
+
+
+    private static final List<String> KEYWORDS = List.of(
+            "java",
+            "developer",
+            "backend",
+            "frontend",
+            "react",
+            "fullstack"
+    );
+
+    private String normalize(String text) {
+        return text
+                .toLowerCase()
+                .replaceAll("[^a-z0-9 ]", " ")
+                .replaceAll("\\s+", " ")
+                .trim();
+    }
+    private boolean matchTitle(Job job) {
+        String title = normalize(job.getTitle());
+//        String title = job.getTitle().toLowerCase();
+        return KEYWORDS.stream().anyMatch(title::contains);
+    }
+
     @Override
     public void run(String... args) throws Exception {
         synchronizeDataWithRetry();
@@ -73,7 +97,6 @@ public class ElasticsearchDataInitializer implements CommandLineRunner {
                         )
                                 )
                         .toList();
-                System.out.println(texts);
 
                 List<float[]> vectors = new java.util.ArrayList<>();
 
@@ -97,17 +120,9 @@ public class ElasticsearchDataInitializer implements CommandLineRunner {
                 List<JobES> jobsToSave = IntStream.range(0, allJobs.size())
                         .mapToObj(i -> {
                             Job job = allJobs.get(i);
-                            if(job.getId().equalsIgnoreCase("JOB_ULTRA_005")){
-                                publisher.publishEvent(new JobCreatedEvent(job.getId()));
-                                System.out.println("Đã vào gửi");
-                            }
-                            if(job.getId().equalsIgnoreCase("JOB_ULTRA_007")){
-                                publisher.publishEvent(new JobCreatedEvent(job.getId()));
-                                System.out.println("Đã vào gửi");
-                            }
-                            if(job.getId().equalsIgnoreCase("JOB_UNIQUE_006")){
-                                publisher.publishEvent(new JobCreatedEvent(job.getId()));
-                                System.out.println("Đã vào gửi");
+                            if (matchTitle(job)) {
+                                    publisher.publishEvent(new JobCreatedEvent(job.getId()));
+                                    System.out.println("➕ Added to queue: " + job.getTitle());
                             }
                             return JobES.builder()
                                     .id(job.getId())

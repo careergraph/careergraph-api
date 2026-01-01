@@ -16,4 +16,9 @@ public interface JobNotificationQueueRepository
             SendType sendType,
             StatusSend status
     );
+    boolean existsByUserIdAndJobIdAndSendType(
+            String userId,
+            String jobId,
+            SendType sendType
+    );
 }
