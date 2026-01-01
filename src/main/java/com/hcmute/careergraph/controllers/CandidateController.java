@@ -49,13 +49,13 @@ public class CandidateController {
     public RestResponse<String> uploadFile(
             @PathVariable String id,
             @RequestParam("type") FileType type,
-            @RequestParam("file") MultipartFile file) throws ChangeSetPersister.NotFoundException {
+            @RequestParam("file") MultipartFile file) throws ChangeSetPersister.NotFoundException, IOException {
 
-        // String objectName = candidateService.updateResource(id, file, type);
+        String objectName = candidateService.updateAvatar(id, file, type);
         return RestResponse.<String>builder()
                 .status(HttpStatus.CREATED)
                 .message("Update resource successfully")
-                .data(null)
+                .data(objectName)
                 .build();
     }
 
@@ -225,6 +225,24 @@ public class CandidateController {
         return RestResponse.<CandidateClientResponse.OverviewExperience>builder()
                 .status(HttpStatus.OK)
                 .data(overviewExperience)
+                .build();
+    }
+
+    @GetMapping("/{candidateId}/application/{applicationId}/resume")
+    public RestResponse<CandidateClientResponse.CandidateApplicationResumeResponse> getResumeOfApplication (@PathVariable(value="candidateId") String candidateId,
+                                                                                            @PathVariable String applicationId) throws ChangeSetPersister.NotFoundException{
+        Candidate candidate = candidateService.getMyProfile(candidateId);
+        String resumeUrl = candidateService.getResumeUrlApplication(candidateId, applicationId);
+
+        CandidateClientResponse.CandidateApplicationResumeResponse result =
+                CandidateClientResponse.CandidateApplicationResumeResponse.builder()
+                        .applicationId(applicationId)
+                        .url(resumeUrl)
+                        .build();
+
+        return RestResponse.<CandidateClientResponse.CandidateApplicationResumeResponse>builder()
+                .status(HttpStatus.OK)
+                .data(result)
                 .build();
     }
 

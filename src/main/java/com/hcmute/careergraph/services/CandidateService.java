@@ -50,6 +50,11 @@ public interface CandidateService {
     CandidateClientResponse.CandidateProfileResponse getOverview(String candidateId) throws ChangeSetPersister.NotFoundException;
 
     List<Job> getSavedJobs(String candidateId);
+
     Boolean setJobSearchStatus(String candidateId) throws ChangeSetPersister.NotFoundException;
     Boolean toggleJobMail(String candidateId) throws ChangeSetPersister.NotFoundException;
+
+    String getResumeUrlApplication(String candidateId, String applicationId);
+
+    String updateAvatar(String id, MultipartFile file, FileType type) throws IOException;
 }

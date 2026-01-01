@@ -5,7 +5,9 @@ import com.hcmute.careergraph.enums.application.ApplicationStage;
 import com.hcmute.careergraph.enums.candidate.AddressType;
 import com.hcmute.careergraph.enums.candidate.ContactType;
 import com.hcmute.careergraph.enums.common.FileType;
+import com.hcmute.careergraph.enums.common.PartyType;
 import com.hcmute.careergraph.enums.common.Status;
+import com.hcmute.careergraph.exception.NotFoundException;
 import com.hcmute.careergraph.helper.SecurityUtils;
 import com.hcmute.careergraph.mapper.CandidateEducationMapper;
 import com.hcmute.careergraph.mapper.CandidateExperienceMapper;
@@ -18,6 +20,7 @@ import com.hcmute.careergraph.persistence.dtos.response.FileResponse;
 import com.hcmute.careergraph.persistence.models.*;
 import com.hcmute.careergraph.repositories.*;
 import com.hcmute.careergraph.services.CandidateService;
+import com.hcmute.careergraph.services.CloudinaryService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
@@ -63,6 +66,7 @@ public  class CandidateServiceImpl implements CandidateService {
     private final FileRepository fileRepository;
     private final FileMapper fileMapper;
     private final SavedJobRepository savedJobRepository;
+    private final CloudinaryService cloudinaryService;
 
 
     @Override
@@ -427,7 +431,7 @@ public  class CandidateServiceImpl implements CandidateService {
 
     @Override
     public List<FileResponse> listFile(String idd, FileType fileType) throws ChangeSetPersister.NotFoundException {
-        List<File> list = fileRepository.findByOwnerIdAndStatus(idd,Status.ACTIVE);
+        List<File> list = fileRepository.findByOwnerIdAndStatusAndFileType(idd,Status.ACTIVE, fileType);
         return fileMapper.toFileResponses(list);
     }
 
@@ -470,6 +474,30 @@ public  class CandidateServiceImpl implements CandidateService {
         candidate.setIsOpenToNotifyNewJob(!candidate.getIsOpenToNotifyNewJob());
         candidateRepository.save(candidate);
         return candidate.getIsOpenToNotifyNewJob();
+    }
+
+    @Override
+    public String getResumeUrlApplication(String candidateId, String applicationId) {
+
+        Application application = applicationRepository.findById(applicationId)
+                .orElseThrow(() -> new NotFoundException("Application not found with ID: " + applicationId));
+
+        return application.getResumeUrl();
+    }
+
+    @Override
+    public String updateAvatar(String id, MultipartFile file, FileType type) throws IOException {
+
+        String imageUrl = cloudinaryService.uploadImage(file, PartyType.CANDIDATE.name(), id, type);
+
+        // Update candidate
+        Candidate candidate = candidateRepository.findById(id)
+                .orElseThrow(() -> new NotFoundException("Candidate not found with ID: " + id));
+
+        candidate.setAvatar(imageUrl);
+        candidateRepository.save(candidate);
+
+        return imageUrl;
     }
 
 
