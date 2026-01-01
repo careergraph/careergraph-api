@@ -8,21 +8,22 @@ import org.springframework.data.jpa.repository.Query;
 import java.util.List;
 
 public interface JobNotificationHistoryRepository
-        extends JpaRepository<JobNotificationHistory, String> {
+                extends JpaRepository<JobNotificationHistory, String> {
 
-    @Query("select h.jobId from JobNotificationHistory h where h.userId = :userId")
-    List<String> findSentJobIds(String userId);
+        @Query("select h.jobId from JobNotificationHistory h where h.userId = :userId")
+        List<String> findSentJobIds(String userId);
 
-    boolean existsByJobIdAndUserId(String jobId, String userId);
+        @Query("select h.jobId from JobNotificationHistory h where h.userId = :userId and h.sendType = :sendType")
+        List<String> findJobIdsByUserIdAndSendType(String userId, SendType sendType);
 
-    boolean existsByUserIdAndJobIdAndSendType(
-            String userId,
-            String jobId,
-            SendType sendType
-    );
+        boolean existsByJobIdAndUserId(String jobId, String userId);
 
-    List<JobNotificationHistory> findByUserIdAndSendType(
-            String userId,
-            SendType sendType
-    );
+        boolean existsByUserIdAndJobIdAndSendType(
+                        String userId,
+                        String jobId,
+                        SendType sendType);
+
+        List<JobNotificationHistory> findByUserIdAndSendType(
+                        String userId,
+                        SendType sendType);
 }
