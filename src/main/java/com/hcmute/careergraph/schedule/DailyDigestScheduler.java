@@ -11,6 +11,7 @@ import com.hcmute.careergraph.repositories.CandidateRepository;
 import com.hcmute.careergraph.repositories.JobNotificationHistoryRepository;
 import com.hcmute.careergraph.repositories.JobNotificationQueueRepository;
 import com.hcmute.careergraph.repositories.JobRepository;
+import com.hcmute.careergraph.services.JobRecommendationService;
 import com.hcmute.careergraph.services.MailService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -32,9 +33,23 @@ public class DailyDigestScheduler {
     private final CandidateRepository candidateRepo;
     private final JobNotificationHistoryRepository historyRepo;
     private final MailService mailService;
+    private final JobRecommendationService recommendService;
+    private static final List<String> KEYWORDS = List.of(
+            "java",
+            "developer",
+            "backend",
+            "frontend",
+            "react",
+            "fullstack"
+    );
+
+    private boolean matchTitle(Job job) {
+        String title = job.getTitle().toLowerCase();
+        return KEYWORDS.stream().anyMatch(title::contains);
+    }
 
 //    @Scheduled(cron = "0 0 8 * * *")
-    @Scheduled(cron = "0 */2 * * * ?")
+    @Scheduled(cron = "0 */3 * * * ?")
     @Transactional
     public void sendDailyDigest() {
         System.out.println("chạy schedule");
@@ -76,5 +91,17 @@ public class DailyDigestScheduler {
 
             queueRepo.deleteAll(items);
         });
+    }
+
+//    @Scheduled(cron = "0 0 5 * * *")
+    @Scheduled(cron = "0 */2 * * * *")
+    public void buildQueue() {
+
+        List<Candidate> candidates =
+                candidateRepo.findAllByIsOpenToNotifyNewJob((true));
+
+        for (Candidate c : candidates) {
+            recommendService.recommendJobsForCandidate(c, 5);
+        }
     }
 }

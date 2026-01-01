@@ -2,6 +2,10 @@ package com.hcmute.careergraph.services.impl;
 
 import co.elastic.clients.elasticsearch.ElasticsearchClient;
 import co.elastic.clients.elasticsearch._types.FieldValue;
+import co.elastic.clients.elasticsearch._types.Script;
+import co.elastic.clients.elasticsearch._types.ScriptLanguage;
+import co.elastic.clients.elasticsearch._types.query_dsl.FunctionBoostMode;
+import co.elastic.clients.elasticsearch._types.query_dsl.FunctionScoreMode;
 import co.elastic.clients.elasticsearch._types.query_dsl.TextQueryType;
 import co.elastic.clients.elasticsearch.core.SearchResponse;
 import com.hcmute.careergraph.enums.common.PartyType;
@@ -201,7 +205,50 @@ public class JobESServiceImpl implements JobESService {
         }
     }
 
+    public SearchResponse<JobES> searchRecommendJobs(
+            String keyword,
+            Pageable pageable
+    ) {
+        Script script = Script.of(s -> s
+                .lang(ScriptLanguage.Painless)
+                .source("""
+            double score = _score;
+            long days = ChronoUnit.DAYS.getBetween(
+                doc['createdAt'].value.toInstant(),
+                Instant.now()
+            );
+            return score * Math.exp(-days / 14.0);
+        """)
+        );
 
+        try {
+            return client.search(s -> s
+                            .index("jobs_es")
+                            .query(q -> q
+                                    .scriptScore(ss -> ss
+                                            .query(base -> base
+                                                    .multiMatch(mm -> mm
+                                                            .query(keyword)
+                                                            .fields(
+                                                                    "title^10",
+                                                                    "jobCategory^5",
+                                                                    "description^2"
+                                                            )
+                                                            .fuzziness("AUTO")
+                                                    )
+                                            )
+                                            .script(script)
+                                    )
+                            )
+                            .from((int) pageable.getOffset())
+                            .size(pageable.getPageSize()),
+                    JobES.class
+            );
+        }catch (Exception e) {
+            e.printStackTrace();
+            return null;
+        }
+    }
 
 
     @Override

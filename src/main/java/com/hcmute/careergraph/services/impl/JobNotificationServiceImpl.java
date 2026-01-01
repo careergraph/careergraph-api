@@ -42,11 +42,16 @@ public class JobNotificationServiceImpl {
     @Transactional
     public void onJobCreated(JobCreatedEvent event) {
 
+        Job job = jobRepo.findById(event.jobId()).orElse(null);
+        if (job == null) return;
         List<Candidate> candidates =
                 candidateRepo.findAll();
 
         for (Candidate c : candidates) {
             try {
+                boolean sent =
+                        historyRepo.existsByJobIdAndUserId(event.jobId(), c.getId());
+                if (sent) return;
                 jobNotificationQueueRepository.save(JobNotificationQueue.builder()
                         .userId(c.getId())
                         .jobId(event.jobId())
@@ -59,61 +64,4 @@ public class JobNotificationServiceImpl {
             }
         }
     }
-//    @EventListener
-//    @Transactional
-//    public void onJobCreated(JobCreatedEvent event) {
-//
-//        List<Candidate> candidates =
-//                candidateRepo.findAll();
-//
-//        for (Candidate c : candidates) {
-//
-//            List<String> sent =
-//                    historyRepo.findSentJobIds(c.getId());
-//
-//            String profile =
-//                    c.getDesiredPosition() + " " +
-//                            c.getIndustries() + " " +
-//                            c.getLocations();
-//
-//            float[] vector = embedService.embed(profile);
-//
-//            SearchResponse<JobES> esJobs =
-//                    jobESService.knnSearch(vector, 10);
-//
-//
-//            // 1. Thu thập tất cả ID từ kết quả Elasticsearch
-//            List<String> esIds = esJobs.hits().hits().stream()
-//                    .map(hit -> hit.id())
-//                    .toList();
-//
-//            // 2. Query database một lần duy nhất cho tất cả IDs
-//            // Sau đó filter các điều kiện: Active, chưa gửi, và giới hạn 5 job
-//            List<Job> jobs = jobRepo.findAllById(esIds).stream()
-////                    .filter(j -> j.getStatus() == Status.ACTIVE)
-//                    .filter(j -> !sent.contains(j.getId()))
-//                    .limit(5)
-//                    .toList();
-//
-//            if (jobs.isEmpty()) continue;
-//
-//            String html = JobMailTemplateBuilder.build(jobs);
-//
-//            mailService.sendHtml(
-//                    c.getAccount().getEmail(),
-//                    "🔥 Việc làm phù hợp với bạn",
-//                    html
-//            );
-//
-//            jobs.forEach(j ->
-//                    historyRepo.save(
-//                            JobNotificationHistory.builder()
-//                                    .userId(c.getId())
-//                                    .jobId(j.getId())
-//                                    .sentAt(LocalDateTime.now())
-//                                    .build()
-//                    )
-//            );
-//        }
-//    }
 }

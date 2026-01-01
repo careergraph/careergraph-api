@@ -20,4 +20,8 @@ public interface JobESService {
             Pageable pageable,
             PartyType type
     );
+    SearchResponse<JobES> searchRecommendJobs(
+            String keyword,
+            Pageable pageable
+    );
 }
