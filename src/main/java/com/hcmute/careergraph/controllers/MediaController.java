@@ -1,38 +1,125 @@
 package com.hcmute.careergraph.controllers;
 
+import com.hcmute.careergraph.enums.common.FileType;
+import com.hcmute.careergraph.enums.common.PartyType;
+import com.hcmute.careergraph.helper.SecurityUtils;
+import com.hcmute.careergraph.persistence.dtos.response.CloudFileResponse;
+import com.hcmute.careergraph.persistence.dtos.response.FileResponse;
+import com.hcmute.careergraph.services.CandidateService;
 import com.hcmute.careergraph.services.CloudinaryService;
 import lombok.RequiredArgsConstructor;
+import org.apache.commons.lang3.StringUtils;
+import org.springframework.data.crossstore.ChangeSetPersister;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
+import javax.swing.text.ChangedCharSetException;
 import java.io.IOException;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
-@RequestMapping("/media")
 @RestController
+@RequestMapping("/media")
 @RequiredArgsConstructor
 public class MediaController {
 
     private final CloudinaryService cloudinaryService;
+    private final SecurityUtils securityUtils;
+    private final CandidateService candidateService;
 
+    /**
+     * Upload an image (avatar/cover...). Required request params:
+     * - ownerType (e.g. "candidates" or "companies")
+     * - idd       (owner id; note: name "idd" used per your request)
+     * - fileType  (e.g. "avatar", "cover")
+     * <p>
+     * Example form-data keys: file, ownerType=candidates, idd=123, fileType=avatar
+     */
     @PostMapping("/image")
-    public ResponseEntity<Map<String, String>> uploadImage(@RequestParam("file") MultipartFile file) throws IOException {
-        String url = cloudinaryService.uploadImage(file);
+    public ResponseEntity<Map<String, String>> uploadImage(
+            @RequestParam("file") MultipartFile file,
+            @RequestParam("ownerType") String ownerType,
+            @RequestParam("idd") String idd,
+            @RequestParam("fileType") FileType fileType
+    ) throws IOException {
+        String url = cloudinaryService.uploadImage(file, ownerType, idd, fileType);
         Map<String, String> response = new HashMap<>();
         response.put("url", url);
+        response.put("ownerType", ownerType);
+        response.put("idd", idd);
+        response.put("fileType", fileType.name());
         return ResponseEntity.ok(response);
     }
 
+    /**
+     * Upload a video (resource_type = "video").
+     */
     @PostMapping("/video")
-    public ResponseEntity<Map<String, String>> uploadVideo(@RequestParam("file") MultipartFile file) throws IOException {
-        String url = cloudinaryService.uploadVideo(file);
+    public ResponseEntity<Map<String, String>> uploadVideo(
+            @RequestParam("file") MultipartFile file,
+            @RequestParam("ownerType") String ownerType,
+            @RequestParam("idd") String idd,
+            @RequestParam("fileType") FileType fileType
+    ) throws IOException {
+        String url = cloudinaryService.uploadVideo(file, ownerType, idd, fileType);
         Map<String, String> response = new HashMap<>();
         response.put("url", url);
+        response.put("ownerType", ownerType);
+        response.put("idd", idd);
+        response.put("fileType", fileType.name());
         return ResponseEntity.ok(response);
+    }
+
+    /**
+     * Upload a generic file (cv, document...). Use fileType e.g. "cv".
+     */
+    @PostMapping("/file")
+    public ResponseEntity<FileResponse> uploadFile(
+            @RequestParam("file") MultipartFile file,
+            @RequestParam("ownerType") String ownerType,
+            @RequestParam("idd") String idd,
+            @RequestParam("fileType") FileType fileType
+    ) throws IOException {
+        FileResponse result = cloudinaryService.uploadFile(file, ownerType, idd, fileType);
+        return ResponseEntity.ok(result);
+    }
+
+    /**
+     * List files for an owner. If fileType is omitted, returns all files for the owner.
+     * Example: GET /media?ownerType=candidates&idd=123
+     * GET /media?ownerType=candidates&idd=123&fileType=cv
+     */
+    @GetMapping
+    public ResponseEntity<List<FileResponse>> listFiles(
+            @RequestParam("ownerType") String ownerType,
+            @RequestParam("idd") String idd,
+            @RequestParam(value = "fileType", required = false) FileType fileType
+    ) throws IOException, ChangeSetPersister.NotFoundException {
+
+        if (StringUtils.isAnyBlank(ownerType, idd)) {
+            throw new IllegalArgumentException("ownerType and idd are required");
+        }
+        List<FileResponse> files = null;
+        if(ownerType.equalsIgnoreCase(PartyType.CANDIDATE.name())) {
+            files = candidateService.listFile(idd, fileType);
+        }
+
+        return ResponseEntity.ok(files);
+    }
+
+    /**
+     * Delete a resource by its Cloudinary public_id.
+     * Example: DELETE /media?publicId=candidates/123/avatar/uuid_name
+     */
+    @DeleteMapping
+    public ResponseEntity<Map<String, Object>> deleteByPublicId(@RequestParam("publicId") String publicId) throws IOException {
+        String candidateId = securityUtils.getCandidateId().get();
+        boolean deleted = cloudinaryService.deleteByPublicId(candidateId,publicId);
+        Map<String, Object> resp = new HashMap<>();
+        resp.put("publicId", publicId);
+        resp.put("deleted", deleted);
+        return ResponseEntity.ok(resp);
     }
 }

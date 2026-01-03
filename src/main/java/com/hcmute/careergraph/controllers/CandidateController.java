@@ -1,26 +1,36 @@
 package com.hcmute.careergraph.controllers;
 
 import com.hcmute.careergraph.enums.common.FileType;
+import com.hcmute.careergraph.exception.BadRequestException;
 import com.hcmute.careergraph.helper.RestResponse;
 import com.hcmute.careergraph.helper.SecurityUtils;
-import com.hcmute.careergraph.mapper.CandidateEducationMapper;
-import com.hcmute.careergraph.mapper.CandidateExperienceMapper;
-import com.hcmute.careergraph.mapper.CandidateMapper;
-import com.hcmute.careergraph.mapper.CandidateSkillMapper;
+import com.hcmute.careergraph.mapper.*;
 import com.hcmute.careergraph.persistence.dtos.request.CandidateRequest;
 import com.hcmute.careergraph.persistence.dtos.response.CandidateClientResponse;
 import com.hcmute.careergraph.persistence.dtos.response.CandidateResponse;
 import com.hcmute.careergraph.persistence.dtos.response.CandidateSkillResponse;
+import com.hcmute.careergraph.persistence.dtos.response.JobResponse;
 import com.hcmute.careergraph.persistence.models.Candidate;
+import com.hcmute.careergraph.persistence.models.Job;
 import com.hcmute.careergraph.services.CandidateService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.crossstore.ChangeSetPersister;
+import org.springframework.data.repository.query.Param;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.io.IOException;
+import java.time.LocalDate;
+import java.time.Period;
+import java.time.YearMonth;
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("candidates")
@@ -33,14 +43,15 @@ public class CandidateController {
     private final CandidateExperienceMapper candidateExperienceMapper;
     private final CandidateEducationMapper candidateEducationMapper;
     private final CandidateSkillMapper candidateSkillMapper;
+    private final JobMapper jobMapper;
 
     @PostMapping("/{id}/files")
     public RestResponse<String> uploadFile(
             @PathVariable String id,
             @RequestParam("type") FileType type,
-            @RequestParam("file") MultipartFile file) throws ChangeSetPersister.NotFoundException {
+            @RequestParam("file") MultipartFile file) throws ChangeSetPersister.NotFoundException, IOException {
 
-        String objectName = candidateService.updateResource(id, file, type);
+        String objectName = candidateService.updateAvatar(id, file, type);
         return RestResponse.<String>builder()
                 .status(HttpStatus.CREATED)
                 .message("Update resource successfully")
@@ -62,8 +73,14 @@ public class CandidateController {
     }
 
     @GetMapping("/me")
-    public RestResponse<CandidateResponse> getMyProfile() throws ChangeSetPersister.NotFoundException {
-        Candidate candidate = candidateService.getMyProfile(securityUtils.getCandidateId().get());
+    public RestResponse<CandidateResponse> getMyProfile(Authentication authentication) throws ChangeSetPersister.NotFoundException {
+
+        String candidateId = securityUtils.extractCandidateId(authentication);
+        if (candidateId == null || candidateId.isEmpty()) {
+            throw new BadRequestException("Candidate ID invalid");
+        }
+
+        Candidate candidate = candidateService.getMyProfile(candidateId);
 
         return RestResponse.<CandidateResponse>builder()
                 .status(HttpStatus.OK)
@@ -145,8 +162,6 @@ public class CandidateController {
                 .build();
     }
 
-
-
     @DeleteMapping("/educations/{educationId}")
     public RestResponse<List<CandidateClientResponse.CandidateEducationResponse>> deleteEducation(@PathVariable String educationId) throws ChangeSetPersister.NotFoundException{
         Candidate candidate = candidateService.deleteEducation(securityUtils.getCandidateId().get(), educationId);
@@ -163,5 +178,123 @@ public class CandidateController {
                 .status(HttpStatus.OK)
                 .data(candidateSkillMapper.toResponseList(candidate.getSkills()))
                 .build();
+    }
+
+    @GetMapping("/applied-jobs")
+    public RestResponse<List<CandidateClientResponse.AppliedJobs>> appliedJobs (@RequestParam(value="status" ,required = false) String status) throws ChangeSetPersister.NotFoundException{
+        return RestResponse.<List<CandidateClientResponse.AppliedJobs>>builder()
+                .status(HttpStatus.OK)
+                .data(candidateService.getAppliedJobs(securityUtils.getCandidateId().get(), status))
+                .build();
+    }
+    @GetMapping("/saved-jobs")
+    public RestResponse<List<JobResponse>> savedJobs () throws ChangeSetPersister.NotFoundException{
+
+        List<Job> list = candidateService.getSavedJobs(securityUtils.getCandidateId().get());
+        List<JobResponse> listResponse = list.stream()
+                .map( j -> jobMapper.toResponseWithStatusAppliedAndLiked(j, false,true))
+                .toList();
+        return RestResponse.<List<JobResponse>>builder()
+                .status(HttpStatus.OK)
+                .data(listResponse)
+                .build();
+    }
+    @GetMapping("/{candidateId}/overview")
+    public RestResponse<CandidateClientResponse.Overview> getOverview (@PathVariable(value="candidateId") String candidateId) throws ChangeSetPersister.NotFoundException{
+        Candidate candidate = candidateService.getMyProfile(candidateId);
+
+        CandidateClientResponse.Overview overview = CandidateClientResponse.Overview.builder()
+                .profile(candidateMapper.toProfileResponse(candidate))
+                .jobCriteria(candidateMapper.toJobCriteriaResponse(candidate))
+                .skills(candidateSkillMapper.toResponseList(candidate.getSkills()))
+                .educations(candidateEducationMapper.toResponses(candidate.getEducations()))
+                .build();
+        return RestResponse.<CandidateClientResponse.Overview>builder()
+                .status(HttpStatus.OK)
+                .data(overview)
+                .build();
+    }
+    @GetMapping("/{candidateId}/experience")
+    public RestResponse<CandidateClientResponse.OverviewExperience> getExperience (@PathVariable(value="candidateId") String candidateId) throws ChangeSetPersister.NotFoundException{
+        Candidate candidate = candidateService.getMyProfile(candidateId);
+        List<CandidateClientResponse.CandidateExperienceResponse> exs = candidateExperienceMapper.toResponses(candidate.getExperiences());
+        CandidateClientResponse.OverviewExperience overviewExperience =  CandidateClientResponse.OverviewExperience.builder()
+                .experiences(exs)
+                .totalYear(calcTotalYearsSimple(exs))
+                .build();
+        return RestResponse.<CandidateClientResponse.OverviewExperience>builder()
+                .status(HttpStatus.OK)
+                .data(overviewExperience)
+                .build();
+    }
+
+    @GetMapping("/{candidateId}/application/{applicationId}/resume")
+    public RestResponse<CandidateClientResponse.CandidateApplicationResumeResponse> getResumeOfApplication (@PathVariable(value="candidateId") String candidateId,
+                                                                                            @PathVariable String applicationId) throws ChangeSetPersister.NotFoundException{
+        Candidate candidate = candidateService.getMyProfile(candidateId);
+        String resumeUrl = candidateService.getResumeUrlApplication(candidateId, applicationId);
+
+        CandidateClientResponse.CandidateApplicationResumeResponse result =
+                CandidateClientResponse.CandidateApplicationResumeResponse.builder()
+                        .applicationId(applicationId)
+                        .url(resumeUrl)
+                        .build();
+
+        return RestResponse.<CandidateClientResponse.CandidateApplicationResumeResponse>builder()
+                .status(HttpStatus.OK)
+                .data(result)
+                .build();
+    }
+
+    @DeleteMapping("/media")
+    public ResponseEntity<Map<String, Object>> deleteByPublicId(@RequestParam("fileId") String fileId) throws IOException, ChangeSetPersister.NotFoundException {
+        String candidateId = securityUtils.getCandidateId().get();
+        candidateService.deleteByFileId(candidateId,fileId);
+        Map<String, Object> resp = new HashMap<>();
+        resp.put("fileId", fileId);
+        return ResponseEntity.ok(resp);
+    }
+
+    @PutMapping("/job-search-status")
+    public RestResponse<Boolean> setJobSearchStatus () throws ChangeSetPersister.NotFoundException{
+        Boolean status = candidateService.setJobSearchStatus(securityUtils.getCandidateId().get());
+        return RestResponse.<Boolean>builder()
+                .status(HttpStatus.OK)
+                .message("success")
+                .data(status)
+                .build();
+    }
+    @PutMapping("/job-mail")
+    public RestResponse<Boolean> toggleJobMail () throws ChangeSetPersister.NotFoundException{
+        Boolean status = candidateService.toggleJobMail(securityUtils.getCandidateId().get());
+        return RestResponse.<Boolean>builder()
+                .status(HttpStatus.OK)
+                .message("success")
+                .data(status)
+                .build();
+    }
+
+    private double calcTotalYearsSimple(List<CandidateClientResponse.CandidateExperienceResponse> exps) {
+        if (exps == null || exps.isEmpty()) return 0;
+
+        long totalMonths = 0;
+
+        for (var exp : exps) {
+            if (exp.startDate() == null) continue;
+
+            YearMonth start = YearMonth.parse(exp.startDate());
+            YearMonth end = Boolean.TRUE.equals(exp.isCurrent())
+                    ? YearMonth.now()
+                    : YearMonth.parse(exp.endDate() == null || exp.endDate().isBlank()
+                    ? YearMonth.now().toString()
+                    : exp.endDate());
+
+            long months = end.getYear() * 12 + end.getMonthValue()
+                    - (start.getYear() * 12 + start.getMonthValue());
+
+            totalMonths += Math.max(0, months);
+        }
+
+        return Math.round((totalMonths / 12.0) * 10) / 10.0;
     }
 }

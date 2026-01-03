@@ -19,12 +19,12 @@ public class ApplicationMapper {
     private final CandidateMapper candidateMapper;
     private final JobMapper jobMapper;
 
-    public ApplicationResponse toResponse(Application application) {
+    public ApplicationResponse toResponse(Application application, boolean isDetail) {
         if (application == null) {
             return null;
         }
 
-        return ApplicationResponse.builder()
+        ApplicationResponse applicationResponse = ApplicationResponse.builder()
                 .applicationId(application.getId())
                 .coverLetter(application.getCoverLetter())
                 .resumeUrl(application.getResumeUrl())
@@ -35,18 +35,22 @@ public class ApplicationMapper {
                 .stageChangedAt(application.getStageChangedAt())
                 .stageNote(application.getCurrentStageNote())
                 .stageHistory(mapStageHistory(application.getStageHistory()))
-                .candidate(candidateMapper.toResponse(application.getCandidate()))
-                .job(jobMapper.toResponse(application.getJob()))
                 .build();
+
+        if (isDetail) {
+            applicationResponse.setCandidate(candidateMapper.toResponse(application.getCandidate()));
+            applicationResponse.setJob(jobMapper.toResponse(application.getJob()));
+        }
+        return applicationResponse;
     }
 
-    public List<ApplicationResponse> toResponseList(List<Application> applications) {
+    public List<ApplicationResponse> toResponseList(List<Application> applications, boolean isDetail) {
         if (applications == null || applications.isEmpty()) {
             return Collections.emptyList();
         }
 
         return applications.stream()
-                .map(this::toResponse)
+                .map(application -> this.toResponse(application, isDetail))
                 .toList();
     }
 

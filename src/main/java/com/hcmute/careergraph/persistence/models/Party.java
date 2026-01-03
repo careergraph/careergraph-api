@@ -2,8 +2,10 @@ package com.hcmute.careergraph.persistence.models;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import jakarta.persistence.*;
+import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.Setter;
+import lombok.ToString;
 import lombok.experimental.SuperBuilder;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 
@@ -19,6 +21,8 @@ import java.util.Set;
 @EntityListeners(AuditingEntityListener.class)
 @JsonIgnoreProperties(ignoreUnknown = true)
 @SuperBuilder
+@ToString(callSuper = true, exclude = {"contacts", "addresses"})
+@EqualsAndHashCode(callSuper = true, exclude = {"contacts", "addresses"})
 public abstract class Party extends BaseEntity {
 
     @Column(name = "tagname")

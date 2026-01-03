@@ -17,6 +17,14 @@ public record JobResponse(
         String description,
         String department,
 
+        // Basic info of company
+        String companyId,
+        String companyAvatar,
+        String companyName,
+
+        boolean isApplied,
+        boolean isSaved,
+
         // Arrays
         List<String> responsibilities,
         List<String> qualifications,
@@ -61,6 +69,10 @@ public record JobResponse(
         Integer saved,
         Integer likes,
         Integer shares,
+
+        // Application recruiment
+        Boolean resume,
+        Boolean coverLetter,
 
         // Timeline (optional - for detail view)
         List<JobTimelineEventResponse> timeline,
