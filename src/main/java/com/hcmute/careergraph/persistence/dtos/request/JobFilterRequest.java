@@ -1,5 +1,7 @@
 package com.hcmute.careergraph.persistence.dtos.request;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.annotation.JsonInclude;
 import com.hcmute.careergraph.enums.common.Status;
 import com.hcmute.careergraph.enums.job.EducationType;
 import com.hcmute.careergraph.enums.job.EmploymentType;
@@ -16,6 +18,7 @@ import java.util.List;
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
+@JsonIgnoreProperties(ignoreUnknown = true)
 public class JobFilterRequest {
 
     private List<Status> statuses;
