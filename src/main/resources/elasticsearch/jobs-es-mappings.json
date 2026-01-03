@@ -1,0 +1,58 @@
+{
+  "properties": {
+    "id": {
+      "type": "keyword"
+    },
+    "title": {
+      "type": "text",
+      "analyzer": "vi_analyzer"
+    },
+    "description": {
+      "type": "text",
+      "analyzer": "vi_analyzer"
+    },
+    "status": {
+      "type": "keyword"
+    },
+    "jobCategory": {
+      "type": "text",
+      "analyzer": "vi_analyzer",
+      "fields": {
+        "keyword": {
+          "type": "keyword"
+        }
+      }
+    },
+    "employmentType": {
+      "type": "keyword"
+    },
+    "experienceLevel": {
+      "type": "keyword"
+    },
+    "education": {
+      "type": "keyword"
+    },
+    "state": {
+      "type": "text",
+      "analyzer": "vi_analyzer"
+    },
+    "city": {
+      "type": "keyword"
+    },
+    "companyId": {
+      "type": "keyword"
+    },
+
+    "createdAt": {
+      "type": "date",
+      "format": "yyyy-MM-dd"
+    },
+
+    "embedding": {
+      "type": "dense_vector",
+      "dims": 768,
+      "index": true,
+      "similarity": "cosine"
+    }
+  }
+}

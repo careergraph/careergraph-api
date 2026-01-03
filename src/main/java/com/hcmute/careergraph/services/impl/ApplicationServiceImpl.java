@@ -21,6 +21,7 @@ import org.springframework.util.StringUtils;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.Comparator;
+import java.util.List;
 import java.util.Optional;
 
 @Service
@@ -34,31 +35,32 @@ public class ApplicationServiceImpl implements ApplicationService {
     private final JobRepository jobRepository;
     private final MailService mailService;
 
+
+
     private static final String SUBMISSION_NOTE = "Application submitted by candidate";
 
     @Override
     public Application createApplication(ApplicationRequest request) {
         log.info("Creating new application for candidate: {} to job: {}", 
-                request.candidateId(), request.jobId());
+                request.getCandidateId(), request.getJobId());
         
         // Find candidate and job
-        Candidate candidate = candidateRepository.findById(request.candidateId())
-                .orElseThrow(() -> new RuntimeException("Candidate not found with id: " + request.candidateId()));
+        Candidate candidate = candidateRepository.findById(request.getCandidateId())
+                .orElseThrow(() -> new RuntimeException("Candidate not found with id: " + request.getCandidateId()));
         
-        Job job = jobRepository.findById(request.jobId())
-                .orElseThrow(() -> new RuntimeException("Job not found with id: " + request.jobId()));
+        Job job = jobRepository.findById(request.getJobId())
+                .orElseThrow(() -> new RuntimeException("Job not found with id: " + request.getJobId()));
 
         LocalDateTime now = LocalDateTime.now();
-        String appliedTimestamp = Optional.ofNullable(request.appliedDate())
+        String appliedTimestamp = Optional.ofNullable(request.getAppliedDate())
                 .filter(StringUtils::hasText)
                 .orElse(now.format(DateTimeFormatter.ISO_LOCAL_DATE_TIME));
 
         // Create application entity
         Application application = Application.builder()
-                .coverLetter(request.coverLetter())
-                .resumeUrl(request.resumeUrl())
-                .rating(request.rating())
-                .notes(request.notes())
+                .coverLetter(request.getCoverLetter())
+                .resumeUrl(request.getResumeUrl())
+                .notes(request.getNotes())
                 .appliedDate(appliedTimestamp)
                 .currentStage(ApplicationStage.APPLIED)
                 .stageChangedAt(now)
@@ -93,9 +95,14 @@ public class ApplicationServiceImpl implements ApplicationService {
 
     @Override
     @Transactional(readOnly = true)
-    public Page<Application> getAllApplications(Pageable pageable) {
+    public List<Application> getAllApplications(String jobId, String companyId) {
         log.info("Getting all applications with pagination");
-        return applicationRepository.findAll(pageable);
+
+        List<Application> applications = applicationRepository.findByCompanyIdAndJobId(companyId, jobId);
+        if (applications.isEmpty()) {
+            return List.of();
+        }
+        return applications;
     }
 
     @Override
@@ -103,6 +110,24 @@ public class ApplicationServiceImpl implements ApplicationService {
     public Page<Application> getApplicationsByCandidate(String candidateId, Pageable pageable) {
         log.info("Getting applications by candidate id: {}", candidateId);
         return applicationRepository.findByCandidateId(candidateId, pageable);
+    }
+    @Override
+    @Transactional(readOnly = true)
+    public Page<Application> getApplicationsByCandidateWithJob(String candidateId, Pageable pageable) {
+//        return applicationRepository.getApplicationsByCandidateWithJob(candidateId, pageable);
+        return applicationRepository.findByJobId("00000000-0000-0000-0000-000000001007", pageable);
+    }
+    @Override
+    @Transactional(readOnly = true)
+    public Page<Application> getApplicationsByCandidateWithJobWithStatus(String candidateId, Pageable pageable, ApplicationStage status) {
+//        return applicationRepository.getApplicationsByCandidateWithJob(candidateId, pageable);
+//        return applicationRepository.getApplicationsByCandidateWithJobWithStatus("00000000-0000-0000-0000-000000001007", pageable,status);
+        return applicationRepository.getAllApplicationsWithStatus(pageable,status);
+    }
+
+    @Override
+    public boolean existsApplicationsByJobIdAndCandidateId(String jobId, String candidateId) {
+        return applicationRepository.existsApplicationsByJobIdAndCandidateId(jobId, candidateId);
     }
 
     @Override
@@ -120,22 +145,21 @@ public class ApplicationServiceImpl implements ApplicationService {
                 .orElseThrow(() -> new RuntimeException("Application not found with id: " + id));
 
         // Update fields
-        application.setCoverLetter(request.coverLetter());
-        application.setResumeUrl(request.resumeUrl());
-        application.setRating(request.rating());
-        application.setNotes(request.notes());
+        application.setCoverLetter(request.getCoverLetter());
+        application.setResumeUrl(request.getResumeUrl());
+        application.setNotes(request.getNotes());
 
         // Update candidate if changed
-        if (!application.getCandidate().getId().equals(request.candidateId())) {
-            Candidate candidate = candidateRepository.findById(request.candidateId())
-                    .orElseThrow(() -> new RuntimeException("Candidate not found with id: " + request.candidateId()));
+        if (!application.getCandidate().getId().equals(request.getCandidateId())) {
+            Candidate candidate = candidateRepository.findById(request.getCandidateId())
+                    .orElseThrow(() -> new RuntimeException("Candidate not found with id: " + request.getCandidateId()));
             application.setCandidate(candidate);
         }
 
         // Update job if changed
-        if (!application.getJob().getId().equals(request.jobId())) {
-            Job job = jobRepository.findById(request.jobId())
-                    .orElseThrow(() -> new RuntimeException("Job not found with id: " + request.jobId()));
+        if (!application.getJob().getId().equals(request.getJobId())) {
+            Job job = jobRepository.findById(request.getJobId())
+                    .orElseThrow(() -> new RuntimeException("Job not found with id: " + request.getJobId()));
             application.setJob(job);
         }
 
@@ -157,11 +181,11 @@ public class ApplicationServiceImpl implements ApplicationService {
 
     @Override
     public Application updateApplicationStage(String id, ApplicationStageUpdateRequest request) {
-        log.info("Updating application {} stage to {}", id, request.stage());
+        log.info("Updating application {} stage to {}", id, request.getStage());
         Application application = applicationRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Application not found with id: " + id));
 
-        ApplicationStage targetStage = request.stage();
+        ApplicationStage targetStage = request.getStage();
         ApplicationStage currentStage = application.getCurrentStage();
 
         if (targetStage == null) {
@@ -169,8 +193,8 @@ public class ApplicationServiceImpl implements ApplicationService {
         }
 
         if (currentStage == targetStage) {
-            if (StringUtils.hasText(request.note())) {
-                application.setCurrentStageNote(request.note().trim());
+            if (StringUtils.hasText(request.getNote())) {
+                application.setCurrentStageNote(request.getNote().trim());
                 application.setStageChangedAt(LocalDateTime.now());
                 applicationRepository.save(application);
             }
@@ -181,8 +205,8 @@ public class ApplicationServiceImpl implements ApplicationService {
         validateStageTransition(currentStage, targetStage, id);
 
         LocalDateTime now = LocalDateTime.now();
-        String note = resolveStageNote(targetStage, request.note());
-        String actor = resolveActorLabel(request.changedBy(), application.getCandidate());
+        String note = resolveStageNote(targetStage, request.getNote());
+        String actor = resolveActorLabel(request.getChangeBy(), application.getCandidate());
 
         application.setCurrentStage(targetStage);
         application.setStageChangedAt(now);
@@ -222,11 +246,13 @@ public class ApplicationServiceImpl implements ApplicationService {
 
         return switch (stage) {
             case APPLIED -> SUBMISSION_NOTE;
+            case SCHEDULED -> "Your interview has been scheduled.";
             case SCREENING -> "We are reviewing your profile.";
+            case INTERVIEW -> "Your interview has been send. Pls check your email.";
             case HR_CONTACTED -> "Our HR team will reach out shortly.";
             case INTERVIEW_SCHEDULED -> "Your interview has been scheduled.";
             case INTERVIEW_COMPLETED -> "Your interview is complete and under evaluation.";
-            case TRIAL_PERIOD -> "A trial or probationary period has started.";
+            case TRIAL -> "A trial or probationary period has started.";
             case OFFER_EXTENDED -> "We have extended an offer.";
             case OFFER_ACCEPTED -> "You have accepted our offer.";
             case OFFER_DECLINED -> "You declined the offer.";
@@ -298,13 +324,13 @@ public class ApplicationServiceImpl implements ApplicationService {
             builder.append(candidate.getFirstName().trim());
         }
         if (StringUtils.hasText(candidate.getLastName())) {
-            if (builder.length() > 0) {
+            if (!builder.isEmpty()) {
                 builder.append(' ');
             }
             builder.append(candidate.getLastName().trim());
         }
 
-        if (builder.length() > 0) {
+        if (!builder.isEmpty()) {
             return builder.toString();
         }
 

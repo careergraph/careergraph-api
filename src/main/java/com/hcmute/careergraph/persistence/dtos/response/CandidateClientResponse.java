@@ -8,6 +8,7 @@ import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import lombok.Builder;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 
@@ -103,10 +104,44 @@ public final class CandidateClientResponse {
     }
 
     @Builder
-    public record CandidateSkillResponse(
-            String id,
-            String name
+    public record CandidateApplicationResumeResponse(
+            String applicationId,
+            String url
     ) {
     }
 
+//    @Builder
+//    public record CandidateSkillResponse(
+//            String id,
+//            String name
+//    ) {
+//    }
+
+    @Builder
+    public record AppliedJobs(
+            String jobName,
+            String jobId,
+            String companyName,
+            String linkResume,
+            String appliedAt,
+            String deadline,
+            String status
+    ){}
+
+
+
+    @Builder
+    public record Overview(
+            CandidateProfileResponse profile,
+            CandidateJobCriteriaResponse jobCriteria,
+            List<CandidateSkillResponse> skills,
+            List<CandidateEducationResponse> educations
+    ){}
+
+    @Builder
+    public record OverviewExperience(
+        List<CandidateExperienceResponse> experiences,
+        double totalYear,
+        String summary
+        ){}
 }
