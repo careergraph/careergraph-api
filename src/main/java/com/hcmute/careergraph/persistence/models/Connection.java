@@ -3,9 +3,11 @@ package com.hcmute.careergraph.persistence.models;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.hcmute.careergraph.enums.candidate.ConnectionType;
 import jakarta.persistence.*;
+import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+import lombok.ToString;
 import lombok.experimental.SuperBuilder;
 
 @Entity
@@ -15,6 +17,8 @@ import lombok.experimental.SuperBuilder;
 @SuperBuilder
 @NoArgsConstructor
 @JsonIgnoreProperties(ignoreUnknown = true)
+@ToString(callSuper = true, exclude = {"candidate"})
+@EqualsAndHashCode(callSuper = true, exclude = {"candidate"})
 public class Connection extends BaseEntity {
 
     @Column(name = "note", columnDefinition = "TEXT")
@@ -45,4 +49,3 @@ public class Connection extends BaseEntity {
     @Column(name = "connected_education_id")
     private String connectedEducationId;
 }
-

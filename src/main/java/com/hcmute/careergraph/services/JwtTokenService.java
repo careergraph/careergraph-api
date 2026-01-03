@@ -15,6 +15,8 @@ public interface JwtTokenService {
     String rotateRefreshToken(Account account, String familyId);
 
     String generateRefreshTokenWithFamily(Account account);
+
+    String generateResetPasswordToken(String email);
 }
 
 

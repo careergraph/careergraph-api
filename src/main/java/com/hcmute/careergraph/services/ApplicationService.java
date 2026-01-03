@@ -1,10 +1,13 @@
 package com.hcmute.careergraph.services;
 
+import com.hcmute.careergraph.enums.application.ApplicationStage;
 import com.hcmute.careergraph.persistence.dtos.request.ApplicationRequest;
 import com.hcmute.careergraph.persistence.dtos.request.ApplicationStageUpdateRequest;
 import com.hcmute.careergraph.persistence.models.Application;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+
+import java.util.List;
 
 public interface ApplicationService {
 
@@ -12,7 +15,7 @@ public interface ApplicationService {
 
     Application getApplicationById(String id);
 
-    Page<Application> getAllApplications(Pageable pageable);
+    List<Application> getAllApplications(String jobId, String companyId);
 
     Page<Application> getApplicationsByCandidate(String candidateId, Pageable pageable);
 
@@ -23,4 +26,8 @@ public interface ApplicationService {
     void deleteApplication(String id);
 
     Application updateApplicationStage(String id, ApplicationStageUpdateRequest request);
+
+    Page<Application> getApplicationsByCandidateWithJob(String candidateId, Pageable pageable);
+    Page<Application> getApplicationsByCandidateWithJobWithStatus(String candidateId, Pageable pageable, ApplicationStage status);
+    boolean existsApplicationsByJobIdAndCandidateId(String jobId, String candidateId);
 }

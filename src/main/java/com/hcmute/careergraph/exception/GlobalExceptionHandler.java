@@ -34,6 +34,7 @@ public class GlobalExceptionHandler {
 
         restResponse.setStatus(HttpStatus.OK);
         restResponse.setMessage(exception.getErrorMessage());
+        restResponse.setData(exception.getData());
 
         return ResponseEntity.status(errorCode.getCode()).body(restResponse);
     }

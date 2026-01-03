@@ -8,9 +8,10 @@ public interface AuthService {
 
     void register(AuthRequests.RegisterRequest request, boolean isHR);
 
-    void confirmOtp(AuthRequests.ConfirmOtpRequest request);
+    String confirmOtp(AuthRequests.ConfirmOtpRequest request);
 
-    void resendOtp(AuthRequests.ConfirmOtpRequest request);
+    Integer resendOtp(AuthRequests.ResendOtpRequest request);
+    Long getTtlOtp(String email);
 
     AuthResponses.TokenResponse login(AuthRequests.LoginRequest request);
 
@@ -18,13 +19,15 @@ public interface AuthService {
 
     AuthResponses.TokenResponse refresh(String refreshToken);
 
-    void forgotPassword(AuthRequests.ForgotPasswordRequest request);
+    Integer forgotPassword(AuthRequests.ForgotPasswordRequest request);
     
-    void resetPassword(AuthRequests.ResetPasswordRequest request);
+    void resetPassword(String resetPasswordToken, AuthRequests.ResetPasswordRequest request);
 
     AuthResponses.TokenResponse googleLogin(AuthRequests.GoogleLoginRequest request);
 
     AuthResponses.TokenResponse refreshWithFamily(Jwt jwt);
+
+    String generateOTPToken(String email);
 }
 
 

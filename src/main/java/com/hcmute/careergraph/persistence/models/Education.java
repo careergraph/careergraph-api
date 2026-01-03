@@ -4,9 +4,11 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.hcmute.careergraph.enums.education.EducationLevel;
 import com.hcmute.careergraph.enums.education.UniversityType;
 import jakarta.persistence.*;
+import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+import lombok.ToString;
 import lombok.experimental.SuperBuilder;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 
@@ -30,6 +32,8 @@ import java.util.Set;
 @NoArgsConstructor
 @JsonIgnoreProperties(ignoreUnknown = true)
 @EntityListeners(AuditingEntityListener.class)
+@ToString(callSuper = true, exclude = {"candidateEducations", "educationConnections"})
+@EqualsAndHashCode(callSuper = true, exclude = {"candidateEducations", "educationConnections"})
 public class Education extends Party {
 
     @Column(name = "official_name", nullable = false, length = 255)

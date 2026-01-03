@@ -1,7 +1,11 @@
 package com.hcmute.careergraph.persistence.dtos.request;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.annotation.JsonInclude;
 import com.hcmute.careergraph.enums.common.Status;
+import com.hcmute.careergraph.enums.job.EducationType;
 import com.hcmute.careergraph.enums.job.EmploymentType;
+import com.hcmute.careergraph.enums.job.ExperienceLevel;
 import com.hcmute.careergraph.enums.job.JobCategory;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
@@ -14,11 +18,18 @@ import java.util.List;
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
+@JsonIgnoreProperties(ignoreUnknown = true)
 public class JobFilterRequest {
 
     private List<Status> statuses;
 
+    private String city;
+
     private List<JobCategory> jobCategories;
 
     private List<EmploymentType> employmentTypes;
+
+    private List<ExperienceLevel> experienceLevels;
+
+    private List<EducationType> educationTypes;
 }

@@ -1,15 +1,26 @@
 package com.hcmute.careergraph.controllers;
 
+import com.hcmute.careergraph.enums.common.PartyType;
 import com.hcmute.careergraph.enums.job.JobCategory;
 import com.hcmute.careergraph.exception.BadRequestException;
 import com.hcmute.careergraph.helper.RestResponse;
 import com.hcmute.careergraph.helper.SecurityUtils;
+import com.hcmute.careergraph.mapper.ApplicationMapper;
 import com.hcmute.careergraph.mapper.JobMapper;
+import com.hcmute.careergraph.persistence.dtos.request.ApplicationRequest;
 import com.hcmute.careergraph.persistence.dtos.request.JobCreationRequest;
 import com.hcmute.careergraph.persistence.dtos.request.JobFilterRequest;
+import com.hcmute.careergraph.persistence.dtos.request.JobRecruimentRequest;
+import com.hcmute.careergraph.persistence.dtos.response.ApplicationResponse;
 import com.hcmute.careergraph.persistence.dtos.response.JobResponse;
+import com.hcmute.careergraph.persistence.models.Application;
 import com.hcmute.careergraph.persistence.models.Job;
+import com.hcmute.careergraph.repositories.ApplicationRepository;
+import com.hcmute.careergraph.repositories.SavedJobRepository;
+import com.hcmute.careergraph.services.ApplicationService;
+import com.hcmute.careergraph.services.CandidateService;
 import com.hcmute.careergraph.services.JobService;
+import com.hcmute.careergraph.services.SavedJobService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -19,6 +30,7 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.ArrayList;
@@ -27,14 +39,21 @@ import java.util.List;
 import java.util.Map;
 
 @RestController
-@RequestMapping("jobs")
 @RequiredArgsConstructor
 @Slf4j
+@RequestMapping("jobs")
 public class JobController {
 
     private final JobService jobService;
+    private final ApplicationService applicationService;
     private final JobMapper jobMapper;
+    private final ApplicationMapper applicationMapper;
     private final SecurityUtils securityUtils;
+    private final ApplicationRepository applicationRepository;
+    private final SavedJobService savedJobService;
+    private final CandidateService candidateService;
+
+    // ============================ JOB MANAGEMENT ============================
 
     /**
      * POST /api/v1/jobs
@@ -71,18 +90,29 @@ public class JobController {
      * @param id Job ID
      * @return RestResponse<JobResponse>
      */
-    @GetMapping("/{id}")
-    public RestResponse<JobResponse> getJobById(@PathVariable String id) {
-        log.info("GET /api/v1/jobs/{} - Fetching job", id);
+        @GetMapping("/{id}")
+        public RestResponse<JobResponse> getJobById(@PathVariable String id) {
+            log.info("GET /api/v1/jobs/{} - Fetching job", id);
 
-        Job job = jobService.getJobById(id);
+            Job job = jobService.getJobById(id);
 
-        return RestResponse.<JobResponse>builder()
-                .status(HttpStatus.OK)
-                .message("Job retrieved successfully")
-                .data(jobMapper.toResponse(job))
-                .build();
-    }
+            String candidateId = securityUtils.getCandidateId().orElse(null);
+
+            boolean applied=false;
+            if(candidateId!=null) {
+                applied = applicationService.existsApplicationsByJobIdAndCandidateId(id,candidateId);
+            }
+            boolean idSaved = false;
+            if(candidateId!=null) {
+                idSaved =savedJobService.existsByCandidateIdAndJobId(candidateId,id);
+            }
+            JobResponse jobResponse = jobMapper.toResponseWithStatusAppliedAndLiked(job, applied,idSaved);
+            return RestResponse.<JobResponse>builder()
+                    .status(HttpStatus.OK)
+                    .message("Job retrieved successfully")
+                    .data(jobResponse)
+                    .build();
+        }
 
     /**
      * GET /api/v1/jobs
@@ -111,35 +141,6 @@ public class JobController {
     }
 
     /**
-     * GET /api/v1/jobs/company/{companyId}
-     * Lấy tất cả jobs của một company với pagination
-     *
-     * @param companyId Company ID
-     * @param page Page number
-     * @param size Page size
-     * @return RestResponse<Page<JobResponse>>
-     */
-    @GetMapping("/company/{companyId}")
-    public RestResponse<Page<JobResponse>> getJobsByCompany(
-            @PathVariable String companyId,
-            @RequestParam(name = "page", defaultValue = "0") Integer page,
-            @RequestParam(name = "size", defaultValue = "10") Integer size
-    ) {
-        log.info("GET /api/v1/jobs/company/{} - Fetching jobs (page: {}, size: {})",
-                companyId, page, size);
-
-        Pageable pageable = PageRequest.of(page, size);
-
-        Page<Job> jobPage = jobService.getJobsByCompany(companyId, pageable);
-
-        return RestResponse.<Page<JobResponse>>builder()
-                .status(HttpStatus.OK)
-                .message("Jobs retrieved successfully")
-                .data(mapToJobResponsePage(jobPage, pageable))
-                .build();
-    }
-
-    /**
      * PUT /api/v1/jobs/{id}
      * Cập nhật job
      *
@@ -159,6 +160,26 @@ public class JobController {
         String companyId = securityUtils.extractCompanyId(authentication);
 
         Job job = jobService.updateJob(id, request, companyId);
+
+        return RestResponse.<JobResponse>builder()
+                .status(HttpStatus.OK)
+                .message("Job updated successfully")
+                .data(jobMapper.toResponse(job))
+                .build();
+    }
+
+    @PutMapping("/{id}/recruitment")
+    public RestResponse<JobResponse> updateJobRecruitment(
+            @PathVariable("id") String jobId,
+            @RequestBody JobRecruimentRequest request,
+            Authentication authentication
+    ) {
+        if (jobId == null) {
+            throw new BadRequestException("Job ID is required");
+        }
+        String companyId = securityUtils.extractCompanyId(authentication);
+
+        Job job = jobService.updateJob(jobId, companyId, request);
 
         return RestResponse.<JobResponse>builder()
                 .status(HttpStatus.OK)
@@ -289,6 +310,8 @@ public class JobController {
                 .build();
     }
 
+    // ============================ JOB FOR CANDIDATE ============================
+
     /**
      * GET /api/v1/jobs/personalized
      * Lấy danh sách jobs được personalized cho user hiện tại
@@ -314,7 +337,7 @@ public class JobController {
         if (candidateId == null) {
             recommendationJobs = jobService.getJobsForAnonymousUser();
         } else {
-            recommendationJobs = jobService.getJobsPersonalized(candidateId);
+            recommendationJobs = jobService.getJobsPersonalizedES(candidateId);
         }
 
         return RestResponse.<List<JobResponse>>builder()
@@ -350,6 +373,28 @@ public class JobController {
                 .status(HttpStatus.OK)
                 .message("Jobs retrieved successfully")
                 .data(mapToJobResponseList(jobsPopular))
+                .build();
+    }
+
+    @GetMapping("{jobId}/similar")
+    public RestResponse<Page<JobResponse>> getJobsSimilar(
+            @PathVariable("jobId") String jobId,
+            @RequestParam(name = "page", defaultValue = "0") Integer page,
+            @RequestParam(name = "size", defaultValue = "5") Integer size
+    ) {
+
+        if (jobId.isBlank()) {
+            throw new BadRequestException("Job ID invalid");
+        }
+
+        Pageable pageable = PageRequest.of(page, size);
+
+        Page<Job> jobs = jobService.getSimilarJob(jobId, pageable);
+
+        return RestResponse.<Page<JobResponse>>builder()
+                .status(HttpStatus.OK)
+                .message("Get jobs similar success")
+                .data(mapToJobResponsePage(jobs, pageable))
                 .build();
     }
 
@@ -423,18 +468,22 @@ public class JobController {
             @RequestBody JobFilterRequest filter,
             @RequestParam(name = "page", defaultValue = "0") Integer page,
             @RequestParam(name = "size", defaultValue = "10") Integer size,
-            @RequestParam(required = false) String query,
+            @RequestParam(required = false, defaultValue = "") String query,
             Authentication authentication) {
         log.info("POST /api/v1/jobs/search - Fetching lookup jobs");
 
         String companyId = securityUtils.extractCompanyId(authentication);
-        if (companyId == null) {
-            throw new BadRequestException("Company ID is not null");
-        }
+        String candidateId = securityUtils.extractCandidateId(authentication);
+//        if (authentication != null && (authentication.getPrincipal() instanceof Jwt)){
+//            Jwt jwt = (Jwt) authentication.getPrincipal();
+//            candidateId = jwt.getClaim(candidateId).toString();
+//        }
+
 
         Pageable pageable = PageRequest.of(page, size);
-
-        Page<Job> jobPage = jobService.search(filter, companyId, query, pageable);
+        Page<Job> jobPage = (companyId != null && !companyId.isEmpty())
+                ? jobService.search(filter, companyId, query, pageable, PartyType.COMPANY)
+                : jobService.searchEmbed(filter, candidateId, query, pageable, PartyType.CANDIDATE);
 
         return RestResponse.<Page<JobResponse>>builder()
                 .status(HttpStatus.OK)
@@ -443,6 +492,62 @@ public class JobController {
                 .build();
     }
 
+    // ============================ APPLY JOB MANAGEMENT ============================
+
+    @PostMapping("/{id}/application")
+    public RestResponse<ApplicationResponse> apply(
+            @PathVariable("id") String jobId,
+            @RequestBody ApplicationRequest request,
+            Authentication authentication) {
+
+        String candidateId = securityUtils.extractCandidateId(authentication);
+        if (candidateId == null || candidateId.isBlank()) {
+            throw new BadRequestException("Candidate ID invalid");
+        }
+        request.setCandidateId(candidateId);
+
+        if (request.getResumeUrl().isBlank()) {
+            throw new BadRequestException("Application invalid. Resume is required");
+        }
+
+        Application application = applicationService.createApplication(request);
+        return RestResponse.<ApplicationResponse>builder()
+                .status(HttpStatus.CREATED)
+                .message("Application created successfully")
+                .data(applicationMapper.toResponse(application, false))
+                .build();
+    }
+    @PostMapping("/{candidateId}/{jobId}")
+    public RestResponse<Void> saveJob(
+            @PathVariable("candidateId") String candidateId,
+            @PathVariable("jobId") String jobId){
+        savedJobService.saveJob(candidateId, jobId);
+        return RestResponse.<Void>builder()
+                .status(HttpStatus.OK)
+                .message("Lưu công việc thành công")
+                .build();
+    }
+    @DeleteMapping("/{candidateId}/{jobId}")
+    public RestResponse<Void> unsavedJob(
+            @PathVariable("candidateId") String candidateId,
+            @PathVariable("jobId") String  jobId){
+        savedJobService.unsaveJob(candidateId, jobId);
+        return RestResponse.<Void>builder()
+                .status(HttpStatus.OK)
+                .message("Hủy lưu công việc thành công")
+                .build();
+
+    }
+    @GetMapping("/candidate/{candidateId}")
+    public RestResponse<List<JobResponse>> getSavedJobs(@PathVariable String candidateId) {
+        List<Job> list = candidateService.getSavedJobs(candidateId);
+        return RestResponse.<List<JobResponse>>builder()
+                .status(HttpStatus.OK)
+                .data(jobMapper.toResponseListWithStatusSaved(list))
+                .build();
+    }
+
+    // ============================ HELPER METHOD ============================
     // Helper method to map to response page
     private Page<JobResponse> mapToJobResponsePage(Page<Job> jobPage, Pageable pageable) {
         List<JobResponse> jobResponses = jobPage.stream()
