@@ -10,33 +10,19 @@ import org.springframework.data.domain.Pageable;
 import java.util.List;
 
 public interface JobESService {
-        Page<JobES> searchPosts(String key, Pageable pageable);
-
-        SearchResponse<JobES> searchJobsByNavtive(String key, Pageable pageable);
-
         SearchResponse<JobES> searchJobsByNavtiveAndFuzzy(String key, Pageable pageable);
-
-        SearchResponse<JobES> knnSearch(float[] queryVector, int k);
-
         SearchResponse<JobES> knnSearch(
                         float[] vector,
                         JobFilterRequest filter,
                         String partyId,
                         Pageable pageable,
                         PartyType type);
-
-        SearchResponse<JobES> searchRecommendJobs(
+        SearchResponse<JobES> knnSearch(
                         String keyword,
-                        Pageable pageable);
-
-        /**
-         * Search jobs cho Daily Digest với decay function và filters
-         */
-        SearchResponse<JobES> searchRecommendJobs(
-                        String keyword,
+                        JobFilterRequest filter,
+                        String partyId,
                         Pageable pageable,
-                        List<String> excludeJobIds,
-                        int maxAgeDays);
+                        PartyType type);
 
         /**
          * Search jobs cho Daily Digest với filter chỉ từ danh sách job mới đăng.
