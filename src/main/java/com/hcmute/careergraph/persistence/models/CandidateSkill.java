@@ -44,7 +44,7 @@ public class CandidateSkill extends BaseEntity {
     private Candidate candidate;
 
     // Many-to-One relationship with Skill
-    @ManyToOne(fetch = FetchType.LAZY)
+    @ManyToOne(fetch = FetchType.EAGER)
     @JoinColumn(name = "skill_id")
     private Skill skill;
 }

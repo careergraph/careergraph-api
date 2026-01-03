@@ -297,5 +297,4 @@ public class CandidateController {
 
         return Math.round((totalMonths / 12.0) * 10) / 10.0;
     }
-
 }

@@ -105,7 +105,7 @@ public class Candidate extends Party {
     private Set<CandidateExperience> experiences;
 
     // Skill relationships
-    @OneToMany(mappedBy = "candidate", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
+    @OneToMany(mappedBy = "candidate", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.EAGER)
     private Set<CandidateSkill> skills;
 
     // Application relationships
