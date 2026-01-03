@@ -90,7 +90,7 @@ public class DailyDigestScheduler {
      */
     // @Scheduled(cron = "0 0 8 * * *") // Production: 8:00 AM mỗi ngày
     // @Scheduled(cron = "0 0 8 ? * MON,FRI")
-    @Scheduled(cron = "0 */3 * * * ?") // Test: mỗi 3 phút
+    // @Scheduled(cron = "0 */3 * * * ?") // Test: mỗi 3 phút
     @Transactional
     public void sendDailyDigest() {
         log.info("📧 Starting sendDailyDigest...");
