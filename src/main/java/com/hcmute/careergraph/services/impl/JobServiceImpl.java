@@ -2,6 +2,7 @@ package com.hcmute.careergraph.services.impl;
 
 import co.elastic.clients.elasticsearch.core.SearchResponse;
 import co.elastic.clients.elasticsearch.core.search.Hit;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.hcmute.careergraph.enums.common.PartyType;
 import com.hcmute.careergraph.enums.common.Status;
 import com.hcmute.careergraph.enums.job.EducationType;
@@ -15,6 +16,7 @@ import com.hcmute.careergraph.persistence.documents.JobES;
 import com.hcmute.careergraph.persistence.dtos.request.JobCreationRequest;
 import com.hcmute.careergraph.persistence.dtos.request.JobFilterRequest;
 import com.hcmute.careergraph.persistence.dtos.request.JobRecruimentRequest;
+import com.hcmute.careergraph.persistence.dtos.response.CvSuggestionResponse;
 import com.hcmute.careergraph.persistence.event.JobCreatedEvent;
 import com.hcmute.careergraph.persistence.models.Candidate;
 import com.hcmute.careergraph.persistence.models.Company;
@@ -32,6 +34,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.elasticsearch.ResourceNotFoundException;
 import org.springframework.security.core.userdetails.User;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -50,6 +53,7 @@ public class JobServiceImpl implements JobService {
     private final CandidateRepository candidateRepository;
     private final JobMapper jobMapper;
     private final JobESService jobESService;
+    private final ObjectMapper objectMapper;
 
     private final Integer PAGE_SIZE_PERSONAL_JOB = 8;
     private final EmbeddingModel embeddingModel;
@@ -58,6 +62,7 @@ public class JobServiceImpl implements JobService {
     private final QueryEnrichmentService  queryEnrichmentService;
 
     private final HuggingFaceEmbeddingService huggingFaceEmbeddingService;
+    private final FastAPIClientService fastAPIClientService;
 
     private final ApplicationEventPublisher publisher;
 
@@ -481,6 +486,95 @@ public class JobServiceImpl implements JobService {
             return new PageImpl<>(ljobs, pageable, total);
         }
         return jobs;
+    }
+
+    @Override
+    public CvSuggestionResponse generateCv(String jobId, String candidateId) {
+
+        Job job = jobRepository.findById(jobId)
+                .orElseThrow(() -> new ResourceNotFoundException("Job not found with id: " + jobId));
+
+        Candidate candidate = candidateRepository.findById(candidateId)
+                .orElseThrow(() -> new ResourceNotFoundException("Candidate not found with id: " + candidateId));
+
+        // 2. Xây dựng Prompt (Câu lệnh cho AI)
+        String prompt = buildCvGenerationPrompt(job, candidate);
+
+        // 3. Gọi AI
+        String jsonResponse = fastAPIClientService.cvSuggestion(prompt);
+
+        // 4. Parse kết quả JSON từ AI thành Object
+        try {
+            // Đôi khi AI trả về markdown ```json ... ```, cần clean trước khi parse
+            String cleanJson = cleanJsonString(jsonResponse);
+            return objectMapper.readValue(cleanJson, CvSuggestionResponse.class);
+        } catch (Exception e) {
+            log.error("Error parsing AI response", e);
+            throw new RuntimeException("Failed to generate CV suggestion", e);
+        }
+    }
+
+    // Helper để làm sạch chuỗi JSON nếu AI trả về dạng Markdown
+    private String cleanJsonString(String response) {
+        if (response.contains("```json")) {
+            return response.replace("```json", "").replace("```", "").trim();
+        }
+        if (response.contains("```")) {
+            return response.replace("```", "").trim();
+        }
+        return response;
+    }
+
+    private String buildCvGenerationPrompt(Job job, Candidate candidate) {
+        StringBuilder sb = new StringBuilder();
+
+        sb.append("Đóng vai là một chuyên gia tư vấn nghề nghiệp và viết CV chuyên nghiệp (Top CV Writer). ");
+        sb.append("Nhiệm vụ của bạn là viết lại nội dung CV cho ứng viên để phù hợp nhất với công việc đang ứng tuyển.\n\n");
+
+        // --- Input: Job Info ---
+        sb.append("--- THÔNG TIN CÔNG VIỆC (TARGET JOB) ---\n");
+        sb.append("Vị trí: ").append(job.getTitle()).append("\n");
+        sb.append("Công ty: ").append(job.getCompany().getName()).append("\n");
+        sb.append("Mô tả công việc: ").append(job.getDescription()).append("\n");
+        sb.append("Yêu cầu kỹ năng: ").append(job.getQualifications()).append("\n\n");
+
+        // --- Input: Candidate Info ---
+        sb.append("--- HỒ SƠ GỐC CỦA ỨNG VIÊN ---\n");
+        sb.append("Họ tên: ").append(candidate.getFirstName() + " " + candidate.getLastName()).append("\n");
+        List<String> skills = candidate.getSkills().stream()
+                        .map(skill -> skill.getSkill().getName())
+                        .toList();
+        sb.append("Kỹ năng hiện có: ").append(skills).append("\n");
+
+        List<String> experiences = candidate.getExperiences().stream()
+                        .map(experience -> experience.getCompany().getName() + ": from " + experience.getStartDate()
+                                + " to " + experience.getEndDate())
+                        .toList();
+        sb.append("Kinh nghiệm làm việc: ").append(experiences).append("\n");
+
+        List<String> educations = candidate.getEducations().stream()
+                .map(experience -> experience.getEducation().getOfficialName() + ": from " + experience.getStartDate()
+                        + " to " + experience.getEndDate())
+                .toList();
+        sb.append("Học vấn: ").append(educations).append("\n\n");
+
+        // --- Output Requirement ---
+        sb.append("--- YÊU CẦU ĐẦU RA ---\n");
+        sb.append("1. Hãy viết lại phần 'summary' (tóm tắt) thật ấn tượng, thể hiện ứng viên là người phù hợp cho vị trí này.\n");
+        sb.append("2. Trong phần 'experience', hãy viết lại các 'bulletPoints' sao cho làm nổi bật các từ khóa (keywords) có trong mô tả công việc (Job Description).\n");
+        sb.append("3. Chỉ giữ lại hoặc sắp xếp các kỹ năng (skills) liên quan lên đầu.\n");
+        sb.append("4. Trả về kết quả DUY NHẤT là một chuỗi JSON hợp lệ khớp với cấu trúc sau (không giải thích thêm):\n");
+
+        // Cung cấp mẫu JSON để AI điền vào
+        sb.append("{\n" +
+                "  \"personal\": { \"fullName\": \"...\", \"headline\": \"...\", \"summary\": \"...\", \"location\": \"...\" },\n" +
+                "  \"contact\": { \"email\": \"...\", \"phone\": \"...\", \"linkedin\": \"...\" },\n" +
+                "  \"experience\": [ { \"role\": \"...\", \"company\": \"...\", \"startDate\": \"...\", \"endDate\": \"...\", \"bulletPoints\": [\"...\"] } ],\n" +
+                "  \"education\": [ { \"school\": \"...\", \"degree\": \"...\", \"startDate\": \"...\", \"endDate\": \"...\" } ],\n" +
+                "  \"skills\": [ { \"name\": \"...\" } ]\n" +
+                "}");
+
+        return sb.toString();
     }
 
 }

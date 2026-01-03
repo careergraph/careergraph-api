@@ -12,6 +12,7 @@ import com.hcmute.careergraph.persistence.dtos.request.JobCreationRequest;
 import com.hcmute.careergraph.persistence.dtos.request.JobFilterRequest;
 import com.hcmute.careergraph.persistence.dtos.request.JobRecruimentRequest;
 import com.hcmute.careergraph.persistence.dtos.response.ApplicationResponse;
+import com.hcmute.careergraph.persistence.dtos.response.CvSuggestionResponse;
 import com.hcmute.careergraph.persistence.dtos.response.JobResponse;
 import com.hcmute.careergraph.persistence.models.Application;
 import com.hcmute.careergraph.persistence.models.Job;
@@ -544,6 +545,21 @@ public class JobController {
         return RestResponse.<List<JobResponse>>builder()
                 .status(HttpStatus.OK)
                 .data(jobMapper.toResponseListWithStatusSaved(list))
+                .build();
+    }
+
+    // ============================ AI GENERATE CV ============================
+    @PostMapping("/{jobId}/cv-suggestion")
+    public RestResponse<CvSuggestionResponse> generateCv(@PathVariable String jobId,
+                                                         Authentication authentication) {
+
+        String candidateId = securityUtils.extractCandidateId(authentication);
+
+        CvSuggestionResponse result = jobService.generateCv(jobId, candidateId);
+
+        return RestResponse.<CvSuggestionResponse>builder()
+                .status(HttpStatus.OK)
+                .data(result)
                 .build();
     }
 

@@ -6,4 +6,6 @@ import com.hcmute.careergraph.persistence.dtos.response.ChatResponse;
 public interface FastAPIClientService {
 
     ChatResponse chat(ChatRequest request);
+
+    String cvSuggestion(String prompt);
 }

@@ -5,6 +5,7 @@ import com.hcmute.careergraph.enums.job.JobCategory;
 import com.hcmute.careergraph.persistence.dtos.request.JobCreationRequest;
 import com.hcmute.careergraph.persistence.dtos.request.JobFilterRequest;
 import com.hcmute.careergraph.persistence.dtos.request.JobRecruimentRequest;
+import com.hcmute.careergraph.persistence.dtos.response.CvSuggestionResponse;
 import com.hcmute.careergraph.persistence.models.Job;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -54,4 +55,6 @@ public interface JobService {
 
     Page<Job> search(JobFilterRequest filter, String partyId, String query, Pageable pageable, PartyType type);
     Page<Job> searchEmbed(JobFilterRequest filter, String partyId, String query, Pageable pageable, PartyType type);
+
+    CvSuggestionResponse generateCv(String jobId, String candidateId);
 }
