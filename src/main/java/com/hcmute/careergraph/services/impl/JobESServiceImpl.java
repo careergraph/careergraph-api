@@ -2,12 +2,19 @@ package com.hcmute.careergraph.services.impl;
 
 import co.elastic.clients.elasticsearch.ElasticsearchClient;
 import co.elastic.clients.elasticsearch._types.FieldValue;
+import co.elastic.clients.elasticsearch._types.Script;
+import co.elastic.clients.elasticsearch._types.ScriptLanguage;
+import co.elastic.clients.elasticsearch._types.query_dsl.FunctionBoostMode;
+import co.elastic.clients.elasticsearch._types.query_dsl.FunctionScoreMode;
+import co.elastic.clients.elasticsearch._types.query_dsl.Operator;
 import co.elastic.clients.elasticsearch._types.query_dsl.TextQueryType;
 import co.elastic.clients.elasticsearch.core.SearchResponse;
+import co.elastic.clients.json.JsonData;
 import com.hcmute.careergraph.enums.common.PartyType;
 import com.hcmute.careergraph.persistence.documents.JobES;
 import com.hcmute.careergraph.persistence.dtos.request.JobFilterRequest;
 import com.hcmute.careergraph.repositories.JobESRepository;
+import com.hcmute.careergraph.services.EmbedService;
 import com.hcmute.careergraph.services.JobESService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -24,213 +31,452 @@ import java.util.List;
 @Slf4j
 public class JobESServiceImpl implements JobESService {
 
-    private final JobESRepository jobESRepository;
+        private final JobESRepository jobESRepository;
 
+        private final ElasticsearchClient client;
 
-    private final ElasticsearchClient client;
-    @Override
-    public Page<JobES> searchPosts(String key, Pageable pageable) {
-        return jobESRepository.search(key, pageable);
-    }
+        private final EmbedService embedService;
 
-    @Override
-    public SearchResponse<JobES> searchJobsByNavtive(String key, Pageable pageable) {
-        try {
-            // Thực hiện search
-            SearchResponse<JobES> response = client.search(s -> s
-                            .index("jobs_es")
-                            .query(q -> q
-                                    .multiMatch(mm -> mm
-                                            .query(key)
-                                            .fields("title^10","jobCategory^5","state")
-                                    )
-                            )
-                            .from((int) pageable.getOffset())
-                            .size(pageable.getPageSize()),
-                    JobES.class
-            );
-            return response;
+        @Override
+        public SearchResponse<JobES> searchJobsByNavtiveAndFuzzy(String key, Pageable pageable) {
+                try {
+                        SearchResponse<JobES> response = client.search(s -> s
+                                        .index("jobs_es")
+                                        .query(q -> q
+                                                        .bool(b -> b
+                                                                        // Search theo text
+                                                                        .must(m -> m
+                                                                                        .multiMatch(mm -> mm
+                                                                                                        .query(key)
+                                                                                                        .fields(
+                                                                                                                        "title^10",
+                                                                                                                        "jobCategory^5",
+                                                                                                                        "state^1")
+                                                                                                        .fuzziness("AUTO")
+                                                                                                        .type(TextQueryType.MostFields)))
 
-        } catch (Exception e) {
-            e.printStackTrace();
-            return null;
+                                                        ))
+                                        .from((int) pageable.getOffset())
+                                        .size(pageable.getPageSize()),
+                                        JobES.class);
+
+                        return response;
+                } catch (Exception e) {
+                        e.printStackTrace();
+                        return null;
+                }
         }
-    }
 
-    @Override
-    public SearchResponse<JobES> searchJobsByNavtiveAndFuzzy(String key, Pageable pageable) {
-        try {
-            LocalDate today = LocalDate.now();
+        @Override
+        public SearchResponse<JobES> knnSearch(
+                        float[] queryVector,
+                        JobFilterRequest filter,
+                        String partyId,
+                        Pageable pageable,
+                        PartyType type) {
+                try {
+                        return client.search(s -> s
+                                        .index("jobs_es")
+                                        .from((int) pageable.getOffset())
+                                        .size(pageable.getPageSize())
+                                        .knn(knn -> knn
+                                                        .field("embedding")
+                                                        .queryVector(toFloatList(queryVector))
+                                                        .k(100)
+                                                        .numCandidates(300)
+                                                        .filter(f -> f.bool(b -> {
 
-            SearchResponse<JobES> response = client.search(s -> s
-                            .index("jobs_es")
-                            .query(q -> q
-                                    .bool(b -> b
-                                            // Search theo text
-                                            .must(m -> m
-                                                    .multiMatch(mm -> mm
-                                                            .query(key)
-                                                            .fields(
-                                                                    "title^10",
-                                                                    "jobCategory^5",
-                                                                    "state^1"
-                                                            )
-                                                            .fuzziness("AUTO")
-                                                            .type(TextQueryType.MostFields)
-                                                    )
-                                            )
+                                                                /* ===== STATUS ===== */
+                                                                if (filter.getStatuses() != null
+                                                                                && !filter.getStatuses().isEmpty()) {
+                                                                        b.filter(q -> q.terms(t -> t
+                                                                                        .field("status")
+                                                                                        .terms(v -> v.value(
+                                                                                                        filter.getStatuses()
+                                                                                                                        .stream()
+                                                                                                                        .map(s1 -> FieldValue
+                                                                                                                                        .of(s1.name()))
+                                                                                                                        .toList()))));
+                                                                }
 
-                                    )
-                            )
-                            .from((int) pageable.getOffset())
-                            .size(pageable.getPageSize()),
-                    JobES.class
-            );
+                                                                /* ===== JOB CATEGORY ===== */
+                                                                if (filter.getJobCategories() != null && !filter
+                                                                                .getJobCategories().isEmpty()) {
+                                                                        b.filter(q -> q.terms(t -> t
+                                                                                        .field("jobCategory.keyword")
+                                                                                        .terms(v -> v.value(
+                                                                                                        filter.getJobCategories()
+                                                                                                                        .stream()
+                                                                                                                        .map(c -> FieldValue
+                                                                                                                                        .of(c.name()))
+                                                                                                                        .toList()))));
+                                                                }
 
-            return response;
-        } catch (Exception e) {
-            e.printStackTrace();
-            return null;
+                                                                /* ===== EMPLOYMENT TYPE ===== */
+                                                                if (filter.getEmploymentTypes() != null && !filter
+                                                                                .getEmploymentTypes().isEmpty()) {
+                                                                        b.filter(q -> q.terms(t -> t
+                                                                                        .field("employmentType")
+                                                                                        .terms(v -> v.value(
+                                                                                                        filter.getEmploymentTypes()
+                                                                                                                        .stream()
+                                                                                                                        .map(e -> FieldValue
+                                                                                                                                        .of(e.name()))
+                                                                                                                        .toList()))));
+                                                                }
+
+                                                                /* ===== EXPERIENCE ===== */
+                                                                if (filter.getExperienceLevels() != null && !filter
+                                                                                .getExperienceLevels().isEmpty()) {
+                                                                        b.filter(q -> q.terms(t -> t
+                                                                                        .field("experienceLevel")
+                                                                                        .terms(v -> v.value(
+                                                                                                        filter.getExperienceLevels()
+                                                                                                                        .stream()
+                                                                                                                        .map(e -> FieldValue
+                                                                                                                                        .of(e.name()))
+                                                                                                                        .toList()))));
+                                                                }
+
+                                                                /* ===== EDUCATION ===== */
+                                                                if (filter.getEducationTypes() != null && !filter
+                                                                                .getEducationTypes().isEmpty()) {
+                                                                        b.filter(q -> q.terms(t -> t
+                                                                                        .field("education")
+                                                                                        .terms(v -> v.value(
+                                                                                                        filter.getEducationTypes()
+                                                                                                                        .stream()
+                                                                                                                        .map(e -> FieldValue
+                                                                                                                                        .of(e.name()))
+                                                                                                                        .toList()))));
+                                                                }
+
+                                                                /* ===== CITY ===== */
+                                                                if (filter.getCity() != null
+                                                                                && !filter.getCity().isEmpty()) {
+                                                                        b.filter(q -> q.term(t -> t
+                                                                                        .field("city")
+                                                                                        .value(filter.getCity())));
+                                                                }
+
+                                                                /* ===== COMPANY ===== */
+                                                                if (type == PartyType.COMPANY && partyId != null) {
+                                                                        b.filter(q -> q.term(t -> t
+                                                                                        .field("companyId")
+                                                                                        .value(partyId)));
+                                                                }
+
+                                                                return b;
+                                                        }))),
+                                        JobES.class);
+
+                } catch (Exception e) {
+                        e.printStackTrace();
+                        return null;
+                }
         }
-    }
 
-    @Override
-    public SearchResponse<JobES> knnSearch(
-            float[] queryVector,
-            JobFilterRequest filter,
-            String partyId,
-            Pageable pageable,
-            PartyType type
-    ) {
-        try {
-            return client.search(s -> s
-                            .index("jobs_es")
-                            .from((int) pageable.getOffset())
-                            .size(pageable.getPageSize())
-                            .knn(knn -> knn
-                                    .field("embedding")
-                                    .queryVector(toFloatList(queryVector))
-                                    .k(100)
-                                    .numCandidates(300)
-                                    .filter(f -> f.bool(b -> {
+        /**
+         * Hybrid Search: Kết hợp BM25 Text Search + KNN Embedding Search + Exact
+         * Filters
+         * (FREE VERSION - Basic License, không dùng RRF)
+         * 
+         * Kiến trúc:
+         * 1. KNN Query: Đặt trong bool.should (KHÔNG dùng top-level knn)
+         * 2. BM25 Text Search: multi_match với fuzzy, phrase_prefix, cross_fields
+         * 3. Hybrid Score: ES tự động cộng scores từ các should clauses
+         * 4. Post Filter: Lọc chính xác sau khi scoring
+         * 
+         * Mapping required cho embedding field:
+         * {
+         * "embedding": {
+         * "type": "dense_vector",
+         * "dims": 768, // hoặc dimension của model
+         * "index": true,
+         * "similarity": "cosine"
+         * }
+         * }
+         */
+        @Override
+        public SearchResponse<JobES> knnSearch(
+                        String keyword,
+                        JobFilterRequest filter,
+                        String partyId,
+                        Pageable pageable,
+                        PartyType type) {
+                try {
+                        float[] queryVector = embedService.embed(keyword);
 
-                                        /* ===== STATUS ===== */
-                                        if (filter.getStatuses() != null && !filter.getStatuses().isEmpty()) {
-                                            b.filter(q -> q.terms(t -> t
-                                                    .field("status")
-                                                    .terms(v -> v.value(
-                                                            filter.getStatuses().stream()
-                                                                    .map(s1 -> FieldValue.of(s1.name()))
-                                                                    .toList()
-                                                    ))
-                                            ));
-                                        }
+                        return client.search(s -> s
+                                        .index("jobs_es")
+                                        .from((int) pageable.getOffset())
+                                        .size(pageable.getPageSize())
 
-                                        /* ===== JOB CATEGORY ===== */
-                                        if (filter.getJobCategories() != null && !filter.getJobCategories().isEmpty()) {
-                                            b.filter(q -> q.terms(t -> t
-                                                    .field("jobCategory.keyword")
-                                                    .terms(v -> v.value(
-                                                            filter.getJobCategories().stream()
-                                                                    .map(c -> FieldValue.of(c.name()))
-                                                                    .toList()
-                                                    ))
-                                            ));
-                                        }
+                                        /* ===== HYBRID QUERY: KNN + BM25 trong bool.should ===== */
+                                        .query(q -> q
+                                                        .bool(b -> b
+                                                                        /*
+                                                                         * ===== 1. KNN SEMANTIC SEARCH =====
+                                                                         * Đặt trong should, boost 0.5 để cân bằng với
+                                                                         * BM25
+                                                                         */
+                                                                        .should(sh -> sh
+                                                                                        .knn(knn -> knn
+                                                                                                        .field("embedding")
+                                                                                                        .queryVector(toFloatList(
+                                                                                                                        queryVector))
+                                                                                                        .numCandidates(100)
+                                                                                                        .boost(0.5f)))
 
-                                        /* ===== EMPLOYMENT TYPE ===== */
-                                        if (filter.getEmploymentTypes() != null && !filter.getEmploymentTypes().isEmpty()) {
-                                            b.filter(q -> q.terms(t -> t
-                                                    .field("employmentType")
-                                                    .terms(v -> v.value(
-                                                            filter.getEmploymentTypes().stream()
-                                                                    .map(e -> FieldValue.of(e.name()))
-                                                                    .toList()
-                                                    ))
-                                            ));
-                                        }
+                                                                        /*
+                                                                         * ===== 2. BM25 TEXT SEARCH =====
+                                                                         * BestFields: Tìm term match tốt nhất trong 1
+                                                                         * field
+                                                                         */
+                                                                        .should(sh -> sh
+                                                                                        .multiMatch(mm -> mm
+                                                                                                        .query(keyword)
+                                                                                                        .fields(
+                                                                                                                        "title^10",
+                                                                                                                        "jobCategory^5",
+                                                                                                                        "state^2",
+                                                                                                                        "city^1")
+                                                                                                        .fuzziness("AUTO")
+                                                                                                        .type(TextQueryType.BestFields)
+                                                                                                        .operator(Operator.Or)
+                                                                                                        .minimumShouldMatch(
+                                                                                                                        "30%")
+                                                                                                        .boost(1.0f)))
 
-                                        /* ===== EXPERIENCE ===== */
-                                        if (filter.getExperienceLevels() != null && !filter.getExperienceLevels().isEmpty()) {
-                                            b.filter(q -> q.terms(t -> t
-                                                    .field("experienceLevel")
-                                                    .terms(v -> v.value(
-                                                            filter.getExperienceLevels().stream()
-                                                                    .map(e -> FieldValue.of(e.name()))
-                                                                    .toList()
-                                                    ))
-                                            ));
-                                        }
+                                                                        /*
+                                                                         * ===== 3. PHRASE PREFIX =====
+                                                                         * Boost cao cho exact phrase match
+                                                                         */
+                                                                        .should(sh -> sh
+                                                                                        .multiMatch(mm -> mm
+                                                                                                        .query(keyword)
+                                                                                                        .fields(
+                                                                                                                        "title^10",
+                                                                                                                        "jobCategory^5")
+                                                                                                        .type(TextQueryType.PhrasePrefix)
+                                                                                                        .boost(1.5f)))
 
-                                        /* ===== EDUCATION ===== */
-                                        if (filter.getEducationTypes() != null && !filter.getEducationTypes().isEmpty()) {
-                                            b.filter(q -> q.terms(t -> t
-                                                    .field("education")
-                                                    .terms(v -> v.value(
-                                                            filter.getEducationTypes().stream()
-                                                                    .map(e -> FieldValue.of(e.name()))
-                                                                    .toList()
-                                                    ))
-                                            ));
-                                        }
+                                                                        /*
+                                                                         * ===== 4. CROSS FIELDS =====
+                                                                         * Match terms across multiple fields
+                                                                         */
+                                                                        .should(sh -> sh
+                                                                                        .multiMatch(mm -> mm
+                                                                                                        .query(keyword)
+                                                                                                        .fields(
+                                                                                                                        "title^10",
+                                                                                                                        "jobCategory^5",
+                                                                                                                        "state^2",
+                                                                                                                        "city^1")
+                                                                                                        .type(TextQueryType.CrossFields)
+                                                                                                        .operator(Operator.Or)
+                                                                                                        .boost(0.8f)))
 
-                                        /* ===== CITY ===== */
-                                        if (filter.getCity() != null && !filter.getCity().isEmpty()) {
-                                            b.filter(q -> q.term(t -> t
-                                                    .field("city")
-                                                    .value(filter.getCity())
-                                            ));
-                                        }
+                                                                        // Ít nhất 1 should clause phải match
+                                                                        .minimumShouldMatch("1")))
 
-                                        /* ===== COMPANY ===== */
-                                        if (type == PartyType.COMPANY && partyId != null) {
-                                            b.filter(q -> q.term(t -> t
-                                                    .field("companyId")
-                                                    .value(partyId)
-                                            ));
-                                        }
+                                        /* ===== 5. POST FILTER (Exact Filtering) ===== */
+                                        .postFilter(pf -> pf
+                                                        .bool(b -> {
+                                                                /* ===== STATUS ===== */
+                                                                if (filter.getStatuses() != null
+                                                                                && !filter.getStatuses().isEmpty()) {
+                                                                        b.filter(fq -> fq.terms(t -> t
+                                                                                        .field("status")
+                                                                                        .terms(v -> v.value(
+                                                                                                        filter.getStatuses()
+                                                                                                                        .stream()
+                                                                                                                        .map(st -> FieldValue
+                                                                                                                                        .of(st.name()))
+                                                                                                                        .toList()))));
+                                                                }
 
-                                        return b;
-                                    }))
-                            ),
-                    JobES.class);
+                                                                /* ===== JOB CATEGORY ===== */
+                                                                if (filter.getJobCategories() != null
+                                                                                && !filter.getJobCategories()
+                                                                                                .isEmpty()) {
+                                                                        b.filter(fq -> fq.terms(t -> t
+                                                                                        .field("jobCategory.keyword")
+                                                                                        .terms(v -> v.value(
+                                                                                                        filter.getJobCategories()
+                                                                                                                        .stream()
+                                                                                                                        .map(c -> FieldValue
+                                                                                                                                        .of(c.name()))
+                                                                                                                        .toList()))));
+                                                                }
 
-        } catch (Exception e) {
-            e.printStackTrace();
-            return null;
+                                                                /* ===== EMPLOYMENT TYPE ===== */
+                                                                if (filter.getEmploymentTypes() != null
+                                                                                && !filter.getEmploymentTypes()
+                                                                                                .isEmpty()) {
+                                                                        b.filter(fq -> fq.terms(t -> t
+                                                                                        .field("employmentType")
+                                                                                        .terms(v -> v.value(
+                                                                                                        filter.getEmploymentTypes()
+                                                                                                                        .stream()
+                                                                                                                        .map(e -> FieldValue
+                                                                                                                                        .of(e.name()))
+                                                                                                                        .toList()))));
+                                                                }
+
+                                                                /* ===== EXPERIENCE LEVEL ===== */
+                                                                if (filter.getExperienceLevels() != null
+                                                                                && !filter.getExperienceLevels()
+                                                                                                .isEmpty()) {
+                                                                        b.filter(fq -> fq.terms(t -> t
+                                                                                        .field("experienceLevel")
+                                                                                        .terms(v -> v.value(
+                                                                                                        filter.getExperienceLevels()
+                                                                                                                        .stream()
+                                                                                                                        .map(e -> FieldValue
+                                                                                                                                        .of(e.name()))
+                                                                                                                        .toList()))));
+                                                                }
+
+                                                                /* ===== EDUCATION ===== */
+                                                                if (filter.getEducationTypes() != null
+                                                                                && !filter.getEducationTypes()
+                                                                                                .isEmpty()) {
+                                                                        b.filter(fq -> fq.terms(t -> t
+                                                                                        .field("education")
+                                                                                        .terms(v -> v.value(
+                                                                                                        filter.getEducationTypes()
+                                                                                                                        .stream()
+                                                                                                                        .map(e -> FieldValue
+                                                                                                                                        .of(e.name()))
+                                                                                                                        .toList()))));
+                                                                }
+
+                                                                /* ===== CITY ===== */
+                                                                if (filter.getCity() != null
+                                                                                && !filter.getCity().isEmpty()) {
+                                                                        b.filter(fq -> fq.term(t -> t
+                                                                                        .field("city.keyword")
+                                                                                        .value(filter.getCity())));
+                                                                }
+
+                                                                /* ===== COMPANY ===== */
+                                                                if (type == PartyType.COMPANY && partyId != null) {
+                                                                        b.filter(fq -> fq.term(t -> t
+                                                                                        .field("companyId")
+                                                                                        .value(partyId)));
+                                                                }
+
+                                                                return b;
+                                                        })),
+                                        JobES.class);
+
+                } catch (Exception e) {
+                        log.error("Error in hybrid knnSearch: {}", e.getMessage());
+                        e.printStackTrace();
+                        throw new RuntimeException("Failed to execute hybrid search", e);
+                }
         }
-    }
 
+        /**
+         * Search jobs cho Daily Digest với filter CHỈ từ danh sách job mới đăng.
+         * Đây là method chính cho Daily Digest pipeline.
+         *
+         * @param keyword           Từ khóa tìm kiếm (từ candidate profile)
+         * @param pageable          Pagination
+         * @param newlyPostedJobIds Danh sách job IDs mới đăng (filter IN - chỉ search
+         *                          trong này)
+         * @param excludeJobIds     Danh sách job IDs cần loại (đã gửi trước đó)
+         */
+        @Override
+        public SearchResponse<JobES> searchRecommendJobsFromNewlyPosted(
+                        String keyword,
+                        Pageable pageable,
+                        List<String> newlyPostedJobIds,
+                        List<String> excludeJobIds) {
+                try {
+                        // Nếu không có job mới → trả về null
+                        if (newlyPostedJobIds == null || newlyPostedJobIds.isEmpty()) {
+                                log.debug("No newly posted jobs to search");
+                                return null;
+                        }
 
+                        return client.search(s -> s
+                                        .index("jobs_es")
+                                        .query(q -> q
+                                                        .functionScore(fs -> fs
+                                                                        .query(base -> base
+                                                                                        .bool(b -> {
+                                                                                                // Text matching với
+                                                                                                // relevance
+                                                                                                b.must(m -> m
+                                                                                                                .multiMatch(mm -> mm
+                                                                                                                                .query(keyword)
+                                                                                                                                .fields(
+                                                                                                                                                "title^10",
+                                                                                                                                                "jobCategory^5",
+                                                                                                                                                "state^2",
+                                                                                                                                                "city^1")
+                                                                                                                                .fuzziness("AUTO")
+                                                                                                                                .type(TextQueryType.MostFields)));
 
+                                                                                                // Filter: CHỈ search
+                                                                                                // trong danh sách job
+                                                                                                // mới đăng
+                                                                                                b.filter(f -> f
+                                                                                                                .ids(ids -> ids
+                                                                                                                                .values(newlyPostedJobIds)));
 
-    @Override
-    public SearchResponse<JobES> knnSearch(float[] queryVector, int k) {
-        try {
-            SearchResponse<JobES> response = client.search( s -> s
-                            .index("jobs_es")
-                            .knn(knn -> knn
-                                    .field("embedding")
-                                    .queryVector(toFloatList(queryVector))
-                                    .k(k)
-                                    .numCandidates(100)
+                                                                                                // Filter: Chỉ job còn
+                                                                                                // ACTIVE
+                                                                                                b.filter(f -> f
+                                                                                                                .term(t -> t
+                                                                                                                                .field("status")
+                                                                                                                                .value("ACTIVE")));
 
-                            ),
-                    JobES .class
-            );
+                                                                                                // Exclude job IDs đã
+                                                                                                // // gửi
+                                                                                                if (excludeJobIds != null
+                                                                                                                && !excludeJobIds
+                                                                                                                                .isEmpty()) {
+                                                                                                        b.mustNot(mn -> mn
+                                                                                                                        .ids(ids -> ids
+                                                                                                                                        .values(excludeJobIds)));
+                                                                                                }
 
-            return response;
-
-        } catch (Exception e) {
-            e.printStackTrace();
-            return null;
+                                                                                                return b;
+                                                                                        }))
+                                                                        // Decay function: Boost job mới, giảm dần theo
+                                                                        // thời gian
+                                                                        .functions(f -> f
+                                                                                        .scriptScore(ss -> ss
+                                                                                                        .script(script -> script
+                                                                                                                        .source("""
+                                                                                                                                            long created = doc['createdAt'].value.toEpochMilli();
+                                                                                                                                            long now = new Date().getTime();
+                                                                                                                                            double days = (now - created) / 86400000.0;
+                                                                                                                                            if (days < 0) days = 0;
+                                                                                                                                            double scale = 7.0;
+                                                                                                                                            double decayScore = Math.exp(-Math.pow(days, 2) / (2 * Math.pow(scale, 2)));
+                                                                                                                                            return Math.max(decayScore, 0.1);
+                                                                                                                                        """))))
+                                                                        .boostMode(FunctionBoostMode.Multiply)
+                                                                        .scoreMode(FunctionScoreMode.Multiply)))
+                                        .from((int) pageable.getOffset())
+                                        .size(pageable.getPageSize()),
+                                        JobES.class);
+                } catch (Exception e) {
+                        log.error("Error searching recommend jobs from newly posted: {}", e.getMessage());
+                        e.printStackTrace();
+                        return null;
+                }
         }
-    }
-    private List<Float> toFloatList(float [] vector){
-        List<Float> list = new ArrayList<>();
-        for(float v : vector)
-            list.add(v);
 
-        return list;
-    }
+        private List<Float> toFloatList(float[] vector) {
+                List<Float> list = new ArrayList<>();
+                for (float v : vector)
+                        list.add(v);
+
+                return list;
+        }
 }

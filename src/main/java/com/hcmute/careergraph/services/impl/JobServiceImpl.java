@@ -461,7 +461,7 @@ public class JobServiceImpl implements JobService {
             float[] queryVector = embedService.embed(keyword);
 
             SearchResponse<JobES> esResponse =
-                    jobESService.knnSearch(queryVector, filter, partyId, pageable, type);
+                    jobESService.knnSearch(keyword, filter, partyId, pageable, type);
 //            SearchResponse<JobES> esResponse =
 //                    jobESService.knnSearch(queryVector, 10);
 

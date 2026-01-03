@@ -10,10 +10,17 @@ import org.springframework.data.jpa.repository.Query;
 import java.util.List;
 
 public interface JobNotificationQueueRepository
-        extends JpaRepository<JobNotificationQueue, String> {
+                extends JpaRepository<JobNotificationQueue, String> {
 
-    List<JobNotificationQueue> findBySendTypeAndStatusSend(
-            SendType sendType,
-            StatusSend status
-    );
+        List<JobNotificationQueue> findBySendTypeAndStatusSend(
+                        SendType sendType,
+                        StatusSend status);
+
+        boolean existsByUserIdAndJobIdAndSendType(
+                        String userId,
+                        String jobId,
+                        SendType sendType);
+
+        @Query("select q.jobId from JobNotificationQueue q where q.userId = :userId and q.sendType = :sendType")
+        List<String> findJobIdsByUserIdAndSendType(String userId, SendType sendType);
 }

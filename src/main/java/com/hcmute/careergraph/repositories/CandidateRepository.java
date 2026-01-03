@@ -11,4 +11,5 @@ import java.util.Map;
 
 @Repository
 public interface CandidateRepository extends JpaRepository<Candidate, String> {
+    List<Candidate> findAllByIsOpenToNotifyNewJob(Boolean isOpenToNotifyNewJob);
 }

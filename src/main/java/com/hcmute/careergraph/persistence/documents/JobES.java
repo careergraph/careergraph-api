@@ -7,6 +7,8 @@ import jakarta.persistence.Table;
 import lombok.*;
 import org.springframework.data.elasticsearch.annotations.*;
 
+import java.time.LocalDate;
+
 
 @Getter
 @Setter
@@ -16,6 +18,7 @@ import org.springframework.data.elasticsearch.annotations.*;
 @JsonIgnoreProperties(ignoreUnknown = true)
 @Document(indexName = "jobs_es")
 @Setting(settingPath = "elasticsearch/jobs-es-settings.json")
+@Mapping(mappingPath = "elasticsearch/jobs-es-mappings.json")
 public class JobES {
 
     @Id
@@ -61,6 +64,8 @@ public class JobES {
     @Field(type = FieldType.Keyword)
     private String companyId;
 
+    @Field(type = FieldType.Date, format = DateFormat.date)
+    private LocalDate createdAt;
 
     /* ========= VECTOR ========= */
     @Field(
