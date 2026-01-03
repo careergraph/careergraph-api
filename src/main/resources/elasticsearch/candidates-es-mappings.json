@@ -1,0 +1,94 @@
+{
+  "properties": {
+    "id": {
+      "type": "keyword"
+    },
+    "firstName": {
+      "type": "text",
+      "analyzer": "vi_analyzer"
+    },
+    "lastName": {
+      "type": "text",
+      "analyzer": "vi_analyzer"
+    },
+    "email": {
+      "type": "keyword"
+    },
+    "phone": {
+      "type": "keyword"
+    },
+    "avatar": {
+      "type": "keyword"
+    },
+    "gender": {
+      "type": "keyword"
+    },
+    "yearsOfExperience": {
+      "type": "integer"
+    },
+    "desiredPosition": {
+      "type": "text",
+      "analyzer": "vi_analyzer",
+      "fields": {
+        "keyword": {
+          "type": "keyword"
+        }
+      }
+    },
+    "currentJobTitle": {
+      "type": "text",
+      "analyzer": "vi_analyzer",
+      "fields": {
+        "keyword": {
+          "type": "keyword"
+        }
+      }
+    },
+    "summary": {
+      "type": "text",
+      "analyzer": "vi_analyzer"
+    },
+    "isOpenToWork": {
+      "type": "boolean"
+    },
+    "educationLevel": {
+      "type": "keyword"
+    },
+    "experienceLevel": {
+      "type": "keyword"
+    },
+    "industries": {
+      "type": "keyword"
+    },
+    "locations": {
+      "type": "keyword"
+    },
+    "workTypes": {
+      "type": "keyword"
+    },
+    "salaryExpectationMin": {
+      "type": "integer"
+    },
+    "salaryExpectationMax": {
+      "type": "integer"
+    },
+    "skills": {
+      "type": "text",
+      "analyzer": "vi_analyzer"
+    },
+    "createdAt": {
+      "type": "date",
+      "format": "yyyy-MM-dd"
+    },
+    "lastActive": {
+      "type": "date",
+      "format": "yyyy-MM-dd'T'HH:mm:ss||yyyy-MM-dd"
+    },
+    "embedding": {
+      "type": "dense_vector",
+      "dims": 768,
+      "index": true,
+      "similarity": "cosine"
+    }
+  }
+}

@@ -2,6 +2,7 @@ package com.hcmute.careergraph.services.impl;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.hcmute.careergraph.services.RedisService;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.logging.log4j.util.InternalException;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -16,7 +17,7 @@ import java.util.concurrent.TimeUnit;
 
 @Service
 @Slf4j
-public class RedisServiceImpl implements com.hcmute.careergraph.services.RedisService {
+public class RedisServiceImpl implements RedisService {
 
     @Autowired
     private ObjectMapper objectMapper;
