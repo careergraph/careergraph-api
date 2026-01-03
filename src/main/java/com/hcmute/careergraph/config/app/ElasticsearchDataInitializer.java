@@ -7,6 +7,7 @@ import com.hcmute.careergraph.repositories.JobESRepository;
 import com.hcmute.careergraph.repositories.JobNotificationHistoryRepository;
 import com.hcmute.careergraph.repositories.JobNotificationQueueRepository;
 import com.hcmute.careergraph.repositories.JobRepository;
+import com.hcmute.careergraph.repositories.NewlyPostedJobRepository;
 import com.hcmute.careergraph.services.HuggingFaceEmbeddingService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.ai.embedding.Embedding;
@@ -36,6 +37,30 @@ public class ElasticsearchDataInitializer implements CommandLineRunner {
     private final ApplicationEventPublisher publisher;
     private final JobNotificationHistoryRepository historyRepo;
     private final JobNotificationQueueRepository queueRepo;
+    private final NewlyPostedJobRepository newlyPostedJobRepo;
+
+    private static final List<String> KEYWORDS = List.of(
+            "java",
+            "developer",
+            "backend",
+            "frontend",
+            "react",
+            "fullstack");
+
+    private String normalize(String text) {
+        return text
+                .toLowerCase()
+                .replaceAll("[^a-z0-9 ]", " ")
+                .replaceAll("\\s+", " ")
+                .trim();
+    }
+
+    private boolean matchTitle(Job job) {
+        String title = normalize(job.getTitle());
+        // String title = job.getTitle().toLowerCase();
+        return KEYWORDS.stream().anyMatch(title::contains);
+    }
+
     @Override
     public void run(String... args) throws Exception {
         synchronizeDataWithRetry();
@@ -49,31 +74,30 @@ public class ElasticsearchDataInitializer implements CommandLineRunner {
             try {
                 // 1. KIỂM TRA SỨC KHỎE CỦA INDEX/CLUSTER (RẤT QUAN TRỌNG)
                 if (!elasticsearchOperations.indexOps(JobES.class).exists()) {
-                    // Nếu index chưa tồn tại, có thể cần tạo thủ công hoặc để Spring Data tạo (nếu cấu hình auto-create)
-                    // Việc index chưa tồn tại là nguyên nhân phổ biến gây ra lỗi "all shards failed"
-                    System.out.println("Elasticsearch index not found. Waiting for Spring Data to create or retrying...");
+                    // Nếu index chưa tồn tại, có thể cần tạo thủ công hoặc để Spring Data tạo (nếu
+                    // cấu hình auto-create)
+                    // Việc index chưa tồn tại là nguyên nhân phổ biến gây ra lỗi "all shards
+                    // failed"
+                    System.out
+                            .println("Elasticsearch index not found. Waiting for Spring Data to create or retrying...");
                     throw new IllegalStateException("Index does not exist yet.");
                 }
 
                 // 2. THỰC HIỆN ĐỒNG BỘ HÓA DỮ LIỆU
                 System.out.println("Attempt " + attempt + ": Starting data synchronization to Elasticsearch...");
 
-
                 List<Job> allJobs = jobRepository.findAll();
                 List<String> texts = allJobs.stream()
-//                        .map(job -> job.getTitle()
-                                .map(job -> """
-                            %s
-                            %s
-                            %s
-                            """.formatted(
+                        // .map(job -> job.getTitle()
+                        .map(job -> """
+                                %s
+                                %s
+                                %s
+                                """.formatted(
                                 job.getTitle(),
                                 job.getJobCategory().getDisplayName(),
-                                job.getState()
-                        )
-                                )
+                                job.getState()))
                         .toList();
-                System.out.println(texts);
 
                 List<float[]> vectors = new java.util.ArrayList<>();
 
@@ -82,32 +106,24 @@ public class ElasticsearchDataInitializer implements CommandLineRunner {
 
                     List<String> batchTexts = texts.subList(start, end);
 
-
-                    List<float[]> batchVectors =
-                            embeddingModel.embedForResponse(batchTexts)
-                                    .getResults()
-                                    .stream()
-                                    .map(Embedding::getOutput)
-                                    .toList();
+                    List<float[]> batchVectors = embeddingModel.embedForResponse(batchTexts)
+                            .getResults()
+                            .stream()
+                            .map(Embedding::getOutput)
+                            .toList();
 
                     vectors.addAll(batchVectors);
                 }
                 queueRepo.deleteAll();
                 historyRepo.deleteAll();
+                newlyPostedJobRepo.deleteAll(); // Clear newly posted jobs
+
                 List<JobES> jobsToSave = IntStream.range(0, allJobs.size())
                         .mapToObj(i -> {
                             Job job = allJobs.get(i);
-                            if(job.getId().equalsIgnoreCase("JOB_ULTRA_005")){
+                            if (matchTitle(job)) {
                                 publisher.publishEvent(new JobCreatedEvent(job.getId()));
-                                System.out.println("Đã vào gửi");
-                            }
-                            if(job.getId().equalsIgnoreCase("JOB_ULTRA_007")){
-                                publisher.publishEvent(new JobCreatedEvent(job.getId()));
-                                System.out.println("Đã vào gửi");
-                            }
-                            if(job.getId().equalsIgnoreCase("JOB_UNIQUE_006")){
-                                publisher.publishEvent(new JobCreatedEvent(job.getId()));
-                                System.out.println("Đã vào gửi");
+                                System.out.println("➡️ Marked as newly posted: " + job.getTitle());
                             }
                             return JobES.builder()
                                     .id(job.getId())
@@ -121,7 +137,8 @@ public class ElasticsearchDataInitializer implements CommandLineRunner {
                                     .state(job.getState())
                                     .city(job.getCity())
                                     .companyId(job.getCompany().getId())
-//                                    .expiredDate(safeParseDate(job.getExpiryDate()))
+                                    .createdAt(job.getCreatedDate() != null ? job.getCreatedDate().toLocalDate()
+                                            : LocalDate.now())
                                     .embedding(vectors.get(i))
                                     .build();
                         })
@@ -148,7 +165,8 @@ public class ElasticsearchDataInitializer implements CommandLineRunner {
                         return; // Thoát khỏi vòng lặp và kết thúc
                     }
                 } else {
-                    System.err.println("Failed to synchronize data to Elasticsearch after " + MAX_RETRIES + " attempts. Application may experience search issues.");
+                    System.err.println("Failed to synchronize data to Elasticsearch after " + MAX_RETRIES
+                            + " attempts. Application may experience search issues.");
                     // Bạn có thể chọn ném RuntimeException ở đây nếu muốn dừng ứng dụng hoàn toàn
                 }
             }
@@ -177,8 +195,7 @@ public class ElasticsearchDataInitializer implements CommandLineRunner {
 
         elasticsearchOperations.delete(
                 org.springframework.data.elasticsearch.core.query.Query.findAll(),
-                JobES.class
-        );
+                JobES.class);
 
         // Bắt buộc refresh để đảm bảo index trống ngay
         indexOps.refresh();
