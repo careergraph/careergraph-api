@@ -5,9 +5,11 @@ import com.hcmute.careergraph.enums.application.ApplicationStage;
 import com.hcmute.careergraph.persistence.models.Application;
 import com.hcmute.careergraph.persistence.models.BaseEntity;
 import jakarta.persistence.*;
+import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+import lombok.ToString;
 import lombok.experimental.SuperBuilder;
 
 import java.time.LocalDateTime;
@@ -18,6 +20,8 @@ import java.time.LocalDateTime;
 @Setter
 @SuperBuilder
 @NoArgsConstructor
+@ToString(callSuper = true, exclude = {"application"})
+@EqualsAndHashCode(callSuper = true, exclude = {"application"})
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class ApplicationStageHistory extends BaseEntity {
 

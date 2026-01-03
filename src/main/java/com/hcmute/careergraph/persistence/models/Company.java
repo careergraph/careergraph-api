@@ -2,9 +2,11 @@ package com.hcmute.careergraph.persistence.models;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import jakarta.persistence.*;
+import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+import lombok.ToString;
 import lombok.experimental.SuperBuilder;
 
 import java.util.Set;
@@ -16,6 +18,8 @@ import java.util.Set;
 @SuperBuilder
 @NoArgsConstructor
 @JsonIgnoreProperties(ignoreUnknown = true)
+@ToString(callSuper = true, exclude = {"account", "jobs", "companyConnections"})
+@EqualsAndHashCode(callSuper = true, exclude = {"account", "jobs", "companyConnections"})
 public class Company extends Party {
 
     @Column(name = "size")

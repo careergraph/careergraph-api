@@ -2,6 +2,7 @@ package com.hcmute.careergraph.mapper;
 
 import com.hcmute.careergraph.enums.common.Status;
 import com.hcmute.careergraph.persistence.dtos.request.JobCreationRequest;
+import com.hcmute.careergraph.persistence.dtos.response.ChatResponse;
 import com.hcmute.careergraph.persistence.dtos.response.JobResponse;
 import com.hcmute.careergraph.persistence.models.Company;
 import com.hcmute.careergraph.persistence.models.Job;
@@ -100,6 +101,11 @@ public class JobMapper {
                 .description(job.getDescription())
                 .department(job.getDepartment())
 
+                // Basic info company
+                .companyId(job.getCompany().getId())
+                .companyAvatar(job.getCompany().getAvatar())
+                .companyName(job.getCompany().getName())
+
                 // Arrays
                 .responsibilities(job.getResponsibilities())
                 .qualifications(job.getQualifications())
@@ -141,13 +147,92 @@ public class JobMapper {
 
                 // Stats
                 .views(job.getViews())
-                .applicants(job.getApplicants())
+                .applicants(job.getApplications().size())
                 .saved(job.getSaved())
                 .likes(job.getLiked())
                 .shares(job.getShared())
 
+                // Application recruiment
+                .resume(job.getResume())
+                .coverLetter(job.getCoverLetter())
+
                 // Timeline - null for now, có thể implement sau
                 .timeline(null)
+
+                .build();
+    }
+
+    public JobResponse toResponseWithStatusAppliedAndLiked(Job job, boolean isApplied, boolean isSaved) {
+        if (job == null) {
+            return null;
+        }
+
+        return JobResponse.builder()
+                // Basic Info
+                .id(job.getId())
+                .title(job.getTitle())
+                .description(job.getDescription())
+                .department(job.getDepartment())
+
+                // Basic info company
+                .companyId(job.getCompany().getId())
+                .companyAvatar(job.getCompany().getAvatar())
+                .companyName(job.getCompany().getName())
+
+                // Arrays
+                .responsibilities(job.getResponsibilities())
+                .qualifications(job.getQualifications())
+                .minimumQualifications(job.getMinimumQualifications())
+                .benefits(job.getBenefits())
+
+                // Experience
+                .minExperience(job.getMinExperience())
+                .maxExperience(job.getMaxExperience())
+                .experienceLevel(job.getExperienceLevel())
+
+                // Job Type & Category
+                .employmentType(job.getEmploymentType())
+                .type(job.getEmploymentType()) // UI dùng 'type' thay vì 'employmentType'
+                .jobCategory(job.getJobCategory())
+                .education(job.getEducation())
+
+                // Location
+                .state(job.getState())
+                .city(job.getCity())
+                .district(job.getDistrict())
+                .specific(job.getAddress()) // Map 'address' -> 'specific' cho UI
+                .remoteJob(job.isRemoteJob())
+
+                // Skills
+                .skills(Collections.emptyList())
+
+                // Compensation & Contact
+                .salaryRange(job.getSalaryRange())
+                .contactEmail(job.getContactEmail())
+                .contactPhone(job.getContactPhone())
+
+                // Posting Info
+                .postedDate(job.getPostedDate())
+                .expiryDate(job.getExpiryDate())
+                .numberOfPositions(job.getNumberOfPositions())
+                .promotionType(job.getPromotionType())
+                .status(job.getStatus())
+
+                // Stats
+                .views(job.getViews())
+                .applicants(job.getApplications().size())
+                .saved(job.getSaved())
+                .likes(job.getLiked())
+                .shares(job.getShared())
+
+                // Application recruiment
+                .resume(job.getResume())
+                .coverLetter(job.getCoverLetter())
+
+                // Timeline - null for now, có thể implement sau
+                .timeline(null)
+                .isApplied(isApplied)
+                .isSaved(isSaved)
 
                 .build();
     }
@@ -163,5 +248,30 @@ public class JobMapper {
         return jobs.stream()
                 .map(this::toResponse)
                 .collect(Collectors.toList());
+    }
+    public List<JobResponse> toResponseListWithStatusSaved(List<Job> jobs) {
+        if (jobs == null || jobs.isEmpty()) {
+            return Collections.emptyList();
+        }
+
+        return jobs.stream()
+                .map(job -> toResponseWithStatusAppliedAndLiked(job, false, true))
+                .collect(Collectors.toList());
+    }
+
+    public List<ChatResponse.RelatedJobResponse> toRelatedJobResponse(Job relatedJob) {
+        if (relatedJob == null) {
+            return null;
+        }
+
+        return (List<ChatResponse.RelatedJobResponse>) ChatResponse.RelatedJobResponse.builder()
+                .jobId(relatedJob.getId())
+                .salary(relatedJob.getSalaryRange())
+                .location(relatedJob.getCity())
+                .title(relatedJob.getTitle())
+                .company(relatedJob.getCompany().getName())
+                .description(relatedJob.getDescription())
+                .requirements(relatedJob.getResponsibilities())
+                .build();
     }
 }

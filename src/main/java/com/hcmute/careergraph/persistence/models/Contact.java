@@ -3,9 +3,11 @@ package com.hcmute.careergraph.persistence.models;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.hcmute.careergraph.enums.candidate.ContactType;
 import jakarta.persistence.*;
+import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+import lombok.ToString;
 import lombok.experimental.SuperBuilder;
 
 @Entity
@@ -14,6 +16,8 @@ import lombok.experimental.SuperBuilder;
 @Setter
 @SuperBuilder
 @NoArgsConstructor
+@ToString(callSuper = true, exclude = {"party"})
+@EqualsAndHashCode(callSuper = true, exclude = {"party"})
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class Contact extends BaseEntity {
 

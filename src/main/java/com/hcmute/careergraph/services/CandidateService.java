@@ -2,16 +2,18 @@ package com.hcmute.careergraph.services;
 
 import com.hcmute.careergraph.enums.common.FileType;
 import com.hcmute.careergraph.persistence.dtos.request.CandidateRequest;
+import com.hcmute.careergraph.persistence.dtos.response.CandidateClientResponse;
+import com.hcmute.careergraph.persistence.dtos.response.FileResponse;
 import com.hcmute.careergraph.persistence.models.Candidate;
+import com.hcmute.careergraph.persistence.models.Job;
 import com.hcmute.careergraph.persistence.models.Skill;
 import org.springframework.data.crossstore.ChangeSetPersister;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.io.IOException;
 import java.util.List;
 
 public interface CandidateService {
-
-    String updateResource(String candidateId, MultipartFile file, FileType fileType) throws ChangeSetPersister.NotFoundException;
 
     String getResource(String candidateId, FileType fileType) throws ChangeSetPersister.NotFoundException;
 
@@ -26,13 +28,33 @@ public interface CandidateService {
     Candidate addExperience(String candidateId,  CandidateRequest.CandidateExperienceRequest candidateRequest) throws ChangeSetPersister.NotFoundException;
 
     Candidate updateExperience(String candidateId, String experienceId, CandidateRequest.CandidateExperienceRequest candidateRequest) throws ChangeSetPersister.NotFoundException;
+
     Candidate deleteExperience(String candidateId, String experienceId) throws ChangeSetPersister.NotFoundException;
 
     Candidate addEducation(String candidateId,  CandidateRequest.CandidateEducationRequest candidateRequest) throws ChangeSetPersister.NotFoundException;
 
     Candidate updateEducation(String candidateId, String educationId, CandidateRequest.CandidateEducationRequest candidateRequest) throws ChangeSetPersister.NotFoundException;
+
     Candidate deleteEducation(String candidateId, String educationId) throws ChangeSetPersister.NotFoundException;
 
     Candidate replaceSkillsForUser(String candidateId, CandidateRequest.ReplaceSkillsRequest request) throws ChangeSetPersister.NotFoundException;
 
+    List<CandidateClientResponse.AppliedJobs> getAppliedJobs(String candidateId) throws ChangeSetPersister.NotFoundException;
+
+    List<CandidateClientResponse.AppliedJobs> getAppliedJobs(String candidateId, String status) throws ChangeSetPersister.NotFoundException;
+
+    List<FileResponse> listFile(String idd, FileType fileType) throws ChangeSetPersister.NotFoundException;
+
+    void deleteByFileId(String candidateId, String fileId) throws ChangeSetPersister.NotFoundException;
+
+    CandidateClientResponse.CandidateProfileResponse getOverview(String candidateId) throws ChangeSetPersister.NotFoundException;
+
+    List<Job> getSavedJobs(String candidateId);
+
+    Boolean setJobSearchStatus(String candidateId) throws ChangeSetPersister.NotFoundException;
+    Boolean toggleJobMail(String candidateId) throws ChangeSetPersister.NotFoundException;
+
+    String getResumeUrlApplication(String candidateId, String applicationId);
+
+    String updateAvatar(String id, MultipartFile file, FileType type) throws IOException;
 }

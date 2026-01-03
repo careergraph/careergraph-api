@@ -3,12 +3,13 @@ package com.hcmute.careergraph.persistence.models;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.hcmute.careergraph.helper.JsonUtils;
 import jakarta.persistence.*;
+import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+import lombok.ToString;
 import lombok.experimental.SuperBuilder;
 import org.hibernate.annotations.JdbcTypeCode;
-import org.hibernate.procedure.internal.Util;
 import org.hibernate.type.SqlTypes;
 
 import java.util.ArrayList;
@@ -21,6 +22,8 @@ import java.util.Set;
 @Setter
 @SuperBuilder
 @NoArgsConstructor
+@ToString(callSuper = true, exclude = {"account", "connections", "educations", "experiences", "skills", "applications", "contacts", "addresses", "saved_jobs"})
+@EqualsAndHashCode(callSuper = true, exclude = {"account", "connections", "educations", "experiences", "skills", "applications"})
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class Candidate extends Party {
 
@@ -56,6 +59,11 @@ public class Candidate extends Party {
 
     @Column(name = "is_open_to_work")
     private Boolean isOpenToWork;
+
+    @Column(name = "is_open_to_notify_new_job",
+            columnDefinition = "BOOLEAN DEFAULT FALSE"
+    )
+    private Boolean isOpenToNotifyNewJob = false;
 
     @Column(name = "summary", columnDefinition = "TEXT")
     private String summary;
@@ -97,7 +105,7 @@ public class Candidate extends Party {
     private Set<CandidateExperience> experiences;
 
     // Skill relationships
-    @OneToMany(mappedBy = "candidate", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
+    @OneToMany(mappedBy = "candidate", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.EAGER)
     private Set<CandidateSkill> skills;
 
     // Application relationships
@@ -120,5 +128,8 @@ public class Candidate extends Party {
     private List<String> workTypes = new ArrayList<>();
 
 
+    @OneToMany(mappedBy = "candidate", cascade = CascadeType.ALL, orphanRemoval = true)
+    @Column(name = "saved_jobs")
+    private List<SavedJob> savedJobs = new ArrayList<>();
 
 }
