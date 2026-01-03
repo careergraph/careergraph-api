@@ -40,7 +40,7 @@ public class CompanyController {
 
         return RestResponse.<CompanyResponse>builder()
                 .status(HttpStatus.OK)
-                .data(companyMapper.toResponse(company))
+                .data(companyMapper.toResponse(company, false))
                 .build();
     }
 
@@ -52,6 +52,21 @@ public class CompanyController {
                 .data(result)
                 .build();
 
+    }
+
+    @GetMapping("/{companyId}")
+    public RestResponse<CompanyResponse> getCompanyDetail(@PathVariable("companyId") String companyId) {
+
+        if (companyId == null || companyId.isEmpty()) {
+            throw new BadRequestException("Company ID invalid");
+        }
+
+        Company company = companyService.getCompanyById(companyId);
+
+        return RestResponse.<CompanyResponse>builder()
+                .status(HttpStatus.OK)
+                .data(companyMapper.toResponse(company, true))
+                .build();
     }
 
     @GetMapping("/{companyId}/jobs")
