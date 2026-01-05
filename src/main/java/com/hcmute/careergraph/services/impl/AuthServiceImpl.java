@@ -97,7 +97,7 @@ public class AuthServiceImpl implements AuthService {
         String otp = generateOtp();
         redisService.setObject(otpKey(email), otp, TIME_OTP_EXPIRED);
         System.out.println("OTP has been sent to " + otp);
-//        mailService.sendOtp(email, otp);
+        mailService.sendOtp(email, otp);
     }
 
     @Override
@@ -229,7 +229,7 @@ public class AuthServiceImpl implements AuthService {
             throw new AppException(ErrorType.NOT_FOUND, "User not registered yet");
         String otp = generateOtp();
 
-//        mailService.sendOtp(request.getEmail(), otp);
+        mailService.sendOtp(request.getEmail(), otp);
         System.out.println("otp: " + otp);
         redisService.setObject(otpKey(request.getEmail()), otp, TIME_OTP_EXPIRED);
         return TIME_OTP_EXPIRED;
