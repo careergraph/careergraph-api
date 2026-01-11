@@ -3,8 +3,12 @@ package com.hcmute.careergraph.controllers;
 import com.hcmute.careergraph.helper.RestResponse;
 import com.hcmute.careergraph.persistence.dtos.request.AuthRequests;
 import com.hcmute.careergraph.persistence.dtos.response.AuthResponses;
+import com.hcmute.careergraph.persistence.dtos.response.GoogleUserInfo;
+import com.hcmute.careergraph.persistence.models.Account;
 import com.hcmute.careergraph.schedule.DailyDigestScheduler;
 import com.hcmute.careergraph.services.AuthService;
+import com.hcmute.careergraph.services.GoogleAuthService;
+import com.hcmute.careergraph.services.JwtTokenService;
 import com.hcmute.careergraph.services.RedisService;
 import com.hcmute.careergraph.services.impl.AuthServiceImpl;
 import jakarta.persistence.criteria.CriteriaBuilder;
@@ -31,6 +35,8 @@ public class AuthController {
 
     private final AuthService authService;
     private final RedisService redisService;
+    private final GoogleAuthService googleAuthService;
+    private final JwtTokenService jwtTokenService;
 
     @Value("${cookie.secure:false}")
     private boolean cookieSecure;
@@ -235,6 +241,21 @@ public class AuthController {
                 .status(HttpStatus.OK)
                 .data(AuthResponses.OnlyTokenResponse.builder().accessToken(token.getAccessToken()).build())
                 .build();
+    }
+
+
+    @PostMapping("/google")
+    public AuthResponses.OnlyTokenResponse loginWithGoogle(@RequestBody AuthRequests.GoogleLoginRequest request) {
+
+        GoogleUserInfo googleUser = googleAuthService.verify(request.getIdToken());
+
+        // Create user if not exists
+        Account user = authService.findOrCreateGoogleUser(googleUser);
+
+        // Create JWT nội bộ
+        String accessToken = jwtTokenService.generateAccessToken(user);
+
+        return new AuthResponses.OnlyTokenResponse(accessToken);
     }
 
 
