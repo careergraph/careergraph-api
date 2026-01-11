@@ -2,6 +2,8 @@ package com.hcmute.careergraph.services;
 
 import com.hcmute.careergraph.persistence.dtos.request.AuthRequests;
 import com.hcmute.careergraph.persistence.dtos.response.AuthResponses;
+import com.hcmute.careergraph.persistence.dtos.response.GoogleUserInfo;
+import com.hcmute.careergraph.persistence.models.Account;
 import org.springframework.security.oauth2.jwt.Jwt;
 
 public interface AuthService {
@@ -28,6 +30,9 @@ public interface AuthService {
     AuthResponses.TokenResponse refreshWithFamily(Jwt jwt);
 
     String generateOTPToken(String email);
+
+    Account findOrCreateGoogleUser(GoogleUserInfo info);
+
 }
 
 

@@ -7,6 +7,7 @@ import com.hcmute.careergraph.exception.AppException;
 import com.hcmute.careergraph.helper.RestResponse;
 import com.hcmute.careergraph.persistence.dtos.request.AuthRequests;
 import com.hcmute.careergraph.persistence.dtos.response.AuthResponses;
+import com.hcmute.careergraph.persistence.dtos.response.GoogleUserInfo;
 import com.hcmute.careergraph.persistence.models.Account;
 import com.hcmute.careergraph.persistence.models.Candidate;
 import com.hcmute.careergraph.persistence.models.Company;
@@ -368,6 +369,20 @@ public class AuthServiceImpl implements AuthService {
     @Override
     public String generateOTPToken(String email) {
         return "";
+    }
+
+    @Override
+    public Account findOrCreateGoogleUser(GoogleUserInfo info) {
+        return accountRepository.findByEmail(info.getEmail())
+                .orElseGet(() -> {
+                    Account acc = new Account();
+                    acc.setEmail(info.getEmail());
+//                    acc.setName(info.getName());
+//                    user.setAvatar(info.getPicture());
+//                    user.setProvider(AuthProvider.GOOGLE);
+//                    user.setRole(Role.USER);
+                    return accountRepository.save(acc);
+                });
     }
 
     /*============================================ HELPER METHOD ============================================*/
