@@ -7,7 +7,6 @@ import com.hcmute.careergraph.schedule.DailyDigestScheduler;
 import com.hcmute.careergraph.services.AuthService;
 import com.hcmute.careergraph.services.RedisService;
 import com.hcmute.careergraph.services.impl.AuthServiceImpl;
-import jakarta.persistence.criteria.CriteriaBuilder;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;

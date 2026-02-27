@@ -1,6 +1,22 @@
+#application.yml
 spring:
   profiles:
-    active: prod
+    active: ${SPRING_PROFILES_ACTIVE:dev}
+  ai:
+    google:
+      genai:
+        project-id: ${GOOGLE_PROJECT_ID:}
+        api-key: ${GEMINI_API_KEY:}
+        chat:
+          options:
+            model: gemini-2.5-flash
+        embedding:
+          api-key: ${GEMINI_API_KEY:}
+          text:
+            options:
+              model: models/embedding-001
+  elasticsearch:
+    uris: ${SPRING_ELASTICSEARCH_URIS:http://localhost:9200}
 
 server:
   port: ${SERVER_PORT:8080}
@@ -9,9 +25,9 @@ server:
 
 logging:
   level:
-    org.neo4j.driver: DEBUG
-    org.springframework.data.neo4j: DEBUG
-    org.springframework.transaction: DEBUG
+    "[org.neo4j.driver]": DEBUG
+    "[org.springframework.data.neo4j]": DEBUG
+    "[org.springframework.transaction]": DEBUG
 
 jwt:
   signer-key: ${JWT_SIGNER_KEY:uT+Q3VZKCE+yNxmPoB0SH7qqDB8EGtBQY/F1GK2shIRKMZasRvvvyI5T/5y/FDX+}
@@ -52,6 +68,12 @@ mail:
   starttls-enable: ${MAIL_STARTTLS_ENABLE:true}
   debug: ${MAIL_DEBUG:false}
 
+huggingface:
+  api-key: ${HUGGING_FACE_KEY:}
+
+embedding:
+  service:
+    url: ${EMBEDDING_SERVICE_URL:http://localhost:8000}
 ---
 
 spring:

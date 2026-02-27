@@ -2,9 +2,7 @@ package com.hcmute.careergraph.services.impl;
 
 import com.hcmute.careergraph.enums.common.ErrorType;
 import com.hcmute.careergraph.enums.common.Role;
-import com.hcmute.careergraph.enums.common.Status;
 import com.hcmute.careergraph.exception.AppException;
-import com.hcmute.careergraph.helper.RestResponse;
 import com.hcmute.careergraph.persistence.dtos.request.AuthRequests;
 import com.hcmute.careergraph.persistence.dtos.response.AuthResponses;
 import com.hcmute.careergraph.persistence.models.Account;
@@ -19,7 +17,6 @@ import com.hcmute.careergraph.services.JwtTokenService;
 import com.hcmute.careergraph.services.MailService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
