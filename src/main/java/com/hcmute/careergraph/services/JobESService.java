@@ -11,6 +11,17 @@ import java.util.List;
 
 public interface JobESService {
         SearchResponse<JobES> searchJobsByNavtiveAndFuzzy(String key, Pageable pageable);
+
+        /**
+         * Filter-only search: match_all + post filter, sắp xếp theo createdAt desc.
+         * Dùng khi user chưa nhập keyword nhưng có chọn filter.
+         */
+        SearchResponse<JobES> filterOnlySearch(
+                        JobFilterRequest filter,
+                        String partyId,
+                        Pageable pageable,
+                        PartyType type);
+
         SearchResponse<JobES> knnSearch(
                         float[] vector,
                         JobFilterRequest filter,

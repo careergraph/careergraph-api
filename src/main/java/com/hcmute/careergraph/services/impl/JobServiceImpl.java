@@ -56,12 +56,8 @@ public class JobServiceImpl implements JobService {
     private final ObjectMapper objectMapper;
 
     private final Integer PAGE_SIZE_PERSONAL_JOB = 8;
-    private final EmbeddingModel embeddingModel;
     private final EmbedService embedService;
     private final JobESRepository jobESRepository;
-    private final QueryEnrichmentService  queryEnrichmentService;
-
-    private final HuggingFaceEmbeddingService huggingFaceEmbeddingService;
     private final FastAPIClientService fastAPIClientService;
 
     private final ApplicationEventPublisher publisher;
@@ -398,9 +394,9 @@ public class JobServiceImpl implements JobService {
         }
 
         // Get params from filter
-        List<Status> statuses = filter.getStatuses().isEmpty() ? null : filter.getStatuses();
-        List<JobCategory> jobCategories = filter.getJobCategories().isEmpty() ? null : filter.getJobCategories();
-        List<EmploymentType> employmentTypes = filter.getEmploymentTypes().isEmpty() ? null : filter.getEmploymentTypes();
+        List<Status> statuses = filter.getStatuses() == null || filter.getStatuses().isEmpty() ? null : filter.getStatuses();
+        List<JobCategory> jobCategories = filter.getJobCategories() == null || filter.getJobCategories().isEmpty() ? null : filter.getJobCategories();
+        List<EmploymentType> employmentTypes = filter.getEmploymentTypes() == null || filter.getEmploymentTypes().isEmpty() ? null : filter.getEmploymentTypes();
         List<EducationType> educationTypes = null;
         List<ExperienceLevel> experienceLevels = null;
         String city = filter.getCity();
@@ -436,11 +432,11 @@ public class JobServiceImpl implements JobService {
             throw new BadRequestException("Company ID is required");
         }
         // Get params from filter
-        List<Status> statuses = filter.getStatuses().isEmpty() ? null : filter.getStatuses();
-        List<JobCategory> jobCategories = filter.getJobCategories().isEmpty() ? null : filter.getJobCategories();
-        List<EmploymentType> employmentTypes = filter.getEmploymentTypes().isEmpty() ? null : filter.getEmploymentTypes();
-        List<EducationType> educationTypes = filter.getEducationTypes().isEmpty() ? null : filter.getEducationTypes();
-        List<ExperienceLevel> experienceLevels = filter.getExperienceLevels().isEmpty() ? null : filter.getExperienceLevels();;;
+        List<Status> statuses = filter.getStatuses() == null || filter.getStatuses().isEmpty() ? null : filter.getStatuses();
+        List<JobCategory> jobCategories = filter.getJobCategories() == null || filter.getJobCategories().isEmpty() ? null : filter.getJobCategories();
+        List<EmploymentType> employmentTypes = filter.getEmploymentTypes() == null || filter.getEmploymentTypes().isEmpty() ? null : filter.getEmploymentTypes();
+        List<EducationType> educationTypes = filter.getEducationTypes() == null || filter.getEducationTypes().isEmpty() ? null : filter.getEducationTypes();
+        List<ExperienceLevel> experienceLevels = filter.getExperienceLevels() == null || filter.getExperienceLevels().isEmpty() ? null : filter.getExperienceLevels();
         String city = filter.getCity();
 
         Page<Job> jobs = null;
@@ -449,26 +445,35 @@ public class JobServiceImpl implements JobService {
             jobs = jobRepository.searchJobForCompany(partyId, statuses, jobCategories, employmentTypes, query, pageable);
         } else {
             String keyword="";
-            if(partyId==null && (query==null||query.isEmpty())) {
-                List <Job> list = getJobsForAnonymousUser();
-                return new PageImpl<>(list);
-            }
+
+            // Nếu không có keyword → dùng filter-only search (match_all + post filter)
+            boolean hasKeyword = query != null && !query.trim().isEmpty();
+
             if(partyId != null) {
                 Candidate candidate = candidateRepository.findById(partyId)
                         .orElse(null);
-                if(candidate != null && query.isEmpty()) {
+                if(candidate != null && !hasKeyword) {
                     keyword = _genKey(candidate);
                 }
             }
 
-            if(query != null) keyword = keyword + " " + query;
-//            float[] queryVector = embedService.embed(queryEnrichmentService.normalizeToEnglish(keyword));
-            float[] queryVector = embedService.embed(keyword);
+            if(hasKeyword) {
+                keyword = keyword.isEmpty() ? query : keyword + " " + query;
+            }
 
-            SearchResponse<JobES> esResponse =
-                    jobESService.knnSearch(keyword, filter, partyId, pageable, type);
-//            SearchResponse<JobES> esResponse =
-//                    jobESService.knnSearch(queryVector, 10);
+            SearchResponse<JobES> esResponse;
+
+            if (keyword.trim().isEmpty()) {
+                // Không có keyword và không có candidate profile → filter-only search
+                esResponse = jobESService.filterOnlySearch(filter, partyId, pageable, type);
+            } else {
+                // Có keyword → hybrid search (KNN + BM25)
+                esResponse = jobESService.knnSearch(keyword, filter, partyId, pageable, type);
+            }
+
+            if (esResponse == null || esResponse.hits().hits().isEmpty()) {
+                return new PageImpl<>(new ArrayList<>(), pageable, 0);
+            }
 
             List<String> ids = esResponse.hits().hits()
                     .stream()

@@ -67,6 +67,113 @@ public class JobESServiceImpl implements JobESService {
                 }
         }
 
+        /**
+         * Filter-only search: match_all + post filter, sắp xếp theo createdAt desc.
+         * Dùng khi user chưa nhập keyword nhưng có chọn filter.
+         */
+        @Override
+        public SearchResponse<JobES> filterOnlySearch(
+                        JobFilterRequest filter,
+                        String partyId,
+                        Pageable pageable,
+                        PartyType type) {
+                try {
+                        return client.search(s -> s
+                                        .index("jobs_es")
+                                        .from((int) pageable.getOffset())
+                                        .size(pageable.getPageSize())
+                                        .sort(so -> so.field(f -> f.field("createdAt").order(co.elastic.clients.elasticsearch._types.SortOrder.Desc)))
+                                        .query(q -> q.matchAll(m -> m))
+                                        .postFilter(pf -> pf
+                                                        .bool(b -> {
+                                                                // Mặc định chỉ hiện ACTIVE
+                                                                if (filter.getStatuses() != null
+                                                                                && !filter.getStatuses().isEmpty()) {
+                                                                        b.filter(fq -> fq.terms(t -> t
+                                                                                        .field("status")
+                                                                                        .terms(v -> v.value(
+                                                                                                        filter.getStatuses()
+                                                                                                                        .stream()
+                                                                                                                        .map(st -> FieldValue
+                                                                                                                                        .of(st.name()))
+                                                                                                                        .toList()))));
+                                                                }
+
+                                                                if (filter.getJobCategories() != null
+                                                                                && !filter.getJobCategories()
+                                                                                                .isEmpty()) {
+                                                                        b.filter(fq -> fq.terms(t -> t
+                                                                                        .field("jobCategory.keyword")
+                                                                                        .terms(v -> v.value(
+                                                                                                        filter.getJobCategories()
+                                                                                                                        .stream()
+                                                                                                                        .map(c -> FieldValue
+                                                                                                                                        .of(c.name()))
+                                                                                                                        .toList()))));
+                                                                }
+
+                                                                if (filter.getEmploymentTypes() != null
+                                                                                && !filter.getEmploymentTypes()
+                                                                                                .isEmpty()) {
+                                                                        b.filter(fq -> fq.terms(t -> t
+                                                                                        .field("employmentType")
+                                                                                        .terms(v -> v.value(
+                                                                                                        filter.getEmploymentTypes()
+                                                                                                                        .stream()
+                                                                                                                        .map(e -> FieldValue
+                                                                                                                                        .of(e.name()))
+                                                                                                                        .toList()))));
+                                                                }
+
+                                                                if (filter.getExperienceLevels() != null
+                                                                                && !filter.getExperienceLevels()
+                                                                                                .isEmpty()) {
+                                                                        b.filter(fq -> fq.terms(t -> t
+                                                                                        .field("experienceLevel")
+                                                                                        .terms(v -> v.value(
+                                                                                                        filter.getExperienceLevels()
+                                                                                                                        .stream()
+                                                                                                                        .map(e -> FieldValue
+                                                                                                                                        .of(e.name()))
+                                                                                                                        .toList()))));
+                                                                }
+
+                                                                if (filter.getEducationTypes() != null
+                                                                                && !filter.getEducationTypes()
+                                                                                                .isEmpty()) {
+                                                                        b.filter(fq -> fq.terms(t -> t
+                                                                                        .field("education")
+                                                                                        .terms(v -> v.value(
+                                                                                                        filter.getEducationTypes()
+                                                                                                                        .stream()
+                                                                                                                        .map(e -> FieldValue
+                                                                                                                                        .of(e.name()))
+                                                                                                                        .toList()))));
+                                                                }
+
+                                                                if (filter.getCity() != null
+                                                                                && !filter.getCity().isEmpty()) {
+                                                                        b.filter(fq -> fq.term(t -> t
+                                                                                        .field("city.keyword")
+                                                                                        .value(filter.getCity())));
+                                                                }
+
+                                                                if (type == PartyType.COMPANY && partyId != null) {
+                                                                        b.filter(fq -> fq.term(t -> t
+                                                                                        .field("companyId")
+                                                                                        .value(partyId)));
+                                                                }
+
+                                                                return b;
+                                                        })),
+                                        JobES.class);
+                } catch (Exception e) {
+                        log.error("Error in filterOnlySearch: {}", e.getMessage());
+                        e.printStackTrace();
+                        return null;
+                }
+        }
+
         @Override
         public SearchResponse<JobES> knnSearch(
                         float[] queryVector,
@@ -191,7 +298,7 @@ public class JobESServiceImpl implements JobESService {
          * {
          * "embedding": {
          * "type": "dense_vector",
-         * "dims": 768, // hoặc dimension của model
+         * "dims": 384,
          * "index": true,
          * "similarity": "cosine"
          * }
@@ -225,8 +332,8 @@ public class JobESServiceImpl implements JobESService {
                                                                                                         .field("embedding")
                                                                                                         .queryVector(toFloatList(
                                                                                                                         queryVector))
-                                                                                                        .numCandidates(100)
-                                                                                                        .boost(0.5f)))
+                                                                                                        .numCandidates(300)
+                                                                                                        .boost(10.0f)))
 
                                                                         /*
                                                                          * ===== 2. BM25 TEXT SEARCH =====
@@ -245,7 +352,7 @@ public class JobESServiceImpl implements JobESService {
                                                                                                         .type(TextQueryType.BestFields)
                                                                                                         .operator(Operator.Or)
                                                                                                         .minimumShouldMatch(
-                                                                                                                        "30%")
+                                                                                                                        "50%")
                                                                                                         .boost(1.0f)))
 
                                                                         /*
@@ -275,7 +382,9 @@ public class JobESServiceImpl implements JobESService {
                                                                                                                         "city^1")
                                                                                                         .type(TextQueryType.CrossFields)
                                                                                                         .operator(Operator.Or)
-                                                                                                        .boost(0.8f)))
+                                                                                                        .minimumShouldMatch(
+                                                                                                                        "50%")
+                                                                                                        .boost(0.5f)))
 
                                                                         // Ít nhất 1 should clause phải match
                                                                         .minimumShouldMatch("1")))
