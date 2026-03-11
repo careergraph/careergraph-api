@@ -43,7 +43,7 @@ public class CandidateElasticsearchDataInitializer implements CommandLineRunner 
 
   @Override
   public void run(String... args) throws Exception {
-    synchronizeCandidatesWithRetry();
+    // synchronizeCandidatesWithRetry();
   }
 
   private void synchronizeCandidatesWithRetry() {
