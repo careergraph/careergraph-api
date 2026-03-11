@@ -77,6 +77,7 @@ public class AuthRequests {
     public static class GoogleLoginRequest {
         @NotBlank
         private String idToken;
+        private String role; // "user" or "HR", defaults to USER if absent
     }
 }
 

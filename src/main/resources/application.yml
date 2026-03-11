@@ -23,11 +23,11 @@ server:
   servlet:
     context-path: ${SERVER_SERVLET_CONTEXT_PATH:/careergraph/api/v1}
 
-logging:
-  level:
-    "[org.neo4j.driver]": DEBUG
-    "[org.springframework.data.neo4j]": DEBUG
-    "[org.springframework.transaction]": DEBUG
+# logging:
+#   level:
+#     "[org.neo4j.driver]": DEBUG
+#     "[org.springframework.data.neo4j]": DEBUG
+#     "[org.springframework.transaction]": DEBUG
 
 jwt:
   signer-key: ${JWT_SIGNER_KEY:uT+Q3VZKCE+yNxmPoB0SH7qqDB8EGtBQY/F1GK2shIRKMZasRvvvyI5T/5y/FDX+}
@@ -36,7 +36,7 @@ jwt:
 
 google:
   oauth:
-    client-id: ${GOOGLE_OAUTH_CLIENT_ID:}
+    client-id: ${GOOGLE_OAUTH_CLIENT_ID:166848038588-5bre3evlsm652tcp88lrogu6m189s5lb.apps.googleusercontent.com}
     client-secret: ${GOOGLE_OAUTH_CLIENT_SECRET:}
 
 springdoc:
@@ -48,12 +48,9 @@ springdoc:
     tags-sorter: alpha
     try-it-out-enabled: true
     filter: true
-  packages-to-scan: com.hcmute.careergraph.controller
-  paths-to-match: /api/**
+  packages-to-scan: com.hcmute.careergraph.controllers
+  paths-to-match: /**
 
-swagger:
-  username: ${SWAGGER_USERNAME:}
-  password: ${SWAGGER_PASSWORD:}
 
 support:
   email: ${SUPPORT_EMAIL:}

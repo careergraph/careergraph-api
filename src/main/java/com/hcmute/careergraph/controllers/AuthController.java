@@ -12,7 +12,7 @@ import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
-import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
@@ -25,25 +25,38 @@ import java.time.Duration;
 
 @RestController
 @RequestMapping("auth")
-@RequiredArgsConstructor
 public class AuthController {
 
     private final AuthService authService;
     private final RedisService redisService;
+    private final JwtDecoder jwtDecoder;
+    private final JwtDecoder rawJwtDecoder;
+    private final AuthServiceImpl authServiceImpl;
+    private final DailyDigestScheduler dailyDigestScheduler;
 
     @Value("${cookie.secure:false}")
     private boolean cookieSecure;
     @Value("${cookie.samesite:Lax}")
     private String cookieSameSite;
+    @Value("${jwt.refreshable-duration}")
+    private long refreshTtl;
 
     private static final String REFRESH_COOKIE = "rt";
     private static final String RESET_PASSWORD_COOKIE = "ttl_t";
-    private final JwtDecoder jwtDecoder;
-    private final AuthServiceImpl authServiceImpl;
 
-    private final DailyDigestScheduler dailyDigestScheduler;
-    @Value("${jwt.refreshable-duration}")
-    private long refreshTtl;
+    public AuthController(AuthService authService,
+                          RedisService redisService,
+                          JwtDecoder jwtDecoder,
+                          @Qualifier("rawJwtDecoder") JwtDecoder rawJwtDecoder,
+                          AuthServiceImpl authServiceImpl,
+                          DailyDigestScheduler dailyDigestScheduler) {
+        this.authService = authService;
+        this.redisService = redisService;
+        this.jwtDecoder = jwtDecoder;
+        this.rawJwtDecoder = rawJwtDecoder;
+        this.authServiceImpl = authServiceImpl;
+        this.dailyDigestScheduler = dailyDigestScheduler;
+    }
 
     @PostMapping("/register/candidate")
     public RestResponse<Void> registerForCandidate(@Valid @RequestBody AuthRequests.RegisterRequest request) {
@@ -199,12 +212,20 @@ public class AuthController {
     }
 
     @PostMapping("/google-login")
-    public RestResponse<AuthResponses.TokenResponse> googleLogin(@Valid @RequestBody AuthRequests.GoogleLoginRequest request) {
+    public RestResponse<AuthResponses.OnlyTokenResponse> googleLogin(@Valid @RequestBody AuthRequests.GoogleLoginRequest request, HttpServletResponse resp) {
         var tokens = authService.googleLogin(request);
-        return RestResponse.<AuthResponses.TokenResponse>builder()
+        ResponseCookie cookie = ResponseCookie.from(REFRESH_COOKIE, tokens.getRefreshToken())
+                .httpOnly(true)
+                .secure(cookieSecure)
+                .sameSite(cookieSameSite)
+                .path("/")
+                .maxAge(Duration.ofSeconds(refreshTtl))
+                .build();
+        resp.addHeader(HttpHeaders.SET_COOKIE, cookie.toString());
+        return RestResponse.<AuthResponses.OnlyTokenResponse>builder()
                 .status(HttpStatus.OK)
                 .message("Login successful")
-                .data(tokens)
+                .data(AuthResponses.OnlyTokenResponse.builder().accessToken(tokens.getAccessToken()).build())
                 .build();
     }
     @PostMapping("/refresh")
@@ -216,7 +237,7 @@ public class AuthController {
                     .message("Missing refresh cookie")
                     .build();
         }
-        Jwt jwt =  jwtDecoder.decode(refreshCookie);
+        Jwt jwt =  rawJwtDecoder.decode(refreshCookie);
         if(!jwt.getClaim("type").equals("refresh")) {
             return RestResponse.<AuthResponses.OnlyTokenResponse>builder().status(HttpStatus.UNAUTHORIZED).message("Invalid refresh cookie").build();
         }

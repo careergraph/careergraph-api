@@ -60,7 +60,7 @@ public class ElasticsearchDataInitializer implements CommandLineRunner {
 
     @Override
     public void run(String... args) throws Exception {
-        synchronizeDataWithRetry();
+        // synchronizeDataWithRetry();
     }
 
     private void synchronizeDataWithRetry() {
