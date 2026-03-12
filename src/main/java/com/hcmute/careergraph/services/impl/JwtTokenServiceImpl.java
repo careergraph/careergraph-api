@@ -51,21 +51,12 @@ public class JwtTokenServiceImpl implements JwtTokenService {
         Instant exp = now.plusSeconds(accessTtl);
         String jti = UUID.randomUUID().toString();
 
-        var candidateName = "";
-        if (account.getCandidate() != null) {
-            var c = account.getCandidate();
-            var first = c.getFirstName() != null ? c.getFirstName() : "";
-            var last = c.getLastName() != null ? c.getLastName() : "";
-            candidateName = (first + " " + last).trim();
-        }
-
         var builder = JwtClaimsSet.builder()
                 .subject(account.getId())
                 .claim("email", account.getEmail())
                 .claim("role", account.getRole().name())
                 .claim("candidateId", account.getCandidate() != null ? account.getCandidate().getId() : "")
                 .claim("companyId", account.getCompany() != null ? account.getCompany().getId() : "")
-                .claim("fullName", candidateName)
                 .claim("type", "access")
                 .id(jti)
                 .issuedAt(now)

@@ -3,7 +3,6 @@ package com.hcmute.careergraph.controllers;
 import com.hcmute.careergraph.enums.common.FileType;
 import com.hcmute.careergraph.enums.common.PartyType;
 import com.hcmute.careergraph.helper.SecurityUtils;
-import com.hcmute.careergraph.persistence.dtos.response.CloudFileResponse;
 import com.hcmute.careergraph.persistence.dtos.response.FileResponse;
 import com.hcmute.careergraph.services.CandidateService;
 import com.hcmute.careergraph.services.CloudinaryService;
@@ -14,7 +13,6 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
-import javax.swing.text.ChangedCharSetException;
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.List;
