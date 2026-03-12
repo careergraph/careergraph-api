@@ -15,6 +15,10 @@ public record CompanyResponse(
         int noOfFollowing,
         int noOfConnections,
 
+        // Account info
+        String role,
+        String email,
+
         // Company-specific fields
         String size,
         String website,

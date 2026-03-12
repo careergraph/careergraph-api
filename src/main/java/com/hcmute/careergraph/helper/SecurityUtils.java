@@ -73,7 +73,7 @@ public class SecurityUtils {
 
    public Optional<String> getCompanyId() {
       return getCurrentAccount()
-              .map(Account::getCandidate)
+              .map(Account::getCompany)
               .map(c -> c.getId());
    }
 

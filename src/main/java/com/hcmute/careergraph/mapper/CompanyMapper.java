@@ -44,6 +44,16 @@ public class CompanyMapper {
             contacts = toContactResponseSet(company.getContacts());
         }
 
+        // Extract account info (role, email) if available
+        String role = null;
+        String email = null;
+        if (company.getAccount() != null) {
+            role = company.getAccount().getRole() != null
+                    ? company.getAccount().getRole().name()
+                    : null;
+            email = company.getAccount().getEmail();
+        }
+
         return CompanyResponse.builder()
                 .companyId(company.getId())
                 .name(company.getName())
@@ -53,6 +63,10 @@ public class CompanyMapper {
                 .noOfFollowers(company.getNoOfFollowers())
                 .noOfFollowing(company.getNoOfFollowing())
                 .noOfConnections(company.getNoOfConnections())
+
+                // Account info
+                .role(role)
+                .email(email)
 
                 // Company-specific fields
                 .size(company.getSize())
