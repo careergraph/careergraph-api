@@ -14,12 +14,25 @@ import org.springframework.security.web.SecurityFilterChain;
 @Configuration
 public class SecurityConfig {
 
+    // NOTE: In Spring Security 6, requestMatchers() patterns are RELATIVE to servlet context-path  
+    // So patterns should NOT include '/careergraph/api/v1' prefix
     private static final String[] PUBLIC_ENDPOINTS = {
             "/auth/**",
             "/jobs/**",
             "/companies/**",
+            // Swagger/OpenAPI endpoints - must be accessible without authentication
+            "/swagger-ui.html",
             "/swagger-ui/**",
-            "/v3/api-docs/**"
+            "/swagger-resources/**",
+            "/v3/api-docs",
+            "/v3/api-docs/**",
+            "/v3/api-docs.yaml",
+            "/api-docs/**",
+            "/webjars/**",
+            "/error",
+            // Actuator
+            "/actuator/health",
+            "/actuator/health/**"
     };
 
     @Autowired
@@ -35,7 +48,7 @@ public class SecurityConfig {
                 .cors(cors -> cors.configurationSource(corsConfig.corsConfigurationSource()))
                 .csrf(AbstractHttpConfigurer::disable)
 
-                // Auth
+                // Auth - permitAll MUST come before anyRequest().authenticated()
                 .authorizeHttpRequests(authorizeRequests -> authorizeRequests
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                         .requestMatchers(PUBLIC_ENDPOINTS).permitAll()
@@ -46,12 +59,12 @@ public class SecurityConfig {
                         .authenticationEntryPoint(new JwtAuthenticationEntryPointConfig())
                 )
 
-                // OAuth2
+                // OAuth2 - This will attempt JWT decoding for ALL requests with Bearer token
+                // But public endpoints already permitted above, so no auth required
                 .oauth2ResourceServer(oauth2 -> oauth2
                         .jwt(jwtConfigurer -> jwtConfigurer
                                 .decoder(jwtDecoder)
-                                .jwtAuthenticationConverter(jwtAuthenticationConverter()))
-                        .authenticationEntryPoint(new JwtAuthenticationEntryPointConfig()))
+                                        .jwtAuthenticationConverter(jwtAuthenticationConverter())))
                 .httpBasic(AbstractHttpConfigurer::disable)
                 .formLogin(AbstractHttpConfigurer::disable);
 

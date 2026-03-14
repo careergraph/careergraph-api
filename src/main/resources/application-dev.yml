@@ -1,3 +1,4 @@
+# application-dev.yml
 spring:
   datasource:
     url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/careergraph}
@@ -17,30 +18,45 @@ spring:
 
   jpa:
     database-platform: org.hibernate.dialect.PostgreSQLDialect
-    show-sql: true
+    # show-sql: true
     hibernate:
       ddl-auto: update
-      format_sql: true
+      # format_sql: true
     properties:
-      hibernate.jdbc.time_zone: UTC
-
-  redis:
-    host: ${SPRING_REDIS_HOST:localhost}
-    port: ${SPRING_REDIS_PORT:6379}
-    timeout: 2000ms
-    database: 0
-    password: ${SPRING_REDIS_PASSWORD:}
-    lettuce:
-      pool:
-        max-active: 8
-        max-idle: 8
-        min-idle: 0
-        max-wait: -1ms
-      shutdown-timeout: 100ms
+      "[hibernate.jdbc.time_zone]": UTC
+  data:
+    redis:
+      host: ${SPRING_REDIS_HOST:localhost}
+      port: ${SPRING_REDIS_PORT:6479}
+      timeout: 2000ms
+      database: 0
+      password: ${SPRING_REDIS_PASSWORD:}
+      lettuce:
+        pool:
+          max-active: 8
+          max-idle: 8
+          min-idle: 0
+          max-wait: -1ms
+        shutdown-timeout: 100ms
   servlet:
     multipart:
       max-file-size: 5MB        # Giới hạn cho mỗi file
       max-request-size: 10MB
+  elasticsearch:
+    uris: http://localhost:${ES_PORT:9200}
+  ai:
+    google:
+      genai:
+        project-id: ${GOOGLE_PROJECT_ID:}
+        api-key: ${GEMINI_API_KEY:}
+        chat:
+          options:
+            model: gemini-2.5-flash
+        embedding:
+          api-key: ${GEMINI_API_KEY:}
+        text:
+          options:
+            model: text-embedding-005
 
 integration:
   s3:

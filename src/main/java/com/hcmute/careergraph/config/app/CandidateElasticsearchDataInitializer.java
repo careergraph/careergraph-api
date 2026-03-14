@@ -5,10 +5,9 @@ import com.hcmute.careergraph.persistence.models.Candidate;
 import com.hcmute.careergraph.persistence.models.CandidateSkill;
 import com.hcmute.careergraph.repositories.CandidateESRepository;
 import com.hcmute.careergraph.repositories.CandidateRepository;
+import com.hcmute.careergraph.services.HuggingFaceEmbeddingService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.ai.embedding.Embedding;
-import org.springframework.ai.embedding.EmbeddingModel;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.core.annotation.Order;
 import org.springframework.data.elasticsearch.core.ElasticsearchOperations;
@@ -36,7 +35,7 @@ public class CandidateElasticsearchDataInitializer implements CommandLineRunner 
   private final CandidateRepository candidateRepository;
   private final CandidateESRepository candidateESRepository;
   private final ElasticsearchOperations elasticsearchOperations;
-  private final EmbeddingModel embeddingModel;
+  private final HuggingFaceEmbeddingService huggingFaceEmbeddingService;
 
   private static final int EMBEDDING_BATCH_SIZE = 100;
   private static final int MAX_RETRIES = 5;
@@ -44,7 +43,7 @@ public class CandidateElasticsearchDataInitializer implements CommandLineRunner 
 
   @Override
   public void run(String... args) throws Exception {
-    synchronizeCandidatesWithRetry();
+    // synchronizeCandidatesWithRetry();
   }
 
   private void synchronizeCandidatesWithRetry() {
@@ -143,11 +142,7 @@ public class CandidateElasticsearchDataInitializer implements CommandLineRunner 
       int end = Math.min(start + EMBEDDING_BATCH_SIZE, texts.size());
       List<String> batchTexts = texts.subList(start, end);
 
-      List<float[]> batchEmbeddings = embeddingModel.embedForResponse(batchTexts)
-          .getResults()
-          .stream()
-          .map(Embedding::getOutput)
-          .toList();
+      List<float[]> batchEmbeddings = huggingFaceEmbeddingService.embed(batchTexts);
 
       allEmbeddings.addAll(batchEmbeddings);
 

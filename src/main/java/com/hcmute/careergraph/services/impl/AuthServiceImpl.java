@@ -2,9 +2,7 @@ package com.hcmute.careergraph.services.impl;
 
 import com.hcmute.careergraph.enums.common.ErrorType;
 import com.hcmute.careergraph.enums.common.Role;
-import com.hcmute.careergraph.enums.common.Status;
 import com.hcmute.careergraph.exception.AppException;
-import com.hcmute.careergraph.helper.RestResponse;
 import com.hcmute.careergraph.persistence.dtos.request.AuthRequests;
 import com.hcmute.careergraph.persistence.dtos.response.AuthResponses;
 import com.hcmute.careergraph.persistence.dtos.response.GoogleUserInfo;
@@ -14,13 +12,17 @@ import com.hcmute.careergraph.persistence.models.Company;
 import com.hcmute.careergraph.repositories.AccountRepository;
 import com.hcmute.careergraph.repositories.CandidateRepository;
 import com.hcmute.careergraph.repositories.CompanyRepository;
+import com.hcmute.careergraph.persistence.dtos.response.GoogleUserInfo;
 import com.hcmute.careergraph.services.AuthService;
+import com.hcmute.careergraph.services.GoogleAuthService;
 import com.hcmute.careergraph.services.RedisService;
 import com.hcmute.careergraph.services.JwtTokenService;
 import com.hcmute.careergraph.services.MailService;
+import com.hcmute.careergraph.services.UserCacheService;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
@@ -29,14 +31,12 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.security.SecureRandom;
+import java.time.Instant;
 import java.util.*;
-
-import com.google.api.client.googleapis.auth.oauth2.GoogleIdToken;
-import com.google.api.client.googleapis.auth.oauth2.GoogleIdTokenVerifier;
 
 @Service
 @Transactional
-@RequiredArgsConstructor
+@Slf4j
 public class AuthServiceImpl implements AuthService {
 
     private final AccountRepository accountRepository;
@@ -47,8 +47,36 @@ public class AuthServiceImpl implements AuthService {
     private final JwtTokenService jwtTokenService;
     private final RedisService redisService;
     private final MailService mailService;
-    private final JwtDecoder jwtDecoder;
-    private final GoogleIdTokenVerifier googleIdTokenVerifier;
+    private final JwtDecoder jwtDecoder;  // Primary decoder for validation
+    private final JwtDecoder rawJwtDecoder;  // Raw decoder for internal operations
+    private final GoogleAuthService googleAuthService;
+    private final UserCacheService userCacheService;
+
+    // Constructor for dependency injection with Qualifier
+    public AuthServiceImpl(
+            AccountRepository accountRepository,
+            CandidateRepository candidateRepository,
+            CompanyRepository companyRepository,
+            PasswordEncoder passwordEncoder,
+            JwtTokenService jwtTokenService,
+            RedisService redisService,
+            MailService mailService,
+            JwtDecoder jwtDecoder,
+            @Qualifier("rawJwtDecoder") JwtDecoder rawJwtDecoder,
+            GoogleAuthService googleAuthService,
+            UserCacheService userCacheService) {
+        this.accountRepository = accountRepository;
+        this.candidateRepository = candidateRepository;
+        this.companyRepository = companyRepository;
+        this.passwordEncoder = passwordEncoder;
+        this.jwtTokenService = jwtTokenService;
+        this.redisService = redisService;
+        this.mailService = mailService;
+        this.jwtDecoder = jwtDecoder;
+        this.rawJwtDecoder = rawJwtDecoder;
+        this.googleAuthService = googleAuthService;
+        this.userCacheService = userCacheService;
+    }
 
     private Integer TIME_OTP_EXPIRED = 300;
 
@@ -159,8 +187,14 @@ public class AuthServiceImpl implements AuthService {
             meta.put("expiredIn", String.valueOf(TIME_OTP_EXPIRED));
             throw new AppException(ErrorType.UNVERIFIED, "Email not verified", meta);
         }
-        String accessToken = jwtTokenService.generateAccessToken(account);
+        
+        // Generate RT with family, then AT with familyId embedded
         String refreshToken = jwtTokenService.generateRefreshTokenWithFamily(account);
+        Jwt rtJwt = rawJwtDecoder.decode(refreshToken);
+        String familyId = rtJwt.getClaimAsString("fam");
+        String accessToken = jwtTokenService.generateAccessToken(account, familyId);
+        
+        log.debug("Login successful for account {} with family {}", account.getId(), familyId);
         return AuthResponses.TokenResponse.builder()
                 .accessToken(accessToken)
                 .refreshToken(refreshToken)
@@ -170,16 +204,36 @@ public class AuthServiceImpl implements AuthService {
 
     @Override
     public void logout(String accessToken) {
-        try {
-            // Decode the access token to get JTI
-            Jwt jwt = jwtDecoder.decode(accessToken);
-            String jti = jwt.getId();
-            
-            // Blacklist the token using JTI
-            jwtTokenService.blacklist(jti, accessTtl);
-        } catch (JwtException e) {
-            // If token is invalid, we can't blacklist it, but that's okay
-            // The token will naturally expire
+        // 1. Blacklist access token (best-effort, may be expired)
+        String familyFromAt = null;
+        if (accessToken != null && !accessToken.isBlank()) {
+            try {
+                Jwt jwt = rawJwtDecoder.decode(accessToken);
+                String jti = jwt.getId();
+                long remainingAt = jwt.getExpiresAt().getEpochSecond() - Instant.now().getEpochSecond();
+                if (remainingAt > 0) {
+                    jwtTokenService.blacklist("bl-at", jti, remainingAt);
+                }
+                familyFromAt = jwt.getClaimAsString("fam");
+            } catch (JwtException e) {
+                log.debug("AT expired/invalid on logout — skipping AT blacklist: {}", e.getMessage());
+            }
+        }
+
+        // 2. Block refresh token family
+        blockFamily(familyFromAt);
+
+        if (familyFromAt == null) {
+            log.info("Logout with no valid tokens — client already cleared");
+        }
+    }
+    
+    private void blockFamily(String fam) {
+        if (fam == null) return;
+        Long famTtl = redisService.getTtl("rt:fam:exp:" + fam);
+        if (famTtl != null && famTtl > 0) {
+            redisService.setObject("rt:fam:blocked:" + fam, "1", famTtl.intValue());
+            log.info("Logout: blocked RT family {} (TTL {}s)", fam, famTtl);
         }
     }
 
@@ -210,7 +264,7 @@ public class AuthServiceImpl implements AuthService {
             String newRefreshToken = jwtTokenService.generateRefreshToken(account);
             
             // Blacklist the old refresh token
-            jwtTokenService.blacklist(jti, refreshTtl);
+            jwtTokenService.blacklist("bl-rt", jti, (long) refreshTtl);
             
             return AuthResponses.TokenResponse.builder()
                     .accessToken(newAccessToken)
@@ -254,63 +308,86 @@ public class AuthServiceImpl implements AuthService {
     @Override
     public AuthResponses.TokenResponse googleLogin(AuthRequests.GoogleLoginRequest request) {
         try {
-            GoogleIdToken idToken = googleIdTokenVerifier.verify(request.getIdToken());
-            if (idToken == null) {
-                throw new AppException(ErrorType.UNAUTHORIZED, "Invalid Google ID token");
-            }
+            // Verify Google ID token using GoogleAuthService
+            GoogleUserInfo googleUser = googleAuthService.verify(request.getIdToken());
+            
+            String email = googleUser.email();
+            boolean emailVerified = Boolean.TRUE.equals(googleUser.emailVerified());
+            String givenName = googleUser.givenName();
+            String familyName = googleUser.familyName();
+            String pictureUrl = googleUser.picture();
 
-            GoogleIdToken.Payload payload = idToken.getPayload();
-            String email = payload.getEmail();
-            boolean emailVerified = Boolean.TRUE.equals(payload.getEmailVerified());
-            String givenName = (String) payload.get("given_name");
-            String familyName = (String) payload.get("family_name");
-            String pictureUrl = (String) payload.get("picture");
+            boolean isHR = "HR".equalsIgnoreCase(request.getRole());
+            Role targetRole = isHR ? Role.HR : Role.USER;
 
             Account account = accountRepository.findByEmail(email).orElse(null);
             if (account == null) {
-                // Create new account and candidate
-                Candidate candidate = Candidate.builder().build();
+                // Create new account
                 account = Account.builder()
                         .email(email)
-                        .passwordHash(passwordEncoder.encode("google:" + idToken.getPayload().getSubject()))
-                        .role(Role.USER)
+                        .passwordHash(passwordEncoder.encode("google:" + email + ":" + System.currentTimeMillis()))
+                        .role(targetRole)
                         .emailVerified(emailVerified)
-                        .candidate(candidate)
                         .build();
-                candidate.setAccount(account);
-                // Attach basic profile
-                candidate.setFirstName(givenName);
-                candidate.setLastName(familyName);
-                candidate.setAvatar(pictureUrl);
-                candidateRepository.save(candidate);
+                if (isHR) {
+                    Company company = Company.builder().account(account).build();
+                    account.setCompany(company);
+                    companyRepository.save(company);
+                } else {
+                    Candidate candidate = Candidate.builder()
+                            .account(account)
+                            .firstName(givenName)
+                            .lastName(familyName)
+                            .avatar(pictureUrl)
+                            .build();
+                    account.setCandidate(candidate);
+                    candidateRepository.save(candidate);
+                }
+                log.info("Created new {} account from Google OAuth: {}", targetRole, email);
             } else {
-                // Existing account: mark verified if Google confirmed
+                // Existing account: verify role matches
+                if (!account.getRole().equals(targetRole)) {
+                    throw new AppException(ErrorType.UNAUTHORIZED, "You do not have permission to log in to this account");
+                }
+                // Mark verified if Google confirmed
                 if (emailVerified && !account.isEmailVerified()) {
                     account.setEmailVerified(true);
                     accountRepository.save(account);
                 }
-                // Ensure candidate exists and update profile lightly
-                Candidate candidate = account.getCandidate();
-                if (candidate == null) {
-                    candidate = Candidate.builder()
-                            .account(account)
-                            .build();
-                    account.setCandidate(candidate);
+                // Update profile lightly
+                if (isHR) {
+                    Company company = account.getCompany();
+                    if (company == null) {
+                        company = Company.builder().account(account).build();
+                        account.setCompany(company);
+                        companyRepository.save(company);
+                    }
+                } else {
+                    Candidate candidate = account.getCandidate();
+                    if (candidate == null) {
+                        candidate = Candidate.builder().account(account).build();
+                        account.setCandidate(candidate);
+                    }
+                    if (candidate.getAvatar() == null && pictureUrl != null) {
+                        candidate.setAvatar(pictureUrl);
+                    }
+                    if (candidate.getFirstName() == null && givenName != null) {
+                        candidate.setFirstName(givenName);
+                    }
+                    if (candidate.getLastName() == null && familyName != null) {
+                        candidate.setLastName(familyName);
+                    }
+                    candidateRepository.save(candidate);
                 }
-                if (candidate.getAvatar() == null && pictureUrl != null) {
-                    candidate.setAvatar(pictureUrl);
-                }
-                if (candidate.getFirstName() == null && givenName != null) {
-                    candidate.setFirstName(givenName);
-                }
-                if (candidate.getLastName() == null && familyName != null) {
-                    candidate.setLastName(familyName);
-                }
-                candidateRepository.save(candidate);
             }
 
-            String accessToken = jwtTokenService.generateAccessToken(account);
-            String refreshToken = jwtTokenService.generateRefreshToken(account);
+            // Generate family-based tokens
+            String refreshToken = jwtTokenService.generateRefreshTokenWithFamily(account);
+            Jwt rtJwt = rawJwtDecoder.decode(refreshToken);
+            String familyId = rtJwt.getClaimAsString("fam");
+            String accessToken = jwtTokenService.generateAccessToken(account, familyId);
+            
+            log.info("Google login successful for account {}", account.getId());
             return AuthResponses.TokenResponse.builder()
                     .accessToken(accessToken)
                     .refreshToken(refreshToken)
@@ -319,6 +396,7 @@ public class AuthServiceImpl implements AuthService {
         } catch (AppException e) {
             throw e;
         } catch (Exception e) {
+            log.error("Failed to process Google login: {}", e.getMessage());
             throw new AppException(ErrorType.UNAUTHORIZED, "Failed to verify Google token");
         }
     }
@@ -331,38 +409,66 @@ public class AuthServiceImpl implements AuthService {
         String jti = jwt.getId();
         String fam = jwt.getClaimAsString("fam");
         String accountId = jwt.getSubject();
+        String tokenRole = jwt.getClaimAsString("role");
 
-        // 2) Kiểm tra Redis (chưa revoke, còn hạn)
+        log.debug("Processing refresh token - jti: {}, family: {}, accountId: {}", jti, fam, accountId);
+
+        // 1) Check if family is blocked (logout or reuse detected)
+        if (redisService.exists("rt:fam:blocked:" + fam)) {
+            log.warn("Refresh attempt with blocked family: {}", fam);
+            throw new AppException(ErrorType.UNAUTHORIZED, "Session has been invalidated");
+        }
+
+        // 2) Check if user's role has changed by comparing token role vs current DB role
+        Account account = accountRepository.findById(accountId)
+                .orElseThrow(() -> new AppException(ErrorType.NOT_FOUND, "Account not found"));
+
+        if (tokenRole != null && !tokenRole.equals(account.getRole().name())) {
+            log.warn("Role changed detected for account {} - token role: {}, current role: {} - blocking family {}",
+                    accountId, tokenRole, account.getRole(), fam);
+
+            // Block the family to prevent further refresh attempts
+            long remainingTtl = jwt.getExpiresAt().getEpochSecond() - Instant.now().getEpochSecond();
+            if (remainingTtl > 0) {
+                redisService.setObject("rt:fam:blocked:" + fam, "1", (int) remainingTtl);
+            }
+            
+            // Evict user cache
+            userCacheService.evict(accountId);
+
+            throw new AppException(ErrorType.UNAUTHORIZED,
+                    "Your role has been changed from " + tokenRole + " to " + account.getRole().name() + ". Please login again.");
+        }
+
+        // 3) Check Redis for token metadata
         var meta = redisService.getObject("rt:jti:" + jti, Map.class);
 
         if (meta == null || Boolean.TRUE.equals(meta.get("revoked"))) {
-            // REUSE / REVOKED: revoke cả family
+            // REUSE DETECTED or already revoked: block entire family
+            log.warn("Refresh token reuse or revocation detected - jti: {}, family: {}", jti, fam);
+
             String current = redisService.getObject("rt:fam:current:" + fam, String.class);
             if (current != null) {
-                // đánh dấu family bị khoá
+                // Block the family to prevent further use
                 redisService.setObject("rt:fam:blocked:" + fam, "1", refreshTtl);
             }
-            throw new AppException(ErrorType.UNAUTHORIZED, "Refresh reuse or revoked");
-        }
-        // Check family blocked
-        if (redisService.exists("rt:fam:blocked:" + fam)) {
-            throw new AppException(ErrorType.UNAUTHORIZED, "Family blocked");
+
+            throw new AppException(ErrorType.UNAUTHORIZED, "Session has been invalidated");
         }
 
-        // 3) Rotate: revoke jti cũ, phát hành refresh mới cùng family
+        // 4) Success: revoke old RT and rotate
         redisService.setField("rt:jti:" + jti, "revoked", true);
 
-        Account account = accountRepository.findById(accountId)
-                .orElseThrow(() -> new AppException(ErrorType.NOT_FOUND, "Account not found"));
-        String accessToken = jwtTokenService.generateAccessToken(account);
         String refreshToken = jwtTokenService.rotateRefreshToken(account, fam);
+        String accessToken = jwtTokenService.generateAccessToken(account, fam);
+        
+        log.debug("Token refresh successful for account {} in family {}", accountId, fam);
 
         return AuthResponses.TokenResponse.builder()
                 .accessToken(accessToken)
                 .refreshToken(refreshToken)
                 .expiresIn(accessTtl)
                 .build();
-
     }
 
 

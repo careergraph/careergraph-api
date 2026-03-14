@@ -46,14 +46,14 @@ public class JobRecommendationServiceImpl implements JobRecommendationService {
 
                 String keyword = genKeyword(candidate);
                 if (keyword == null || keyword.isBlank()) {
-                        log.warn("Candidate {} has no profile data for recommendation", candidate.getId());
+                        // log.warn("Candidate {} has no profile data for recommendation", candidate.getId());
                         return;
                 }
 
                 // 1. Lấy danh sách job mới đăng
                 List<String> newlyPostedJobIds = newlyPostedJobRepo.findAllJobIds();
                 if (newlyPostedJobIds.isEmpty()) {
-                        log.debug("No newly posted jobs available");
+                        // log.debug("No newly posted jobs available");
                         return;
                 }
 

@@ -21,22 +21,24 @@ spring:
       ddl-auto: update
       format_sql: false
     properties:
-      hibernate.jdbc.time_zone: UTC
+      "[hibernate.jdbc.time_zone]": UTC
 
-  redis:
-    host: ${SPRING_REDIS_HOST:skilled-badger-17572.upstash.io}
-    port: ${SPRING_REDIS_PORT:6379}
-    password: ${SPRING_REDIS_PASSWORD:AUSkAAIncDI4MTFjYzEzNGJhMjc0NjMyYWMzYWU2YTQxZGM0OTJlNnAyMTc1NzI}
-    ssl: ${SPRING_REDIS_SSL:true}
-    timeout: 2000ms
-    database: 0
-    lettuce:
-      pool:
-        max-active: 16
-        max-idle: 8
-        min-idle: 0
-        max-wait: -1ms
-      shutdown-timeout: 100ms
+  data:
+    redis:
+      host: ${SPRING_REDIS_HOST:skilled-badger-17572.upstash.io}
+      port: ${SPRING_REDIS_PORT:6379}
+      password: ${SPRING_REDIS_PASSWORD:AUSkAAIncDI4MTFjYzEzNGJhMjc0NjMyYWMzYWU2YTQxZGM0OTJlNnAyMTc1NzI}
+      ssl:
+        enabled: true
+      timeout: 2000ms
+      database: 0
+      lettuce:
+        pool:
+          max-active: 16
+          max-idle: 8
+          min-idle: 0
+          max-wait: -1ms
+        shutdown-timeout: 100ms
 
   servlet:
     multipart:
@@ -47,6 +49,7 @@ spring:
   ai:
     google:
       genai:
+        project-id: ${GOOGLE_PROJECT_ID:}
         api-key: ${GEMINI_API_KEY}
         chat:
           options:
@@ -55,7 +58,7 @@ spring:
           api-key: ${GEMINI_API_KEY}
         text:
           options:
-            model: text-embedding-004
+            model: text-embedding-005
 
 integration:
   s3:
@@ -91,4 +94,4 @@ management:
       show-details: never
 
 huggingface:
-  api-key: ${HUGGING_FACE_KEY}
+  api-key: ${HUGGING_FACE_KEY:}
