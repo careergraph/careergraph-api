@@ -19,7 +19,7 @@ public class JwtAuthenticationEntryPointConfig implements AuthenticationEntryPoi
         response.setContentType("application/json");
         response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
 
-        RestResponse errorResponse = RestResponse.builder()
+        RestResponse<?> errorResponse = RestResponse.builder()
                 .status(HttpStatus.UNAUTHORIZED)
                 .message("Unauthorized - Invalid credentials")
                 .build();

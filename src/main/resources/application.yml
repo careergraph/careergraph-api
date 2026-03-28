@@ -1,20 +1,36 @@
+# application.yml
 spring:
   profiles:
-    active: prod
+    active: ${SPRING_PROFILES_ACTIVE:dev}
+  config:
+    import: optional:file:.env[.properties]
+  servlet:
+    multipart:
+      max-file-size: ${MULTIPART_MAX_FILE_SIZE:10MB}
+      max-request-size: ${MULTIPART_MAX_REQUEST_SIZE:20MB}
+  elasticsearch:
+    uris: ${SPRING_ELASTICSEARCH_URIS:http://localhost:9200}
+  ai:
+    google:
+      genai:
+        project-id: ${GOOGLE_PROJECT_ID:}
+        api-key: ${GEMINI_API_KEY:}
+        chat:
+          options:
+            model: ${GEMINI_CHAT_MODEL:gemini-2.5-flash}
+        embedding:
+          api-key: ${GEMINI_API_KEY:}
+          text:
+            options:
+              model: ${GEMINI_EMBEDDING_MODEL:text-embedding-005}
 
 server:
   port: ${SERVER_PORT:8080}
   servlet:
     context-path: ${SERVER_SERVLET_CONTEXT_PATH:/careergraph/api/v1}
 
-logging:
-  level:
-    org.neo4j.driver: DEBUG
-    org.springframework.data.neo4j: DEBUG
-    org.springframework.transaction: DEBUG
-
 jwt:
-  signer-key: ${JWT_SIGNER_KEY:uT+Q3VZKCE+yNxmPoB0SH7qqDB8EGtBQY/F1GK2shIRKMZasRvvvyI5T/5y/FDX+}
+  signer-key: ${JWT_SIGNER_KEY:change-me-in-env}
   valid-duration: ${JWT_VALID_DURATION:3600}
   refreshable-duration: ${JWT_REFRESHABLE_DURATION:36000}
 
@@ -22,6 +38,17 @@ google:
   oauth:
     client-id: ${GOOGLE_OAUTH_CLIENT_ID:}
     client-secret: ${GOOGLE_OAUTH_CLIENT_SECRET:}
+
+cookie:
+  secure: ${COOKIE_SECURE:false}
+  samesite: ${COOKIE_SAMESITE:Lax}
+
+cache:
+  user:
+    ttl: ${CACHE_USER_TTL:300}
+
+fast-api:
+  base-url: ${FAST_API_BASE_URL:http://localhost:8000}
 
 springdoc:
   api-docs:
@@ -32,15 +59,11 @@ springdoc:
     tags-sorter: alpha
     try-it-out-enabled: true
     filter: true
-  packages-to-scan: com.hcmute.careergraph.controller
-  paths-to-match: /api/**
-
-swagger:
-  username: ${SWAGGER_USERNAME:}
-  password: ${SWAGGER_PASSWORD:}
+  packages-to-scan: com.hcmute.careergraph.controllers
+  paths-to-match: /**
 
 support:
-  email: ${SUPPORT_EMAIL:}
+  email: ${SUPPORT_EMAIL:support@careergraph.com}
 
 mail:
   host: ${MAIL_HOST:smtp.gmail.com}
@@ -52,16 +75,33 @@ mail:
   starttls-enable: ${MAIL_STARTTLS_ENABLE:true}
   debug: ${MAIL_DEBUG:false}
 
----
+huggingface:
+  api-key: ${HUGGING_FACE_KEY:}
 
+embedding:
+  service:
+    url: ${EMBEDDING_SERVICE_URL:http://localhost:8000}
+
+integration:
+  s3:
+    endpoint: ${INTEGRATION_S3_ENDPOINT:}
+    accessKey: ${INTEGRATION_S3_ACCESS_KEY:}
+    secretKey: ${INTEGRATION_S3_SECRET_KEY:}
+    bucket: ${INTEGRATION_S3_BUCKET:}
+    region: ${INTEGRATION_S3_REGION:}
+
+cloudinary:
+  cloud_name: ${CLOUDINARY_CLOUD_NAME:}
+  api_key: ${CLOUDINARY_API_KEY:}
+  api_secret: ${CLOUDINARY_API_SECRET:}
+
+---
 spring:
   config:
     activate:
       on-profile: dev
     import: optional:file:.env.dev[.properties]
-
 ---
-
 spring:
   config:
     activate:

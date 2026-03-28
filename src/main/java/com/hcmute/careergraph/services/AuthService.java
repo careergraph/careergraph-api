@@ -2,17 +2,18 @@ package com.hcmute.careergraph.services;
 
 import com.hcmute.careergraph.persistence.dtos.request.AuthRequests;
 import com.hcmute.careergraph.persistence.dtos.response.AuthResponses;
-import com.hcmute.careergraph.persistence.dtos.response.GoogleUserInfo;
-import com.hcmute.careergraph.persistence.models.Account;
 import org.springframework.security.oauth2.jwt.Jwt;
 
 public interface AuthService {
 
     void register(AuthRequests.RegisterRequest request, boolean isHR);
 
-    String confirmOtp(AuthRequests.ConfirmOtpRequest request);
+    void confirmRegisterOtp(AuthRequests.ConfirmOtpRequest request);
+
+    String confirmResetPasswordOtp(AuthRequests.ConfirmOtpRequest request);
 
     Integer resendOtp(AuthRequests.ResendOtpRequest request);
+
     Long getTtlOtp(String email);
 
     AuthResponses.TokenResponse login(AuthRequests.LoginRequest request);
@@ -22,7 +23,7 @@ public interface AuthService {
     AuthResponses.TokenResponse refresh(String refreshToken);
 
     Integer forgotPassword(AuthRequests.ForgotPasswordRequest request);
-    
+
     void resetPassword(String resetPasswordToken, AuthRequests.ResetPasswordRequest request);
 
     AuthResponses.TokenResponse googleLogin(AuthRequests.GoogleLoginRequest request);
@@ -30,9 +31,4 @@ public interface AuthService {
     AuthResponses.TokenResponse refreshWithFamily(Jwt jwt);
 
     String generateOTPToken(String email);
-
-    Account findOrCreateGoogleUser(GoogleUserInfo info);
-
 }
-
-

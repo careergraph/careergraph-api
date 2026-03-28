@@ -11,8 +11,6 @@ import com.hcmute.careergraph.persistence.models.Application;
 import com.hcmute.careergraph.services.ApplicationService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.Authentication;
 import org.springframework.util.StringUtils;

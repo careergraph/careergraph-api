@@ -1,5 +1,7 @@
 package com.hcmute.careergraph.persistence.dtos.request;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
@@ -32,6 +34,7 @@ public class AuthRequests {
         @NotBlank
         private String otp;
     }
+
     @Data
     public static class ResendOtpRequest {
         @Email
@@ -59,6 +62,7 @@ public class AuthRequests {
     }
 
     @Data
+    @JsonIgnoreProperties(ignoreUnknown = true)
     public static class ForgotPasswordRequest {
         @Email
         @NotBlank
@@ -77,7 +81,6 @@ public class AuthRequests {
     public static class GoogleLoginRequest {
         @NotBlank
         private String idToken;
+        private String role; // "user" or "HR", defaults to USER if absent
     }
 }
-
-

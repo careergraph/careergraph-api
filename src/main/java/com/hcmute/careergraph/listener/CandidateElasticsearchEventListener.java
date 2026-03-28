@@ -7,7 +7,7 @@ import com.hcmute.careergraph.repositories.CandidateESRepository;
 import com.hcmute.careergraph.repositories.CandidateRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.ai.embedding.EmbeddingModel;
+import com.hcmute.careergraph.services.EmbedService;
 import org.springframework.context.event.EventListener;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Component;
@@ -31,7 +31,7 @@ public class CandidateElasticsearchEventListener {
 
   private final CandidateRepository candidateRepository;
   private final CandidateESRepository candidateESRepository;
-  private final EmbeddingModel embeddingModel;
+  private final EmbedService embedService;
 
   /**
    * Listen to CandidateUpdatedEvent and sync to Elasticsearch
@@ -95,7 +95,7 @@ public class CandidateElasticsearchEventListener {
     String searchText = buildSearchText(candidate);
 
     // Generate embedding
-    float[] embedding = embeddingModel.embed(searchText);
+    float[] embedding = embedService.embed(searchText);
 
     // Convert to CandidateES and save
     CandidateES candidateES = convertToCandidateES(candidate, embedding);

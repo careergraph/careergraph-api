@@ -15,6 +15,16 @@ import java.nio.file.AccessDeniedException;
 @Slf4j
 public class GlobalExceptionHandler {
 
+    @ExceptionHandler(value = BadRequestException.class)
+    ResponseEntity<RestResponse> handlingBadRequestException(BadRequestException exception) {
+        log.warn("Bad request: {}", exception.getMessage());
+
+        RestResponse restResponse = new RestResponse();
+        restResponse.setStatus(HttpStatus.BAD_REQUEST);
+        restResponse.setMessage(exception.getMessage());
+
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(restResponse);
+    }
 
     @ExceptionHandler(value = RuntimeException.class)
     ResponseEntity<RestResponse> handlingRuntimeException(RuntimeException exception) {

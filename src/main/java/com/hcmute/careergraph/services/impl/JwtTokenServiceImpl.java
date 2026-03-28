@@ -1,10 +1,13 @@
 package com.hcmute.careergraph.services.impl;
 
 import com.hcmute.careergraph.enums.common.Role;
+import com.hcmute.careergraph.exception.AppException;
+import com.hcmute.careergraph.enums.common.ErrorType;
 import com.hcmute.careergraph.persistence.models.Account;
 import com.hcmute.careergraph.services.RedisService;
 import com.hcmute.careergraph.services.JwtTokenService;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.oauth2.jwt.JwtClaimsSet;
 import org.springframework.security.oauth2.jwt.JwtEncoder;
@@ -17,41 +20,54 @@ import java.util.Map;
 import java.util.UUID;
 
 @Service
+@Slf4j
 @RequiredArgsConstructor
 public class JwtTokenServiceImpl implements JwtTokenService {
 
     private final RedisService redisService;
     private final JwtEncoder jwtEncoder;
 
-//    @Value("${jwt.issuer}")
-//    private String issuer;
-//    @Value("${jwt.audience}")
-//    private String audience;
-
     @Value("${jwt.valid-duration}")
     private long accessTtl;
 
     @Value("${jwt.refreshable-duration}")
     private Integer refreshTtl;
+    
+    // Minimum TTL to prevent issues with near-expired tokens
+    private static final long MIN_TTL_SECONDS = 10;
 
     @Override
     public String generateAccessToken(Account account) {
+        return generateAccessToken(account, null);
+    }
+    
+    @Override
+    public String generateAccessToken(Account account, String familyId) {
+        if (account == null || account.getId() == null) {
+            throw new IllegalArgumentException("Account must not be null");
+        }
+        
         Instant now = Instant.now();
         Instant exp = now.plusSeconds(accessTtl);
+        String jti = UUID.randomUUID().toString();
 
-        JwtClaimsSet claims = JwtClaimsSet.builder()
+        var builder = JwtClaimsSet.builder()
                 .subject(account.getId())
                 .claim("email", account.getEmail())
                 .claim("role", account.getRole().name())
                 .claim("candidateId", account.getCandidate() != null ? account.getCandidate().getId() : "")
                 .claim("companyId", account.getCompany() != null ? account.getCompany().getId() : "")
                 .claim("type", "access")
-                .id(UUID.randomUUID().toString())
+                .id(jti)
                 .issuedAt(now)
-                .expiresAt(exp)
-                .build();
+                .expiresAt(exp);
 
-        return jwtEncoder.encode(JwtEncoderParameters.from(claims)).getTokenValue();
+        if (familyId != null) {
+            builder.claim("fam", familyId);
+        }
+
+        log.debug("Generated access token for account {} with jti {}", account.getId(), jti);
+        return jwtEncoder.encode(JwtEncoderParameters.from(builder.build())).getTokenValue();
     }
 
 
@@ -70,9 +86,13 @@ public class JwtTokenServiceImpl implements JwtTokenService {
 
         return jwtEncoder.encode(JwtEncoderParameters.from(claims)).getTokenValue();
     }
+    
     @Override
     public String generateRefreshTokenWithFamily(Account account) {
-        return generateRefreshTokenWithFamily(account,UUID.randomUUID().toString());
+        Instant familyExp = Instant.now().plusSeconds(refreshTtl);
+        String familyId = UUID.randomUUID().toString();
+        redisService.setObject("rt:fam:exp:" + familyId, familyExp.getEpochSecond(), refreshTtl);
+        return generateRefreshTokenWithFamily(account, familyId);
     }
 
     @Override
@@ -95,15 +115,30 @@ public class JwtTokenServiceImpl implements JwtTokenService {
     public String rotateRefreshToken(Account account, String familyId){
         return generateRefreshTokenWithFamily(account, familyId);
     }
+    
     private String generateRefreshTokenWithFamily(Account account, String familyId){
+        if (account == null || account.getId() == null) {
+            throw new IllegalArgumentException("Account must not be null");
+        }
+        if (familyId == null || familyId.isBlank()) {
+            throw new IllegalArgumentException("FamilyId must not be null or blank");
+        }
+        
         Instant now = Instant.now();
-        Instant exp = now.plusSeconds(refreshTtl);
+        Long familyExp = redisService.getObject("rt:fam:exp:" + familyId, Long.class);
+        if (familyExp == null) {
+            log.warn("Refresh family {} has expired or does not exist", familyId);
+            throw new AppException(ErrorType.UNAUTHORIZED, "Refresh family expired");
+        }
+        
+        Instant exp = Instant.ofEpochSecond(familyExp);
         String jti = UUID.randomUUID().toString();
+        
         JwtClaimsSet claims = JwtClaimsSet.builder()
-//                .issuer(issuer)
-//                .audience(List.copyOf(audience))
                 .claim("type", "refresh")
                 .claim("fam", familyId)
+                .claim("email", account.getEmail())
+                .claim("role", account.getRole().name())  // Include role for change detection
                 .subject(account.getId())
                 .id(jti)
                 .issuedAt(now)
@@ -111,17 +146,22 @@ public class JwtTokenServiceImpl implements JwtTokenService {
                 .build();
         String token = jwtEncoder.encode(JwtEncoderParameters.from(claims)).getTokenValue();
 
-        //Lưu vào Redis: key theo jti, TTL = refreshTtl
-        //value có thể là JSON( userId, fam, exp, revoked: false)
+        // Calculate TTL safely - ensure it's positive
+        long ttl = Math.max(familyExp - Instant.now().getEpochSecond(), MIN_TTL_SECONDS);
+
+        // Store in Redis: key by jti, TTL = remaining family time
         redisService.setObject("rt:jti:" + jti, Map.of(
                 "accountId", account.getId(),
                 "fam", familyId,
                 "exp", exp.getEpochSecond(),
                 "revoked", false
-        ), refreshTtl);
+        ), (int) ttl);
 
-        // Cũng lưu current jti theo family để nhanh revoke family khi reuse
-        redisService.setObject("rt:family:current:" + familyId, jti, refreshTtl);
+        // Also store current jti by family for quick family revocation on reuse
+        redisService.setObject("rt:fam:current:" + familyId, jti, refreshTtl);
+        
+        log.debug("Generated refresh token for account {} with jti {} in family {}", 
+                account.getId(), jti, familyId);
 
         return token;
     }
@@ -129,15 +169,12 @@ public class JwtTokenServiceImpl implements JwtTokenService {
 
     @Override
     public boolean isBlacklisted(String jti) {
-        Boolean value = redisService.getObject("bl:" + jti, Boolean.class);
+        Boolean value = redisService.getObject("bl-at:" + jti, Boolean.class);
         return value != null && value;
     }
 
     @Override
-    public void blacklist(String jti, long ttlSeconds) {
-        redisService.setObject("bl:" + jti, Boolean.TRUE, (int) ttlSeconds);
+    public void blacklist(String keyPrefix, String jti, long ttlSeconds) {
+        redisService.setObject(keyPrefix + ":" + jti, Boolean.TRUE, (int) ttlSeconds);
     }
-
-
-
 }

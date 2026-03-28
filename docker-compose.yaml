@@ -1,89 +1,135 @@
 name: careergraph-api
-version: '3.8'
 
 services:
-  # --- DATABASE: Postgres với PGVector ---
+  # =============================================
+  # INFRASTRUCTURE SERVICES
+  # =============================================
+
+  # --- DATABASE: PostgreSQL + PGVector ---
   careergraph-db:
     image: pgvector/pgvector:pg16
     container_name: careergraph-postgres
     restart: unless-stopped
     ports:
-      - "5432:5432"
+      - "${POSTGRES_PORT:-5432}:5432"
     environment:
-      - POSTGRES_DB=careergraph
-      - POSTGRES_USER=postgres
-      - POSTGRES_PASSWORD=postgres
+      POSTGRES_DB: ${POSTGRES_DB:-careergraph}
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+    volumes:
+      - ${DATA_PATH:-./data}/postgres:/var/lib/postgresql/data
+      # - ./init-scripts:/docker-entrypoint-initdb.d
     networks:
       - careergraph-network
-    volumes:
-      - pg_dt:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d careergraph"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   # --- CACHE: Redis ---
   careergraph-redis:
-    image: redis:latest
+    image: redis:7-alpine
     container_name: careergraph-redis
     restart: unless-stopped
     ports:
-      - "6379:6379"
-    command: redis-server --save 60 1 --loglevel warning
+      - "${REDIS_PORT:-6379}:6379"
+    command: redis-server --save 60 1 --loglevel warning --requirepass ${REDIS_PASSWORD:-careergraph@Redis2026}
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-careergraph@Redis2026}
+    volumes:
+      - ${DATA_PATH:-./data}/redis:/data
     networks:
       - careergraph-network
-    volumes:
-      - redis_dt:/data
-
-#  # --- APP: Spring Boot API ---
-#  app:
-#    build:
-#      context: .
-#      dockerfile: Dockerfile
-#    container_name: careergraph-api
-#    ports:
-#      - "8080:8080"
-#    restart: unless-stopped
-#    depends_on:
-#      careergraph-db:
-#        condition: service_started
-#      careergraph-redis:
-#        condition: service_started
-#      careergraph-elasticsearch:
-#        condition: service_healthy
-#    networks:
-#      - careergraph-network
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "redis-cli",
+          "-a",
+          "${REDIS_PASSWORD:-careergraph@Redis2026}",
+          "ping",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   # --- SEARCH: Elasticsearch ---
   careergraph-elasticsearch:
     image: docker.elastic.co/elasticsearch/elasticsearch:8.15.5
     container_name: careergraph-elasticsearch
+    restart: unless-stopped
     environment:
       - node.name=es01
       - discovery.type=single-node
       - xpack.security.enabled=false
-      - cluster.name=demo-cluster
+      - cluster.name=careergraph-cluster
       - bootstrap.memory_lock=true
-      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
-      - ELASTIC_PASSWORD=elastic
+      - "ES_JAVA_OPTS=-Xms${ES_HEAP_SIZE:-512m} -Xmx${ES_HEAP_SIZE:-512m}"
+      - ELASTIC_PASSWORD=${ELASTIC_PASSWORD:-elastic}
     ulimits:
       memlock:
         soft: -1
         hard: -1
     ports:
-      - "9200:9200"
-      - "9300:9300"
+      - "${ES_PORT:-9200}:9200"
+      - "${ES_TRANSPORT_PORT:-9300}:9300"
+    volumes:
+      - ${DATA_PATH:-./data}/elasticsearch:/usr/share/elasticsearch/data
     networks:
       - careergraph-network
     healthcheck:
-      test: [ "CMD-SHELL", "curl -s http://localhost:9200/_cluster/health | grep '\"status\":\"green\\|yellow\"'" ]
-      interval: 10s
-      timeout: 5s
+      test:
+        [
+          "CMD-SHELL",
+          "curl -s http://localhost:9200/_cluster/health | grep '\"status\":\"green\\|yellow\"'",
+        ]
+      interval: 15s
+      timeout: 10s
       retries: 10
-    volumes:
-      - es_dt:/usr/share/elasticsearch/data
 
+  # =============================================
+  # APPLICATION SERVICE
+  # =============================================
+
+  # --- APP: Spring Boot API ---
+  careergraph-api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: careergraph-api
+    restart: unless-stopped
+    ports:
+      - "${SERVER_PORT_EXPOSE:-8080}:${SERVER_PORT_CONTAINER:-8080}"
+    env_file:
+      - .env
+    environment:
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-dev}
+      SERVER_PORT: ${SERVER_PORT:-8080}
+      SPRING_DATASOURCE_URL: jdbc:postgresql://careergraph-db:5432/${POSTGRES_DB:-careergraph}
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-postgres}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      SPRING_REDIS_HOST: careergraph-redis
+      SPRING_REDIS_PORT: 6379
+      SPRING_REDIS_PASSWORD: ${REDIS_PASSWORD:-careergraph@Redis2026}
+      SPRING_ELASTICSEARCH_URIS: http://careergraph-elasticsearch:9200
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      GOOGLE_PROJECT_ID: ${GOOGLE_PROJECT_ID:-}
+    depends_on:
+      careergraph-db:
+        condition: service_healthy
+      careergraph-redis:
+        condition: service_healthy
+      careergraph-elasticsearch:
+        condition: service_healthy
+    networks:
+      - careergraph-network
+
+# =============================================
+# NETWORKS & VOLUMES
+# =============================================
 networks:
   careergraph-network:
     driver: bridge
 
-volumes:
-  es_dt:
-  pg_dt:
-  redis_dt: # Lưu trữ dữ liệu Redis
+volumes: {}
