@@ -62,3 +62,10 @@ management:
   endpoint:
     health:
       show-details: never
+
+app:
+  seed:
+    enabled: ${APP_SEED_ENABLED:false}
+    script-path: ${APP_SEED_SCRIPT_PATH:init-scripts/seed-basic.sql}
+    check-table: ${APP_SEED_CHECK_TABLE:jobs}
+    min-row-count: ${APP_SEED_MIN_ROW_COUNT:1}
