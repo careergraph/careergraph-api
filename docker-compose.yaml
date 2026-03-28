@@ -115,6 +115,14 @@ services:
       SPRING_ELASTICSEARCH_URIS: http://careergraph-elasticsearch:9200
       GEMINI_API_KEY: ${GEMINI_API_KEY:-}
       GOOGLE_PROJECT_ID: ${GOOGLE_PROJECT_ID:-}
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.api.rule=Host(`yourdomain.com`)"
+      - "traefik.http.routers.api.entrypoints=websecure"
+      - "traefik.http.routers.api.tls.certresolver=le"
+      - "traefik.http.services.api.loadbalancer.server.port=3000"
+    networks:
+      - proxy
     depends_on:
       careergraph-db:
         condition: service_healthy
@@ -131,6 +139,9 @@ services:
 networks:
   careergraph-network:
     driver: bridge
+  proxy:
+    external: true
+  
 volumes:
   esdata:
     driver: local
