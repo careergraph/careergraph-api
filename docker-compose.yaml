@@ -117,7 +117,7 @@ services:
       GOOGLE_PROJECT_ID: ${GOOGLE_PROJECT_ID:-}
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.api.rule=Host(`yourdomain.com`)"
+      - "traefik.http.routers.api.rule=Host(`thinz.io.vn`)"
       - "traefik.http.routers.api.entrypoints=websecure"
       - "traefik.http.routers.api.tls.certresolver=le"
       - "traefik.http.services.api.loadbalancer.server.port=3000"
