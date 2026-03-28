@@ -22,7 +22,7 @@ spring:
           api-key: ${GEMINI_API_KEY:}
           text:
             options:
-              model: ${GEMINI_EMBEDDING_MODEL:text-embedding-005}
+              model: ${GEMINI_EMBEDDING_MODEL:embedding-001}
 
 server:
   port: ${SERVER_PORT:8080}
@@ -53,14 +53,10 @@ fast-api:
 springdoc:
   api-docs:
     path: /v3/api-docs
+    enabled: ${SPRINGDOC_API_DOCS_ENABLED}
   swagger-ui:
     path: /swagger-ui.html
-    operations-sorter: method
-    tags-sorter: alpha
-    try-it-out-enabled: true
-    filter: true
-  packages-to-scan: com.hcmute.careergraph.controllers
-  paths-to-match: /**
+    enabled: ${SPRINGDOC_SWAGGER_UI_ENABLED}
 
 support:
   email: ${SUPPORT_EMAIL:support@careergraph.com}
