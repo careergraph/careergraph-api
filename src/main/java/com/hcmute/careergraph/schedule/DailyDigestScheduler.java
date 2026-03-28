@@ -58,7 +58,7 @@ public class DailyDigestScheduler {
      * Chạy trước sendDailyDigest (ví dụ 7:00 AM)
      */
     // @Scheduled(cron = "0 0 7 * * *") // Production: 7:00 AM mỗi ngày
-    @Scheduled(cron = "0 */2 * * * *") // Test: mỗi 2 phút
+    // @Scheduled(cron = "0 */2 * * * *") // Test: mỗi 2 phút
     @Transactional
     public void buildQueue() {
         log.info("🔨 Starting buildQueue - Finding matching jobs for candidates...");

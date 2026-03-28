@@ -105,7 +105,7 @@ public class CandidateES {
   private LocalDate lastActive;
 
   /* ========= VECTOR EMBEDDING ========= */
-  @Field(type = FieldType.Dense_Vector, dims = 768, index = true, similarity = "cosine")
+  @Field(type = FieldType.Dense_Vector, dims = 384, index = true, similarity = "cosine")
   private float[] embedding;
 
   /**

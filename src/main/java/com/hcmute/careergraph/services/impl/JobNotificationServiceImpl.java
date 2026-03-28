@@ -39,7 +39,7 @@ public class JobNotificationServiceImpl {
     @Async
     @Transactional
     public void onJobCreated(JobCreatedEvent event) {
-        log.info("📌 Marking job as newly posted: {}", event.jobId());
+        // log.info("📌 Marking job as newly posted: {}", event.jobId());
 
         // Kiểm tra job đã được đánh dấu chưa
         if (newlyPostedJobRepository.existsByJobId(event.jobId())) {
@@ -53,7 +53,7 @@ public class JobNotificationServiceImpl {
                     .postedAt(LocalDateTime.now())
                     .status(Status.ACTIVE)
                     .build());
-            log.info("✅ Job {} marked as newly posted", event.jobId());
+            // log.info("✅ Job {} marked as newly posted", event.jobId());
         } catch (Exception e) {
             // Duplicate key hoặc lỗi khác → skip
             log.warn("Failed to mark job {} as newly posted: {}", event.jobId(), e.getMessage());

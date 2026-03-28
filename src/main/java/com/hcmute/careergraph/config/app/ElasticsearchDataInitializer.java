@@ -10,8 +10,6 @@ import com.hcmute.careergraph.repositories.JobRepository;
 import com.hcmute.careergraph.repositories.NewlyPostedJobRepository;
 import com.hcmute.careergraph.services.HuggingFaceEmbeddingService;
 import lombok.RequiredArgsConstructor;
-import org.springframework.ai.embedding.Embedding;
-import org.springframework.ai.embedding.EmbeddingModel;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.core.annotation.Order;
@@ -30,8 +28,7 @@ public class ElasticsearchDataInitializer implements CommandLineRunner {
 
     private final JobRepository jobRepository;
     private final JobESRepository jobESRepository;
-    private final ElasticsearchOperations elasticsearchOperations; // Cần dùng để kiểm tra sức khỏe ELS
-    private final EmbeddingModel embeddingModel;
+    private final ElasticsearchOperations elasticsearchOperations;
     private final HuggingFaceEmbeddingService huggingFaceEmbeddingService;
     private static final int EMBEDDING_BATCH_SIZE = 100;
     private final ApplicationEventPublisher publisher;
@@ -63,7 +60,7 @@ public class ElasticsearchDataInitializer implements CommandLineRunner {
 
     @Override
     public void run(String... args) throws Exception {
-        synchronizeDataWithRetry();
+//        synchronizeDataWithRetry();
     }
 
     private void synchronizeDataWithRetry() {
@@ -106,11 +103,7 @@ public class ElasticsearchDataInitializer implements CommandLineRunner {
 
                     List<String> batchTexts = texts.subList(start, end);
 
-                    List<float[]> batchVectors = embeddingModel.embedForResponse(batchTexts)
-                            .getResults()
-                            .stream()
-                            .map(Embedding::getOutput)
-                            .toList();
+                    List<float[]> batchVectors = huggingFaceEmbeddingService.embed(batchTexts);
 
                     vectors.addAll(batchVectors);
                 }

@@ -27,7 +27,7 @@ public enum ErrorType {
     API_CALL_FAILED(502, HttpStatus.BAD_GATEWAY),
     SERVICE_UNAVAILABLE(503, HttpStatus.SERVICE_UNAVAILABLE),
     TIMEOUT(504, HttpStatus.GATEWAY_TIMEOUT),
-    UNVERIFIED(505, HttpStatus.FORBIDDEN),
+    UNVERIFIED(403, HttpStatus.FORBIDDEN),
 
     ;
 
@@ -39,4 +39,3 @@ public enum ErrorType {
         this.httpStatusCode = httpStatusCode;
     }
 }
-
