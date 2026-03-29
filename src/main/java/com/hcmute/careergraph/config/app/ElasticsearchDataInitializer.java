@@ -11,6 +11,7 @@ import com.hcmute.careergraph.repositories.NewlyPostedJobRepository;
 import com.hcmute.careergraph.services.HuggingFaceEmbeddingService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.boot.CommandLineRunner;
+import org.springframework.context.annotation.Profile;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.core.annotation.Order;
 import org.springframework.data.elasticsearch.core.ElasticsearchOperations;
@@ -22,6 +23,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.stream.IntStream;
 
 @Component
+@Profile("!test")
 @RequiredArgsConstructor
 @Order(1)
 public class ElasticsearchDataInitializer implements CommandLineRunner {
