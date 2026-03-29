@@ -15,6 +15,8 @@ public class CorsConfig {
         corsConfiguration.addAllowedOrigin("http://localhost:5000");
         corsConfiguration.addAllowedOrigin("http://localhost:5173");
         corsConfiguration.addAllowedOrigin("http://localhost:8000");
+        corsConfiguration.addAllowedOrigin("https://thinz.io.vn");
+        corsConfiguration.addAllowedOrigin("http://thinz.io.vn");
         corsConfiguration.addAllowedMethod("*");
         corsConfiguration.addAllowedHeader("*");
         corsConfiguration.setAllowCredentials(true);
