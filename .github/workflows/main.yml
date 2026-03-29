@@ -118,8 +118,8 @@ jobs:
           DOCKER_HUB_USERNAME: ${{ secrets.DOCKER_HUB_USERNAME }}
           DOCKER_HUB_ACCESS_TOKEN: ${{ secrets.DOCKER_HUB_ACCESS_TOKEN }}
           VPS_APP_DIR: ${{ secrets.VPS_APP_DIR }}
-          IMAGE_REPO: ${{ needs.build-and-push.outputs.image_repo }}
-          IMAGE_TAG: ${{ needs.build-and-push.outputs.image_tag }}
+          IMAGE_REPO: ${{ needs['build-and-push'].outputs.image_repo }}
+          IMAGE_TAG: ${{ needs['build-and-push'].outputs.image_tag }}
           APP_HEALTHCHECK_URL: ${{ vars.APP_HEALTHCHECK_URL || 'http://127.0.0.1:8080/careergraph/api/v1/actuator/health' }}
         with:
           host: ${{ secrets.VPS_HOST }}
