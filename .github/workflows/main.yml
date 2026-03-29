@@ -23,7 +23,8 @@ jobs:
     name: Build, Test, Scan, Push Image
     runs-on: ubuntu-22.04
     outputs:
-      image_tag: ${{ steps.meta.outputs.version }}
+      image_tag: ${{ steps.image_vars.outputs.image_tag }}
+      image_repo: ${{ steps.image_vars.outputs.image_repo }}
 
     steps:
       - name: Checkout code
@@ -62,13 +63,19 @@ jobs:
           username: ${{ secrets.DOCKER_HUB_USERNAME }}
           password: ${{ secrets.DOCKER_HUB_ACCESS_TOKEN }}
 
+      - name: Resolve image coordinates
+        id: image_vars
+        run: |
+          echo "image_repo=${{ secrets.DOCKER_HUB_USERNAME }}/${{ env.IMAGE_NAME }}" >> "$GITHUB_OUTPUT"
+          echo "image_tag=${GITHUB_SHA}" >> "$GITHUB_OUTPUT"
+
       - name: Docker metadata
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ${{ secrets.DOCKER_HUB_USERNAME }}/${{ env.IMAGE_NAME }}
+          images: ${{ steps.image_vars.outputs.image_repo }}
           tags: |
-            type=sha,format=short
+            type=raw,value=${{ steps.image_vars.outputs.image_tag }}
             type=raw,value=latest,enable={{is_default_branch}}
 
       - name: Build and push image
@@ -94,13 +101,15 @@ jobs:
           DOCKER_HUB_USERNAME: ${{ secrets.DOCKER_HUB_USERNAME }}
           DOCKER_HUB_ACCESS_TOKEN: ${{ secrets.DOCKER_HUB_ACCESS_TOKEN }}
           VPS_APP_DIR: ${{ secrets.VPS_APP_DIR }}
+          IMAGE_REPO: ${{ needs.build-and-push.outputs.image_repo }}
+          IMAGE_TAG: ${{ needs.build-and-push.outputs.image_tag }}
           APP_HEALTHCHECK_URL: ${{ vars.APP_HEALTHCHECK_URL || 'http://127.0.0.1:8080/careergraph/api/v1/actuator/health' }}
         with:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USER }}
           key: ${{ secrets.VPS_SSH_PRIVATE_KEY }}
           port: ${{ secrets.VPS_PORT || 22 }}
-          envs: APP_ENV_PROD,DOCKER_HUB_USERNAME,DOCKER_HUB_ACCESS_TOKEN,VPS_APP_DIR,APP_HEALTHCHECK_URL
+          envs: APP_ENV_PROD,DOCKER_HUB_USERNAME,DOCKER_HUB_ACCESS_TOKEN,VPS_APP_DIR,IMAGE_REPO,IMAGE_TAG,APP_HEALTHCHECK_URL
           script_stop: true
           script: |
             set -e
@@ -111,20 +120,32 @@ jobs:
             fi
 
             cd "$VPS_APP_DIR"
-            git fetch --all
-            git checkout main
-            git pull origin main
+
+            if [ ! -f "docker-compose.prod.yaml" ]; then
+              echo "docker-compose.prod.yaml not found in VPS_APP_DIR."
+              exit 1
+            fi
 
             if [ -z "$APP_ENV_PROD" ]; then
               echo "APP_ENV_PROD is empty. Add production env content to GitHub Secret APP_ENV_PROD."
               exit 1
             fi
 
-            printf "%s" "$APP_ENV_PROD" > .env
+            if [ -z "$IMAGE_REPO" ] || [ -z "$IMAGE_TAG" ]; then
+              echo "IMAGE_REPO or IMAGE_TAG is empty. Build output is invalid."
+              exit 1
+            fi
+
+            {
+              printf "%s\n" "$APP_ENV_PROD"
+              printf "DOCKER_IMAGE_REPO=%s\n" "$IMAGE_REPO"
+              printf "IMAGE_TAG=%s\n" "$IMAGE_TAG"
+            } > .env
 
             echo "$DOCKER_HUB_ACCESS_TOKEN" | docker login -u "$DOCKER_HUB_USERNAME" --password-stdin
 
-            docker compose up -d --build
+            docker compose -f docker-compose.prod.yaml pull careergraph-api
+            docker compose -f docker-compose.prod.yaml up -d careergraph-api
 
             echo "Waiting for service health endpoint: $APP_HEALTHCHECK_URL"
             for i in $(seq 1 30); do
@@ -136,5 +157,5 @@ jobs:
             done
 
             echo "Health check failed after deploy. Recent API logs:"
-            docker compose logs --tail=200 careergraph-api || true
+            docker compose -f docker-compose.prod.yaml logs --tail=200 careergraph-api || true
             exit 1
