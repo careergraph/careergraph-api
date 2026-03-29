@@ -15,7 +15,7 @@ import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.core.annotation.Order;
 import org.springframework.data.elasticsearch.core.ElasticsearchOperations;
 import org.springframework.stereotype.Component;
-
+import org.springframework.ai.embedding.EmbeddingModel;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
@@ -35,6 +35,7 @@ public class ElasticsearchDataInitializer implements CommandLineRunner {
     private final JobNotificationHistoryRepository historyRepo;
     private final JobNotificationQueueRepository queueRepo;
     private final NewlyPostedJobRepository newlyPostedJobRepo;
+    private final EmbeddingModel embeddingModel;
 
     private static final List<String> KEYWORDS = List.of(
             "java",
@@ -60,7 +61,7 @@ public class ElasticsearchDataInitializer implements CommandLineRunner {
 
     @Override
     public void run(String... args) throws Exception {
-//        synchronizeDataWithRetry();
+        synchronizeDataWithRetry();
     }
 
     private void synchronizeDataWithRetry() {
