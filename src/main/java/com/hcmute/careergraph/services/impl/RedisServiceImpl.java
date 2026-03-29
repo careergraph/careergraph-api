@@ -85,12 +85,9 @@ public class RedisServiceImpl implements RedisService {
         }
 
         try {
-            String json = objectMapper.writeValueAsString(value);
+            int json = Integer.parseInt(value.toString());
             redisTemplate.opsForValue().set(key, json, Duration.ofSeconds(timeout));
             log.debug("Set object for key '{}' with TTL {} seconds", key, timeout);
-        } catch (JsonProcessingException e) {
-            log.error("Failed to serialize object for key '{}': {}", key, e.getMessage());
-            throw new RuntimeException("Failed to serialize object to JSON", e);
         } catch (RedisConnectionFailureException e) {
             log.error("Redis connection failed while setting key '{}': {}", key, e.getMessage());
             throw e;
