@@ -15,6 +15,8 @@ concurrency:
 
 env:
   IMAGE_NAME: ${{ vars.IMAGE_NAME || 'careergraph-api' }}
+  SONARQUBE_HOST: ${{ secrets.SONARQUBE_HOST }}
+  SONARQUBE_TOKEN: ${{ secrets.SONARQUBE_TOKEN }}
 
 jobs:
   build-and-push:
@@ -41,13 +43,13 @@ jobs:
         run: ./mvnw -B -DskipTests clean package
 
       - name: SonarQube scan (optional)
-        if: ${{ secrets.SONARQUBE_HOST != '' && secrets.SONARQUBE_TOKEN != '' }}
+        if: ${{ env.SONARQUBE_HOST != '' && env.SONARQUBE_TOKEN != '' }}
         uses: kitabisa/sonarqube-action@v1.2.0
         env:
           SONAR_SCANNER_OPTS: -X
         with:
-          host: ${{ secrets.SONARQUBE_HOST }}
-          login: ${{ secrets.SONARQUBE_TOKEN }}
+          host: ${{ env.SONARQUBE_HOST }}
+          login: ${{ env.SONARQUBE_TOKEN }}
           projectBaseDir: src/
           projectKey: ${{ vars.SONAR_PROJECT_KEY || 'careergraph-api' }}
 
