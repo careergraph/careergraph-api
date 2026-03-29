@@ -9,6 +9,7 @@ import com.hcmute.careergraph.services.HuggingFaceEmbeddingService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.CommandLineRunner;
+import org.springframework.context.annotation.Profile;
 import org.springframework.core.annotation.Order;
 import org.springframework.data.elasticsearch.core.ElasticsearchOperations;
 import org.springframework.stereotype.Component;
@@ -27,6 +28,7 @@ import java.util.stream.IntStream;
  * Syncs all candidates from PostgreSQL to Elasticsearch with embeddings.
  */
 @Component
+@Profile("!test")
 @RequiredArgsConstructor
 @Order(2) // Run after JobES initializer
 @Slf4j
