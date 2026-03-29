@@ -11,6 +11,7 @@ RUN mvn -B -q -e -DskipTests dependency:go-offline
 
 # Copy source code
 COPY src ./src
+COPY init-scripts ./init-scripts
 
 # Build jar
 RUN mvn clean package -DskipTests
@@ -22,6 +23,7 @@ WORKDIR /app
 
 # Copy jar từ build stage
 COPY --from=build /app/target/*.jar app.jar
+COPY --from=build /app/init-scripts ./init-scripts
 
 # Port
 ENV PORT=8080

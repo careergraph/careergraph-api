@@ -98,7 +98,8 @@ public class JwtConfig {
         private final UserCacheService userCacheService;
         private static final String BLACKLIST_PREFIX = "bl-at:";
 
-        public CustomJwtDecoder(String signerKey, RedisService redisService, AccountRepository accountRepository, UserCacheService userCacheService) {
+        public CustomJwtDecoder(String signerKey, RedisService redisService, AccountRepository accountRepository,
+                UserCacheService userCacheService) {
             this.redisService = redisService;
             this.accountRepository = accountRepository;
             this.userCacheService = userCacheService;
@@ -106,7 +107,7 @@ public class JwtConfig {
             // Initialize decoder with HS384
             byte[] keyBytes = Base64.getDecoder().decode(signerKey);
             SecretKeySpec secretKeySpec = new SecretKeySpec(keyBytes, "HmacSHA384");
-            
+
             this.nimbusJwtDecoder = NimbusJwtDecoder.withSecretKey(secretKeySpec)
                     .macAlgorithm(MacAlgorithm.HS384)
                     .build();
@@ -116,18 +117,18 @@ public class JwtConfig {
         public Jwt decode(String token) throws JwtException {
             Jwt jwt = nimbusJwtDecoder.decode(token);
             String jti = jwt.getId();
-            
+
             String type = jwt.getClaim("type");
             if (type == null || !type.equalsIgnoreCase("access")) {
                 throw new JwtException("Invalid token type");
             }
-            
+
             // Check blacklist
             Boolean blacklisted = redisService.getObject(BLACKLIST_PREFIX + jti, Boolean.class);
             if (blacklisted != null && blacklisted) {
                 throw new TokenBlacklistedException("Token is blacklisted");
             }
-            
+
             String accountId = jwt.getSubject();
             if (accountId == null) {
                 throw new InvalidTokenSubjectException("Invalid token subject");
@@ -150,9 +151,8 @@ public class JwtConfig {
                 // Invalidate cache so next request sees fresh data
                 userCacheService.evict(accountId);
                 throw new RoleChangedException(
-                    "Your role has been changed from " + tokenRole + " to " + cachedUser.role() + 
-                    ". Please login again to continue."
-                );
+                        "Your role has been changed from " + tokenRole + " to " + cachedUser.role() +
+                                ". Please login again to continue.");
             }
 
             return jwt;
@@ -173,7 +173,7 @@ public class JwtConfig {
                 return null;
             }
 
-            userCacheService.put(accountId, account.getRole(), true);  // Assuming active if found
+            userCacheService.put(accountId, account.getRole(), true); // Assuming active if found
             return new UserCacheService.UserCacheEntry(account.getRole(), true);
         }
 
@@ -212,18 +212,21 @@ public class JwtConfig {
         public Jwt encode(JwtEncoderParameters parameters) throws JwtEncodingException {
             try {
                 JwtClaimsSet claims = parameters.getClaims();
-                
+
                 // Create JWS header with HS384
-                com.nimbusds.jose.JWSHeader jwsHeader = new com.nimbusds.jose.JWSHeader(com.nimbusds.jose.JWSAlgorithm.HS384);
-                
+                com.nimbusds.jose.JWSHeader jwsHeader = new com.nimbusds.jose.JWSHeader(
+                        com.nimbusds.jose.JWSAlgorithm.HS384);
+
                 // Build claims with all the information from the input claims
                 com.nimbusds.jwt.JWTClaimsSet.Builder claimsBuilder = new com.nimbusds.jwt.JWTClaimsSet.Builder()
                         .subject(claims.getSubject())
                         .issuer("careergraph-system")
-                        .issueTime(claims.getIssuedAt() != null ? java.util.Date.from(claims.getIssuedAt()) : new java.util.Date())
-                        .expirationTime(claims.getExpiresAt() != null ? java.util.Date.from(claims.getExpiresAt()) : new java.util.Date(System.currentTimeMillis() + 3600000))
+                        .issueTime(claims.getIssuedAt() != null ? java.util.Date.from(claims.getIssuedAt())
+                                : new java.util.Date())
+                        .expirationTime(claims.getExpiresAt() != null ? java.util.Date.from(claims.getExpiresAt())
+                                : new java.util.Date(System.currentTimeMillis() + 3600000))
                         .jwtID(claims.getId());
-                
+
                 // Add all custom claims - convert Instant to Date for compatibility
                 for (java.util.Map.Entry<String, Object> entry : claims.getClaims().entrySet()) {
                     Object value = entry.getValue();
@@ -233,31 +236,31 @@ public class JwtConfig {
                         claimsBuilder.claim(entry.getKey(), value);
                     }
                 }
-                
+
                 com.nimbusds.jwt.JWTClaimsSet jwtClaimsSet = claimsBuilder.build();
-                
+
                 // Create JWS object
                 com.nimbusds.jose.Payload payload = new com.nimbusds.jose.Payload(jwtClaimsSet.toJSONObject());
                 com.nimbusds.jose.JWSObject jwsObject = new com.nimbusds.jose.JWSObject(jwsHeader, payload);
-                
+
                 // Sign the JWT
                 byte[] keyBytes = Base64.getDecoder().decode(signerKey);
                 jwsObject.sign(new com.nimbusds.jose.crypto.MACSigner(keyBytes));
-                
+
                 String token = jwsObject.serialize();
 
                 // Create headers map
                 java.util.Map<String, Object> headers = new java.util.HashMap<>();
                 headers.put("alg", jwsHeader.getAlgorithm().getName());
                 headers.put("typ", "JWT");
-                
-                return new Jwt(token, 
-                              claims.getIssuedAt(), 
-                              claims.getExpiresAt(),
-                              headers,
-                              claims.getClaims());
+
+                return new Jwt(token,
+                        claims.getIssuedAt(),
+                        claims.getExpiresAt(),
+                        headers,
+                        claims.getClaims());
             } catch (Exception e) {
-                throw new JwtEncodingException("Failed to encode JWT: " + e.getMessage(), e);
+                throw new JwtEncodingException("Failed to encode JWT: " + e.getMessage());
             }
         }
     }

@@ -12,7 +12,7 @@ import org.springframework.boot.CommandLineRunner;
 import org.springframework.core.annotation.Order;
 import org.springframework.data.elasticsearch.core.ElasticsearchOperations;
 import org.springframework.stereotype.Component;
-
+import org.springframework.ai.embedding.EmbeddingModel;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -36,6 +36,7 @@ public class CandidateElasticsearchDataInitializer implements CommandLineRunner 
   private final CandidateESRepository candidateESRepository;
   private final ElasticsearchOperations elasticsearchOperations;
   private final HuggingFaceEmbeddingService huggingFaceEmbeddingService;
+  private final EmbeddingModel embeddingModel;
 
   private static final int EMBEDDING_BATCH_SIZE = 100;
   private static final int MAX_RETRIES = 5;
@@ -43,7 +44,7 @@ public class CandidateElasticsearchDataInitializer implements CommandLineRunner 
 
   @Override
   public void run(String... args) throws Exception {
-//    synchronizeCandidatesWithRetry();
+    synchronizeCandidatesWithRetry();
   }
 
   private void synchronizeCandidatesWithRetry() {
