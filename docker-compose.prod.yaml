@@ -18,6 +18,7 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
     volumes:
       - ${DATA_PATH:-./data}/postgres:/var/lib/postgresql/data
+      # /opt/careergraph/data
       # - ./init-scripts:/docker-entrypoint-initdb.d
     networks:
       - careergraph-network
@@ -94,7 +95,7 @@ services:
 
   # --- APP: Spring Boot API ---
   careergraph-api:
-    image: ${DOCKER_IMAGE_REPO:-thinz/careergraph-api}:${IMAGE_TAG:-latest}
+    image: ${DOCKER_IMAGE_REPO_API:-thinz/careergraph-api}:${IMAGE_TAG_API:-latest}
     pull_policy: always
     container_name: careergraph-api
     restart: unless-stopped
