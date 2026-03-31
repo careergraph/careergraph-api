@@ -53,10 +53,10 @@ fast-api:
 springdoc:
   api-docs:
     path: /v3/api-docs
-    enabled: ${SPRINGDOC_API_DOCS_ENABLED:false}
+    enabled: ${SPRINGDOC_API_DOCS_ENABLED:true}
   swagger-ui:
     path: /swagger-ui.html
-    enabled: ${SPRINGDOC_SWAGGER_UI_ENABLED:false}
+    enabled: ${SPRINGDOC_SWAGGER_UI_ENABLED:true}
 
 support:
   email: ${SUPPORT_EMAIL:support@careergraph.com}

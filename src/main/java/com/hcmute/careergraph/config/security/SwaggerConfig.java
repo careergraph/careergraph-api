@@ -15,6 +15,8 @@ public class SwaggerConfig {
         public OpenAPI openAPI() {
                 return new OpenAPI()
                                 .addServersItem(new Server().url("https://thinz.io.vn"))
+                                .addServersItem(new Server().url("https://api.thinz.io.vn"))
+                                
                                 .addSecurityItem(new SecurityRequirement().addList("bearerAuth"))
                                 .components(new Components()
                                                 .addSecuritySchemes(
