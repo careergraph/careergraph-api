@@ -109,9 +109,15 @@ jobs:
             exit 1
           fi
 
+          if [ -z "${{ secrets.APP_DOCKER_COMPOSE_PROD }}" ]; then
+            echo "Missing secret: APP_DOCKER_COMPOSE_PROD"
+            exit 1
+          fi
+
       - name: Deploy over SSH
         uses: appleboy/ssh-action@v1.0.3
         env:
+          APP_DOCKER_COMPOSE_PROD: ${{ secrets.APP_DOCKER_COMPOSE_PROD }}
           APP_ENV_PROD: ${{ secrets.APP_ENV_PROD }}
           DOCKER_HUB_USERNAME: ${{ secrets.DOCKER_HUB_USERNAME }}
           DOCKER_HUB_ACCESS_TOKEN: ${{ secrets.DOCKER_HUB_ACCESS_TOKEN }}
@@ -125,22 +131,39 @@ jobs:
           key: ${{ secrets.VPS_SSH_PRIVATE_KEY || secrets.VPS_SSH_KEY }}
           passphrase: ${{ secrets.VPS_SSH_PASSPHRASE }}
           port: ${{ secrets.VPS_PORT || secrets.VPS_SSH_PORT || 22 }}
-          envs: APP_ENV_PROD,DOCKER_HUB_USERNAME,DOCKER_HUB_ACCESS_TOKEN,VPS_APP_DIR,IMAGE_REPO,IMAGE_TAG,APP_HEALTHCHECK_URL
+          envs: APP_DOCKER_COMPOSE_PROD,APP_ENV_PROD,DOCKER_HUB_USERNAME,DOCKER_HUB_ACCESS_TOKEN,VPS_APP_DIR,IMAGE_REPO,IMAGE_TAG,APP_HEALTHCHECK_URL
           script_stop: true
           script: |
             set -e
+
+            log_step() {
+              echo "[deploy-api][$(date -u +'%Y-%m-%dT%H:%M:%SZ')] $1"
+            }
+
+            log_step "Starting API deployment script"
 
             if [ -z "$VPS_APP_DIR" ]; then
               echo "VPS_APP_DIR is empty. Set this secret to your project path on VPS."
               exit 1
             fi
 
-            cd "$VPS_APP_DIR"
-
-            if [ ! -f "docker-compose.prod.yaml" ]; then
-              echo "docker-compose.prod.yaml not found in VPS_APP_DIR."
+            if [ -z "$APP_DOCKER_COMPOSE_PROD" ]; then
+              echo "APP_DOCKER_COMPOSE_PROD is empty. Add docker compose content to this GitHub Secret."
               exit 1
             fi
+
+            cd "$VPS_APP_DIR"
+            log_step "Changed directory to $VPS_APP_DIR"
+
+            COMPOSE_FILE_TMP="$(mktemp docker-compose-api-XXXXXX.yaml)"
+            ENV_FILE_TMP="$(mktemp env-api-XXXXXX.list)"
+            log_step "Created temporary deploy files"
+
+            cleanup() {
+              log_step "Cleaning up temporary deploy files"
+              rm -f "$COMPOSE_FILE_TMP" "$ENV_FILE_TMP"
+            }
+            trap cleanup EXIT
 
             if [ -z "$APP_ENV_PROD" ]; then
               echo "APP_ENV_PROD is empty. Add production env content to GitHub Secret APP_ENV_PROD."
@@ -152,23 +175,40 @@ jobs:
               exit 1
             fi
 
+            printf "%s\n" "$APP_DOCKER_COMPOSE_PROD" > "$COMPOSE_FILE_TMP"
+            log_step "Wrote compose content to temporary file"
+
             {
               printf "%s\n" "$APP_ENV_PROD"
               printf "DOCKER_IMAGE_REPO=%s\n" "$IMAGE_REPO"
               printf "IMAGE_TAG=%s\n" "$IMAGE_TAG"
-            } > .env
+            } > "$ENV_FILE_TMP"
+            log_step "Wrote runtime environment to temporary env file"
 
+            set -a
+            . "$ENV_FILE_TMP"
+            set +a
+            log_step "Loaded runtime environment variables"
+
+            log_step "Logging in to Docker registry"
             echo "$DOCKER_HUB_ACCESS_TOKEN" | docker login -u "$DOCKER_HUB_USERNAME" --password-stdin
+            log_step "Docker login succeeded"
 
-            docker compose -f docker-compose.prod.yaml pull careergraph-api
-            docker compose -f docker-compose.prod.yaml up -d careergraph-api
+            log_step "Pulling API image"
+            docker compose -f "$COMPOSE_FILE_TMP" pull careergraph-api
+            log_step "Pull completed"
 
-            API_HOST_PORT=$(docker compose -f docker-compose.prod.yaml port careergraph-api "${SERVER_PORT_CONTAINER:-8080}" | tail -n 1 | awk -F: '{print $NF}')
+            log_step "Starting API container"
+            docker compose -f "$COMPOSE_FILE_TMP" up -d careergraph-api
+            log_step "Container start command completed"
+
+            API_HOST_PORT=$(docker compose -f "$COMPOSE_FILE_TMP" port careergraph-api "${SERVER_PORT_CONTAINER:-8080}" | tail -n 1 | awk -F: '{print $NF}')
             if [ -z "$API_HOST_PORT" ]; then
               echo "Cannot resolve published port for careergraph-api."
-              docker compose -f docker-compose.prod.yaml ps careergraph-api || true
+              docker compose -f "$COMPOSE_FILE_TMP" ps careergraph-api || true
               exit 1
             fi
+            log_step "Resolved published API port: $API_HOST_PORT"
             SERVER_CONTEXT_PATH="${SERVER_SERVLET_CONTEXT_PATH:-/careergraph/api/v1}"
             SERVER_CONTEXT_PATH="${SERVER_CONTEXT_PATH%/}"
 
@@ -184,23 +224,33 @@ jobs:
             HEALTHCHECK_INTERVAL_SECONDS=5
             HEALTHCHECK_ATTEMPTS=$((HEALTHCHECK_TIMEOUT_SECONDS / HEALTHCHECK_INTERVAL_SECONDS))
 
-            echo "Waiting for service health endpoint candidates: $CANDIDATE_HEALTHCHECK_URLS"
+            log_step "Starting health checks"
+            echo "[deploy-api] Healthcheck candidates: $CANDIDATE_HEALTHCHECK_URLS"
 
             for url in $CANDIDATE_HEALTHCHECK_URLS; do
               if [ -z "$url" ]; then
                 continue
               fi
 
-              echo "Trying healthcheck URL: $url"
+              log_step "Trying healthcheck URL: $url"
               for i in $(seq 1 "$HEALTHCHECK_ATTEMPTS"); do
                 if curl -fsS "$url" > /dev/null; then
-                  echo "Deploy succeeded. Service is reachable at: $url"
+                  log_step "Healthcheck succeeded at: $url"
+                  log_step "Removing API image tags from VPS"
+                  docker image rm "$IMAGE_REPO:$IMAGE_TAG" || true
+                  docker image rm "$IMAGE_REPO:latest" || true
+                  log_step "Deployment completed successfully"
                   exit 0
+                fi
+                if [ $((i % 6)) -eq 0 ]; then
+                  log_step "Healthcheck still pending for $url after $((i * HEALTHCHECK_INTERVAL_SECONDS)) seconds"
                 fi
                 sleep "$HEALTHCHECK_INTERVAL_SECONDS"
               done
+              log_step "Healthcheck URL failed after timeout: $url"
             done
 
+            log_step "Health checks failed. Dumping recent API logs"
             echo "Health check failed after deploy. Tried URLs: $CANDIDATE_HEALTHCHECK_URLS. Recent API logs:"
-            docker compose -f docker-compose.prod.yaml logs --tail=200 careergraph-api || true
+            docker compose -f "$COMPOSE_FILE_TMP" logs --tail=200 careergraph-api || true
             exit 1
