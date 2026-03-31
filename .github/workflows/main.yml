@@ -169,33 +169,38 @@ jobs:
               docker compose -f docker-compose.prod.yaml ps careergraph-api || true
               exit 1
             fi
-            FALLBACK_HEALTHCHECK_URL="http://127.0.0.1:${API_HOST_PORT}/careergraph/api/v1/actuator/health"
+            SERVER_CONTEXT_PATH="${SERVER_SERVLET_CONTEXT_PATH:-/careergraph/api/v1}"
+            SERVER_CONTEXT_PATH="${SERVER_CONTEXT_PATH%/}"
 
-            EFFECTIVE_HEALTHCHECK_URL="$APP_HEALTHCHECK_URL"
-            if [ -z "$EFFECTIVE_HEALTHCHECK_URL" ]; then
-              EFFECTIVE_HEALTHCHECK_URL="$FALLBACK_HEALTHCHECK_URL"
+            CANDIDATE_HEALTHCHECK_URLS=""
+            if [ -n "$APP_HEALTHCHECK_URL" ]; then
+              CANDIDATE_HEALTHCHECK_URLS="$APP_HEALTHCHECK_URL"
             fi
+            CANDIDATE_HEALTHCHECK_URLS="$CANDIDATE_HEALTHCHECK_URLS http://127.0.0.1:${API_HOST_PORT}${SERVER_CONTEXT_PATH}/actuator/health"
+            CANDIDATE_HEALTHCHECK_URLS="$CANDIDATE_HEALTHCHECK_URLS http://127.0.0.1:${API_HOST_PORT}/actuator/health"
+            CANDIDATE_HEALTHCHECK_URLS="$CANDIDATE_HEALTHCHECK_URLS http://127.0.0.1:${API_HOST_PORT}${SERVER_CONTEXT_PATH}/v3/api-docs"
 
-            echo "Waiting for service health endpoint: $EFFECTIVE_HEALTHCHECK_URL"
-            for i in $(seq 1 60); do
-              if curl -fsS "$EFFECTIVE_HEALTHCHECK_URL" > /dev/null; then
-                echo "Deploy succeeded. Service is healthy."
-                exit 0
+            HEALTHCHECK_TIMEOUT_SECONDS=300
+            HEALTHCHECK_INTERVAL_SECONDS=5
+            HEALTHCHECK_ATTEMPTS=$((HEALTHCHECK_TIMEOUT_SECONDS / HEALTHCHECK_INTERVAL_SECONDS))
+
+            echo "Waiting for service health endpoint candidates: $CANDIDATE_HEALTHCHECK_URLS"
+
+            for url in $CANDIDATE_HEALTHCHECK_URLS; do
+              if [ -z "$url" ]; then
+                continue
               fi
-              sleep 5
-            done
 
-            if [ "$EFFECTIVE_HEALTHCHECK_URL" != "$FALLBACK_HEALTHCHECK_URL" ]; then
-              echo "Primary health check URL failed. Retrying with detected URL: $FALLBACK_HEALTHCHECK_URL"
-              for i in $(seq 1 24); do
-                if curl -fsS "$FALLBACK_HEALTHCHECK_URL" > /dev/null; then
-                  echo "Deploy succeeded. Service is healthy via detected URL."
+              echo "Trying healthcheck URL: $url"
+              for i in $(seq 1 "$HEALTHCHECK_ATTEMPTS"); do
+                if curl -fsS "$url" > /dev/null; then
+                  echo "Deploy succeeded. Service is reachable at: $url"
                   exit 0
                 fi
-                sleep 5
+                sleep "$HEALTHCHECK_INTERVAL_SECONDS"
               done
-            fi
+            done
 
-            echo "Health check failed after deploy (primary: $EFFECTIVE_HEALTHCHECK_URL, detected: $FALLBACK_HEALTHCHECK_URL). Recent API logs:"
+            echo "Health check failed after deploy. Tried URLs: $CANDIDATE_HEALTHCHECK_URLS. Recent API logs:"
             docker compose -f docker-compose.prod.yaml logs --tail=200 careergraph-api || true
             exit 1
