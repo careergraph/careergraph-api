@@ -19,6 +19,8 @@ public class CorsConfig {
         corsConfiguration.addAllowedOrigin("http://thinz.io.vn");
         corsConfiguration.addAllowedOrigin("http://api.thinz.io.vn");
         corsConfiguration.addAllowedOrigin("https://api.thinz.io.vn");
+        corsConfiguration.addAllowedOrigin("http://hr.thinz.io.vn");
+        corsConfiguration.addAllowedOrigin("https://hr.thinz.io.vn");
         corsConfiguration.addAllowedMethod("*");
         corsConfiguration.addAllowedHeader("*");
         corsConfiguration.setAllowCredentials(true);
