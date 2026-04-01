@@ -117,6 +117,7 @@ services:
       GOOGLE_PROJECT_ID: ${GOOGLE_PROJECT_ID:-}
     labels:
       - "traefik.enable=true"
+      - "traefik.docker.network=proxy"
       - "traefik.http.routers.api.rule=Host(`api.thinz.io.vn`)"
       - "traefik.http.routers.api.entrypoints=websecure"
       - "traefik.http.routers.api.tls.certresolver=le"
