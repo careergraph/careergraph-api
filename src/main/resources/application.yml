@@ -17,7 +17,6 @@ spring:
       data-source-properties:
         TimeZone: Asia/Ho_Chi_Minh
   jpa:
-    database-platform: org.hibernate.dialect.PostgreSQLDialect
     show-sql: ${JPA_SHOW_SQL:false}
     hibernate:
       ddl-auto: ${JPA_DDL_AUTO:update}
@@ -26,7 +25,7 @@ spring:
       "[hibernate.jdbc.time_zone]": UTC
   data:
     redis:
-      host: ${SPRING_REDIS_HOST:}
+      host: ${SPRING_REDIS_HOST:localhost}
       port: ${SPRING_REDIS_PORT:6379}
       password: ${SPRING_REDIS_PASSWORD:}
       ssl:
