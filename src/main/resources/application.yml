@@ -1,15 +1,51 @@
 # application.yml
 spring:
-  profiles:
-    active: ${SPRING_PROFILES_ACTIVE:dev}
   config:
-    import: optional:file:..env[.properties]
+    import: optional:file:.env[.properties]
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:}
+    username: ${SPRING_DATASOURCE_USERNAME:}
+    password: ${SPRING_DATASOURCE_PASSWORD:}
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      maximum-pool-size: ${DATASOURCE_MAX_POOL_SIZE:20}
+      minimum-idle: ${DATASOURCE_MIN_IDLE:5}
+      connection-timeout: ${DATASOURCE_CONNECTION_TIMEOUT_MS:30000}
+      idle-timeout: ${DATASOURCE_IDLE_TIMEOUT_MS:600000}
+      max-lifetime: ${DATASOURCE_MAX_LIFETIME_MS:1800000}
+      auto-commit: true
+      data-source-properties:
+        TimeZone: Asia/Ho_Chi_Minh
+  jpa:
+    database-platform: org.hibernate.dialect.PostgreSQLDialect
+    show-sql: ${JPA_SHOW_SQL:false}
+    hibernate:
+      ddl-auto: ${JPA_DDL_AUTO:update}
+      format_sql: ${JPA_FORMAT_SQL:false}
+    properties:
+      "[hibernate.jdbc.time_zone]": UTC
+  data:
+    redis:
+      host: ${SPRING_REDIS_HOST:}
+      port: ${SPRING_REDIS_PORT:6379}
+      password: ${SPRING_REDIS_PASSWORD:}
+      ssl:
+        enabled: ${SPRING_REDIS_SSL:false}
+      timeout: ${SPRING_REDIS_TIMEOUT:2000ms}
+      database: ${SPRING_REDIS_DATABASE:0}
+      lettuce:
+        pool:
+          max-active: ${REDIS_POOL_MAX_ACTIVE:16}
+          max-idle: ${REDIS_POOL_MAX_IDLE:8}
+          min-idle: ${REDIS_POOL_MIN_IDLE:0}
+          max-wait: ${REDIS_POOL_MAX_WAIT:-1ms}
+        shutdown-timeout: ${REDIS_SHUTDOWN_TIMEOUT:100ms}
+  elasticsearch:
+    uris: ${SPRING_ELASTICSEARCH_URIS:http://localhost:9200}
   servlet:
     multipart:
       max-file-size: ${MULTIPART_MAX_FILE_SIZE:10MB}
       max-request-size: ${MULTIPART_MAX_REQUEST_SIZE:20MB}
-  elasticsearch:
-    uris: ${SPRING_ELASTICSEARCH_URIS:http://localhost:9200}
   ai:
     google:
       genai:
@@ -55,7 +91,7 @@ springdoc:
     path: /v3/api-docs
     enabled: ${SPRINGDOC_API_DOCS_ENABLED:true}
   swagger-ui:
-    path: /swagger-ui.html
+    path: /swagger-ui
     enabled: ${SPRINGDOC_SWAGGER_UI_ENABLED:true}
 
 support:
@@ -91,15 +127,25 @@ cloudinary:
   api_key: ${CLOUDINARY_API_KEY:}
   api_secret: ${CLOUDINARY_API_SECRET:}
 
----
-spring:
-  config:
-    activate:
-      on-profile: dev
-    import: optional:file:...env.dev[.properties]
----
-spring:
-  config:
-    activate:
-      on-profile: prod
-    import: optional:file:...env.prod[.properties]
+logging:
+  level:
+    root: INFO
+    org.springframework.web: WARN
+    org.hibernate.SQL: WARN
+    org.hibernate: WARN
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: never
+
+app:
+  seed:
+    enabled: ${APP_SEED_ENABLED:false}
+    script-path: ${APP_SEED_SCRIPT_PATH:init-scripts/seed-basic.sql}
+    check-table: ${APP_SEED_CHECK_TABLE:jobs}
+    min-row-count: ${APP_SEED_MIN_ROW_COUNT:1}
