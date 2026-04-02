@@ -1,7 +1,6 @@
 package com.hcmute.careergraph.services;
 
 import com.hcmute.careergraph.enums.application.ApplicationStage;
-import org.springframework.scheduling.annotation.Async;
 
 public interface MailService {
 
@@ -14,7 +13,6 @@ public interface MailService {
                                          ApplicationStage stage,
                                          String note);
 
-    @Async
     void sendHtml(String to, String subject, String html);
 }
 
