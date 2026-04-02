@@ -85,8 +85,8 @@ public class RedisServiceImpl implements RedisService {
         }
 
         try {
-            int json = Integer.parseInt(value.toString());
-            redisTemplate.opsForValue().set(key, json, Duration.ofSeconds(timeout));
+            // Value serializer is GenericJackson2JsonRedisSerializer, so store value as-is.
+            redisTemplate.opsForValue().set(key, value, Duration.ofSeconds(timeout));
             log.debug("Set object for key '{}' with TTL {} seconds", key, timeout);
         } catch (RedisConnectionFailureException e) {
             log.error("Redis connection failed while setting key '{}': {}", key, e.getMessage());
