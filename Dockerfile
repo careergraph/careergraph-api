@@ -30,7 +30,7 @@ ENV PORT=8080
 EXPOSE 8080
 
 # Java memory config
-ENV JAVA_OPTS="-Xmx512m -Xms256m -XX:MaxMetaspaceSize=128m"
+ENV JAVA_OPTS="-Xmx768m -Xms256m -XX:MaxMetaspaceSize=256m"
 
 # Run application
 ENTRYPOINT ["sh", "-c", "java $JAVA_OPTS -Dserver.port=${PORT} -jar /app/app.jar"]

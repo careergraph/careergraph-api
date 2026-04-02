@@ -22,7 +22,7 @@ public class MailServiceImpl implements MailService {
     private final SpringTemplateEngine templateEngine;
 
     @Override
-    @Async
+    @Async("mailTaskExecutor")
     public void sendOtp(String toEmail, String otp) {
         try {
             MimeMessage message = mailSender.createMimeMessage();
@@ -53,7 +53,7 @@ public class MailServiceImpl implements MailService {
     }
 
     @Override
-    @Async
+    @Async("mailTaskExecutor")
     public void sendApplicationStageUpdateEmail(String toEmail,
                                                 String candidateName,
                                                 String jobTitle,
@@ -90,6 +90,7 @@ public class MailServiceImpl implements MailService {
     }
 
     @Override
+    @Async("mailTaskExecutor")
     public void sendHtml(String to, String subject, String html) {
         try {
             MimeMessage msg = mailSender.createMimeMessage();
