@@ -7,16 +7,12 @@ import io.swagger.v3.oas.models.Components;
 import io.swagger.v3.oas.models.OpenAPI;
 import io.swagger.v3.oas.models.security.SecurityRequirement;
 import io.swagger.v3.oas.models.security.SecurityScheme;
-import io.swagger.v3.oas.models.servers.Server;
 
 @Configuration
 public class SwaggerConfig {
         @Bean
         public OpenAPI openAPI() {
                 return new OpenAPI()
-                                .addServersItem(new Server().url("https://thinz.io.vn"))
-                                .addServersItem(new Server().url("https://api.thinz.io.vn"))
-                                
                                 .addSecurityItem(new SecurityRequirement().addList("bearerAuth"))
                                 .components(new Components()
                                                 .addSecuritySchemes(

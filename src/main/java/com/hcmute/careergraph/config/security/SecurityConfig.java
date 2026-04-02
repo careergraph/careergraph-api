@@ -1,6 +1,7 @@
 package com.hcmute.careergraph.config.security;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
@@ -11,35 +12,26 @@ import org.springframework.security.oauth2.server.resource.authentication.JwtAut
 import org.springframework.security.oauth2.server.resource.authentication.JwtGrantedAuthoritiesConverter;
 import org.springframework.security.web.SecurityFilterChain;
 
+import java.util.Arrays;
+
 @Configuration
 public class SecurityConfig {
 
-    // NOTE: In Spring Security 6, requestMatchers() patterns are RELATIVE to servlet context-path  
-    // So patterns should NOT include '/careergraph/api/v1' prefix
-    private static final String[] PUBLIC_ENDPOINTS = {
-            "/auth/**",
-            "/jobs/**",
-            "/companies/**",
-            // Swagger/OpenAPI endpoints - must be accessible without authentication
-            "/swagger-ui.html",
-            "/swagger-ui/**",
-            "/swagger-resources/**",
-            "/v3/api-docs",
-            "/v3/api-docs/**",
-            "/v3/api-docs.yaml",
-            "/api-docs/**",
-            "/webjars/**",
-            "/error",
-            // Actuator
-            "/actuator/health",
-            "/actuator/health/**"
-    };
+        @Value("${SECURITY_PUBLIC_ENDPOINTS:}")
+        private String publicEndpointsRaw;
 
     @Autowired
     private CorsConfig corsConfig;
 
     @Autowired
     private JwtDecoder jwtDecoder;
+
+        private String[] resolvePublicEndpoints() {
+                return Arrays.stream(publicEndpointsRaw.split(","))
+                                .map(String::trim)
+                                .filter(s -> !s.isEmpty())
+                                .toArray(String[]::new);
+        }
 
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
@@ -51,7 +43,7 @@ public class SecurityConfig {
                 // Auth - permitAll MUST come before anyRequest().authenticated()
                 .authorizeHttpRequests(authorizeRequests -> authorizeRequests
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
-                        .requestMatchers(PUBLIC_ENDPOINTS).permitAll()
+                        .requestMatchers(resolvePublicEndpoints()).permitAll()
                         .anyRequest().authenticated())
 
                 // Custom exception

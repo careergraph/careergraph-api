@@ -2,23 +2,21 @@ package com.hcmute.careergraph.config.app;
 
 import com.hcmute.careergraph.persistence.documents.CandidateES;
 import com.hcmute.careergraph.persistence.models.Candidate;
-import com.hcmute.careergraph.persistence.models.CandidateSkill;
 import com.hcmute.careergraph.repositories.CandidateESRepository;
 import com.hcmute.careergraph.repositories.CandidateRepository;
 import com.hcmute.careergraph.services.HuggingFaceEmbeddingService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.CommandLineRunner;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Profile;
 import org.springframework.core.annotation.Order;
 import org.springframework.data.elasticsearch.core.ElasticsearchOperations;
 import org.springframework.stereotype.Component;
 import org.springframework.ai.embedding.EmbeddingModel;
 import java.time.LocalDate;
-import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
@@ -40,13 +38,20 @@ public class CandidateElasticsearchDataInitializer implements CommandLineRunner 
   private final HuggingFaceEmbeddingService huggingFaceEmbeddingService;
   private final EmbeddingModel embeddingModel;
 
+  @Value("${APP_ES_SYNC_CANDIDATES_ENABLED:false}")
+  private boolean syncCandidatesEnabled;
+
   private static final int EMBEDDING_BATCH_SIZE = 100;
   private static final int MAX_RETRIES = 5;
   private static final long DELAY_SECONDS = 10;
 
   @Override
   public void run(String... args) throws Exception {
-    // synchronizeCandidatesWithRetry();
+    if (!syncCandidatesEnabled) {
+      log.info("Skip Candidate Elasticsearch synchronization because APP_ES_SYNC_CANDIDATES_ENABLED=false");
+      return;
+    }
+    synchronizeCandidatesWithRetry();
   }
 
   private void synchronizeCandidatesWithRetry() {
