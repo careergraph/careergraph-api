@@ -324,7 +324,7 @@ public class AuthServiceImpl implements AuthService {
             // Verify Google ID token using GoogleAuthService
             GoogleUserInfo googleUser = googleAuthService.verify(request.getIdToken());
 
-            String email = googleUser.email();
+            String email = normalizeEmail(googleUser.email());
             boolean emailVerified = Boolean.TRUE.equals(googleUser.emailVerified());
             String givenName = googleUser.givenName();
             String familyName = googleUser.familyName();
@@ -358,40 +358,10 @@ public class AuthServiceImpl implements AuthService {
                 }
                 log.info("Created new {} account from Google OAuth: {}", targetRole, email);
             } else {
-                // Existing account: verify role matches
+                // Existing account: verify role matches and use current DB record as-is.
                 if (!account.getRole().equals(targetRole)) {
                     throw new AppException(ErrorType.UNAUTHORIZED,
                             "You do not have permission to log in to this account");
-                }
-                // Mark verified if Google confirmed
-                if (emailVerified && !account.isEmailVerified()) {
-                    account.setEmailVerified(true);
-                    accountRepository.save(account);
-                }
-                // Update profile lightly
-                if (isHR) {
-                    Company company = account.getCompany();
-                    if (company == null) {
-                        company = Company.builder().account(account).build();
-                        account.setCompany(company);
-                        companyRepository.save(company);
-                    }
-                } else {
-                    Candidate candidate = account.getCandidate();
-                    if (candidate == null) {
-                        candidate = Candidate.builder().account(account).build();
-                        account.setCandidate(candidate);
-                    }
-                    if (candidate.getAvatar() == null && pictureUrl != null) {
-                        candidate.setAvatar(pictureUrl);
-                    }
-                    if (candidate.getFirstName() == null && givenName != null) {
-                        candidate.setFirstName(givenName);
-                    }
-                    if (candidate.getLastName() == null && familyName != null) {
-                        candidate.setLastName(familyName);
-                    }
-                    candidateRepository.save(candidate);
                 }
             }
 
