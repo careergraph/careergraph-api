@@ -3,6 +3,8 @@ package com.hcmute.careergraph.services.impl;
 import com.hcmute.careergraph.services.EmbedService;
 import com.hcmute.careergraph.services.HuggingFaceEmbeddingService;
 import lombok.RequiredArgsConstructor;
+
+import org.springframework.ai.embedding.EmbeddingModel;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -16,13 +18,15 @@ import java.util.List;
 public class EmbedServiceImpl implements EmbedService {
     private final HuggingFaceEmbeddingService huggingFaceEmbeddingService;
 
+    private final EmbeddingModel embeddingModel;
+
     @Override
     public float[] embed(String text) {
-        return huggingFaceEmbeddingService.embed(text);
+        return embeddingModel.embed(text);
     }
 
     @Override
     public List<float[]> embedBatch(List<String> texts) {
-        return huggingFaceEmbeddingService.embed(texts);
+        return embeddingModel.embed(texts);
     }
 }

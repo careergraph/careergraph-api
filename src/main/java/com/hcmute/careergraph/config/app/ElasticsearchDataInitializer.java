@@ -8,6 +8,7 @@ import com.hcmute.careergraph.repositories.JobNotificationHistoryRepository;
 import com.hcmute.careergraph.repositories.JobNotificationQueueRepository;
 import com.hcmute.careergraph.repositories.JobRepository;
 import com.hcmute.careergraph.repositories.NewlyPostedJobRepository;
+import com.hcmute.careergraph.services.EmbedService;
 import com.hcmute.careergraph.services.HuggingFaceEmbeddingService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -40,7 +41,7 @@ public class ElasticsearchDataInitializer implements CommandLineRunner {
     private final JobNotificationHistoryRepository historyRepo;
     private final JobNotificationQueueRepository queueRepo;
     private final NewlyPostedJobRepository newlyPostedJobRepo;
-    private final EmbeddingModel embeddingModel;
+    private final EmbedService embeddingModel;
 
     @Value("${APP_ES_SYNC_JOBS_ENABLED:false}")
     private boolean syncJobsEnabled;
@@ -116,7 +117,7 @@ public class ElasticsearchDataInitializer implements CommandLineRunner {
 
                     List<String> batchTexts = texts.subList(start, end);
 
-                    List<float[]> batchVectors = huggingFaceEmbeddingService.embed(batchTexts);
+                    List<float[]> batchVectors = embeddingModel.embedBatch(batchTexts);
 
                     vectors.addAll(batchVectors);
                 }
