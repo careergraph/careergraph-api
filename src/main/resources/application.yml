@@ -46,18 +46,12 @@ spring:
       max-file-size: ${MULTIPART_MAX_FILE_SIZE:10MB}
       max-request-size: ${MULTIPART_MAX_REQUEST_SIZE:20MB}
   ai:
-    google:
-      genai:
-        project-id: ${GOOGLE_PROJECT_ID:}
-        api-key: ${GEMINI_API_KEY:}
-        chat:
-          options:
-            model: ${GEMINI_CHAT_MODEL:gemini-2.5-flash}
-        embedding:
-          api-key: ${GEMINI_API_KEY:}
-          text:
-            options:
-              model: ${GEMINI_EMBEDDING_MODEL:embedding-001}
+    openai:
+      api-key: ${GEMINI_API_KEY:}
+      chat:
+        enabled: false
+      embedding:
+        enabled: false  # ✅ tắt auto-config
 
 server:
   port: ${SERVER_PORT:8080}

@@ -70,7 +70,7 @@ public class JobES {
     /* ========= VECTOR ========= */
     @Field(
             type = FieldType.Dense_Vector,
-            dims = 384,
+            dims = 3072,
             index = true,
             similarity = "cosine"
     )

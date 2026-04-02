@@ -4,7 +4,7 @@ import com.hcmute.careergraph.repositories.CandidateESRepository;
 import com.hcmute.careergraph.repositories.JobESRepository;
 import org.junit.jupiter.api.Test;
 import org.springframework.ai.embedding.EmbeddingModel;
-import org.springframework.ai.google.genai.GoogleGenAiChatModel;
+import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.test.context.ActiveProfiles;
@@ -20,7 +20,7 @@ class CareergraphApplicationTests {
 	private CandidateESRepository candidateESRepository;
 
 	@MockBean
-	private GoogleGenAiChatModel googleGenAiChatModel;
+	private ChatModel chatModel;
 
 	@MockBean
 	private EmbeddingModel embeddingModel;
