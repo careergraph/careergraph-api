@@ -1,28 +1,42 @@
 package com.hcmute.careergraph.config.security;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
+import java.util.Arrays;
+import java.util.List;
+import java.util.stream.Collectors;
+
 @Configuration
 public class CorsConfig {
+
+    @Value("${CORS_ALLOWED_ORIGINS:}")
+    private String allowedOrigins;
+
+    @Value("${CORS_ALLOWED_METHODS:*}")
+    private String allowedMethods;
+
+    @Value("${CORS_ALLOWED_HEADERS:*}")
+    private String allowedHeaders;
+
+    private List<String> parseCsv(String raw) {
+        return Arrays.stream(raw.split(","))
+                .map(String::trim)
+                .filter(s -> !s.isEmpty())
+                .collect(Collectors.toList());
+    }
 
     @Bean
     public UrlBasedCorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration corsConfiguration = new CorsConfiguration();
-        corsConfiguration.addAllowedOrigin("http://localhost:3000");
-        corsConfiguration.addAllowedOrigin("http://localhost:5000");
-        corsConfiguration.addAllowedOrigin("http://localhost:5173");
-        corsConfiguration.addAllowedOrigin("http://localhost:8000");
-        corsConfiguration.addAllowedOrigin("https://thinz.io.vn");
-        corsConfiguration.addAllowedOrigin("http://thinz.io.vn");
-        corsConfiguration.addAllowedOrigin("http://api.thinz.io.vn");
-        corsConfiguration.addAllowedOrigin("https://api.thinz.io.vn");
-        corsConfiguration.addAllowedOrigin("http://hr.thinz.io.vn");
-        corsConfiguration.addAllowedOrigin("https://hr.thinz.io.vn");
-        corsConfiguration.addAllowedMethod("*");
-        corsConfiguration.addAllowedHeader("*");
+
+        parseCsv(allowedOrigins).forEach(corsConfiguration::addAllowedOrigin);
+        parseCsv(allowedMethods).forEach(corsConfiguration::addAllowedMethod);
+        parseCsv(allowedHeaders).forEach(corsConfiguration::addAllowedHeader);
+
         corsConfiguration.setAllowCredentials(true);
 
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();

@@ -10,9 +10,11 @@ import com.hcmute.careergraph.repositories.JobRepository;
 import com.hcmute.careergraph.repositories.NewlyPostedJobRepository;
 import com.hcmute.careergraph.services.HuggingFaceEmbeddingService;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.context.annotation.Profile;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.annotation.Order;
 import org.springframework.data.elasticsearch.core.ElasticsearchOperations;
 import org.springframework.stereotype.Component;
@@ -26,6 +28,7 @@ import java.util.stream.IntStream;
 @Profile("!test")
 @RequiredArgsConstructor
 @Order(1)
+@Slf4j
 public class ElasticsearchDataInitializer implements CommandLineRunner {
 
     private final JobRepository jobRepository;
@@ -38,6 +41,9 @@ public class ElasticsearchDataInitializer implements CommandLineRunner {
     private final JobNotificationQueueRepository queueRepo;
     private final NewlyPostedJobRepository newlyPostedJobRepo;
     private final EmbeddingModel embeddingModel;
+
+    @Value("${APP_ES_SYNC_JOBS_ENABLED:false}")
+    private boolean syncJobsEnabled;
 
     private static final List<String> KEYWORDS = List.of(
             "java",
@@ -63,7 +69,11 @@ public class ElasticsearchDataInitializer implements CommandLineRunner {
 
     @Override
     public void run(String... args) throws Exception {
-        // synchronizeDataWithRetry();
+        if (!syncJobsEnabled) {
+            log.info("Skip Job Elasticsearch synchronization because APP_ES_SYNC_JOBS_ENABLED=false");
+            return;
+        }
+        synchronizeDataWithRetry();
     }
 
     private void synchronizeDataWithRetry() {
