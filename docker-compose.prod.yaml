@@ -118,7 +118,7 @@ services:
     labels:
       - "traefik.enable=true"
       - "traefik.docker.network=proxy"
-      - "traefik.http.routers.api.rule=Host(`api.thinz.io.vn`)"
+      - "traefik.http.routers.api.rule=Host(`api.thinz.io.vn`) && PathPrefix(`/careergraph`)" 
       - "traefik.http.routers.api.entrypoints=websecure"
       - "traefik.http.routers.api.tls.certresolver=le"
       - "traefik.http.services.api.loadbalancer.server.port=8080"
