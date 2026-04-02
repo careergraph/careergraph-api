@@ -160,13 +160,14 @@ jobs:
             cd "$VPS_APP_DIR"
             log_step "Changed directory to $VPS_APP_DIR"
 
-            COMPOSE_FILE_TMP="$(mktemp docker-compose-api-XXXXXX.yaml)"
-            ENV_FILE_TMP="$(mktemp env-api-XXXXXX.list)"
-            log_step "Created temporary deploy files"
+            DEPLOY_TMP_DIR="$(mktemp -d)"
+            COMPOSE_FILE_TMP="$DEPLOY_TMP_DIR/docker-compose.yaml"
+            ENV_FILE_TMP="$DEPLOY_TMP_DIR/.env"
+            log_step "Created temporary deploy directory: $DEPLOY_TMP_DIR"
 
             cleanup() {
-              log_step "Cleaning up temporary deploy files"
-              rm -f "$COMPOSE_FILE_TMP" "$ENV_FILE_TMP"
+              log_step "Cleaning up temporary deploy directory"
+              rm -rf "$DEPLOY_TMP_DIR"
             }
             trap cleanup EXIT
 
@@ -187,6 +188,8 @@ jobs:
               printf "%s\n" "$APP_ENV_PROD"
               printf "DOCKER_IMAGE_REPO=%s\n" "$IMAGE_REPO"
               printf "IMAGE_TAG=%s\n" "$IMAGE_TAG"
+              printf "DOCKER_IMAGE_REPO_API=%s\n" "$IMAGE_REPO"
+              printf "IMAGE_TAG_API=%s\n" "$IMAGE_TAG"
             } > "$ENV_FILE_TMP"
             log_step "Wrote runtime environment to temporary env file"
 
@@ -241,7 +244,7 @@ jobs:
               for i in $(seq 1 "$HEALTHCHECK_ATTEMPTS"); do
                 if curl -fsS "$url" > /dev/null; then
                   log_step "Healthcheck succeeded at: $url"
-                  log_step "Removing API image tags from VPS"
+                  log_step "Removing API image tags from VPS (keeping DB/cache/search images)"
                   docker image rm "$IMAGE_REPO:$IMAGE_TAG" || true
                   docker image rm "$IMAGE_REPO:latest" || true
                   log_step "Deployment completed successfully"
