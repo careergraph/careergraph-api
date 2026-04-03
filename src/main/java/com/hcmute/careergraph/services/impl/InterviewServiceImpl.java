@@ -3,11 +3,13 @@ package com.hcmute.careergraph.services.impl;
 import com.hcmute.careergraph.enums.interview.*;
 import com.hcmute.careergraph.exception.BadRequestException;
 import com.hcmute.careergraph.persistence.dtos.request.InterviewFeedbackRequest;
+import com.hcmute.careergraph.persistence.dtos.request.InterviewRecordingRequest;
 import com.hcmute.careergraph.persistence.dtos.request.InterviewRequest;
 import com.hcmute.careergraph.persistence.dtos.request.InterviewRescheduleRequest;
 import com.hcmute.careergraph.persistence.dtos.request.InterviewTimeProposalRequest;
 import com.hcmute.careergraph.persistence.models.*;
 import com.hcmute.careergraph.repositories.*;
+import com.hcmute.careergraph.services.InterviewRoomService;
 import com.hcmute.careergraph.services.InterviewService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -35,10 +37,12 @@ public class InterviewServiceImpl implements InterviewService {
     private final InterviewRepository interviewRepository;
     private final InterviewParticipantRepository participantRepository;
     private final InterviewFeedbackRepository feedbackRepository;
+    private final InterviewRecordingRepository recordingRepository;
     private final InterviewTimeProposalRepository timeProposalRepository;
     private final ApplicationRepository applicationRepository;
     private final AccountRepository accountRepository;
     private final CandidateRepository candidateRepository;
+    private final InterviewRoomService roomService;
 
     private static final List<InterviewStatus> ACTIVE_STATUSES =
             List.of(InterviewStatus.SCHEDULED, InterviewStatus.CONFIRMED);
@@ -84,13 +88,25 @@ public class InterviewServiceImpl implements InterviewService {
             }
         }
 
-        String meetingLink = type == InterviewType.ONLINE ? generateMeetingLink() : null;
-
-        if (type == InterviewType.ONLINE && meetingLink == null) {
-            throw new BadRequestException("Online interview requires a meeting link");
-        }
         if (type == InterviewType.OFFLINE && !StringUtils.hasText(request.getLocation())) {
             throw new BadRequestException("Offline interview requires a location");
+        }
+
+        // Daily Room Model: reuse room by job + date for ONLINE interviews
+        String meetingLink = null;
+        if (type == InterviewType.ONLINE) {
+            String jobId = application.getJob().getId();
+            InterviewRoom room = roomService.findOrCreateRoom(jobId, date, null);
+            meetingLink = room.getRoomCode();
+
+            // Add candidate slot to room
+            roomService.addParticipantSlot(
+                    room.getId(),
+                    application.getId(),
+                    application.getCandidate().getId(),
+                    scheduledAt,
+                    endAt
+            );
         }
 
         Interview interview = Interview.builder()
@@ -327,7 +343,12 @@ public class InterviewServiceImpl implements InterviewService {
                 .recommendation(recommendation)
                 .build();
 
-        return feedbackRepository.save(feedback);
+        InterviewFeedback saved = feedbackRepository.save(feedback);
+
+        // Auto-update application stage based on recommendation
+        updateApplicationStageFromFeedback(interview, recommendation);
+
+        return saved;
     }
 
     @Override
@@ -433,7 +454,21 @@ public class InterviewServiceImpl implements InterviewService {
         LocalDateTime scheduledAt = LocalDateTime.of(proposal.getProposedDate(), proposal.getProposedStartTime());
         LocalDateTime endAt = scheduledAt.plusMinutes(proposal.getProposedDurationMinutes());
 
-        String meetingLink = interview.getType() == InterviewType.ONLINE ? generateMeetingLink() : null;
+        // Daily Room Model: reuse room by job + date
+        String meetingLink = null;
+        if (interview.getType() == InterviewType.ONLINE) {
+            InterviewRoom room = roomService.findOrCreateRoom(
+                    interview.getJob().getId(), proposal.getProposedDate(), null);
+            meetingLink = room.getRoomCode();
+
+            roomService.addParticipantSlot(
+                    room.getId(),
+                    interview.getApplication().getId(),
+                    interview.getCandidate().getId(),
+                    scheduledAt,
+                    endAt
+            );
+        }
 
         Interview rescheduled = Interview.builder()
                 .application(interview.getApplication())
@@ -528,5 +563,68 @@ public class InterviewServiceImpl implements InterviewService {
     public Interview getInterviewByRoomCode(String roomCode) {
         return interviewRepository.findByMeetingLink(roomCode)
                 .orElseThrow(() -> new BadRequestException("Interview room not found"));
+    }
+
+    @Override
+    public InterviewRecording saveRecording(String interviewId, InterviewRecordingRequest request, String recordedBy) {
+        Interview interview = getInterviewById(interviewId);
+
+        InterviewRecording recording = InterviewRecording.builder()
+                .interview(interview)
+                .fileKey(request.getFileKey())
+                .fileSize(request.getFileSize())
+                .durationSeconds(request.getDurationSeconds())
+                .mimeType(request.getMimeType() != null ? request.getMimeType() : "video/webm")
+                .recordingStatus(RecordingStatus.AVAILABLE)
+                .recordedBy(recordedBy)
+                .build();
+
+        InterviewRecording saved = recordingRepository.save(recording);
+        log.info("Recording saved for interview {} by {}", interviewId, recordedBy);
+        return saved;
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<InterviewRecording> getRecordings(String interviewId) {
+        return recordingRepository.findByInterviewId(interviewId);
+    }
+
+    @Override
+    public Interview startInterview(String id, String companyId) {
+        Interview interview = getInterviewById(id);
+        if (!interview.getCompany().getId().equals(companyId)) {
+            throw new BadRequestException("Interview does not belong to your company");
+        }
+        if (interview.getInterviewStatus() != InterviewStatus.SCHEDULED
+                && interview.getInterviewStatus() != InterviewStatus.CONFIRMED) {
+            throw new BadRequestException("Interview can only be started from SCHEDULED or CONFIRMED status");
+        }
+        interview.setInterviewStatus(InterviewStatus.IN_PROGRESS);
+        return interviewRepository.save(interview);
+    }
+
+    private void updateApplicationStageFromFeedback(Interview interview, FeedbackRecommendation recommendation) {
+        try {
+            Application application = interview.getApplication();
+            if (application == null) return;
+
+            com.hcmute.careergraph.enums.application.ApplicationStage newStage = switch (recommendation) {
+                case NEXT_ROUND -> com.hcmute.careergraph.enums.application.ApplicationStage.INTERVIEW_COMPLETED;
+                case EXTEND_OFFER -> com.hcmute.careergraph.enums.application.ApplicationStage.OFFER_EXTENDED;
+                case REJECT -> com.hcmute.careergraph.enums.application.ApplicationStage.REJECTED;
+                case HOLD -> null; // Keep current stage
+            };
+
+            if (newStage != null && newStage != application.getCurrentStage()) {
+                application.setCurrentStage(newStage);
+                application.setStageChangedAt(LocalDateTime.now());
+                applicationRepository.save(application);
+                log.info("Application {} stage updated to {} based on feedback recommendation {}",
+                        application.getId(), newStage, recommendation);
+            }
+        } catch (Exception e) {
+            log.warn("Failed to auto-update application stage from feedback: {}", e.getMessage());
+        }
     }
 }

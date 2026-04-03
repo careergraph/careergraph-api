@@ -5,14 +5,17 @@ import com.hcmute.careergraph.helper.RestResponse;
 import com.hcmute.careergraph.helper.SecurityUtils;
 import com.hcmute.careergraph.mapper.InterviewMapper;
 import com.hcmute.careergraph.persistence.dtos.request.InterviewFeedbackRequest;
+import com.hcmute.careergraph.persistence.dtos.request.InterviewRecordingRequest;
 import com.hcmute.careergraph.persistence.dtos.request.InterviewRequest;
 import com.hcmute.careergraph.persistence.dtos.request.InterviewRescheduleRequest;
 import com.hcmute.careergraph.persistence.dtos.request.InterviewTimeProposalRequest;
 import com.hcmute.careergraph.persistence.dtos.response.InterviewFeedbackResponse;
+import com.hcmute.careergraph.persistence.dtos.response.InterviewRecordingResponse;
 import com.hcmute.careergraph.persistence.dtos.response.InterviewResponse;
 import com.hcmute.careergraph.persistence.dtos.response.InterviewTimeProposalResponse;
 import com.hcmute.careergraph.persistence.models.Interview;
 import com.hcmute.careergraph.persistence.models.InterviewFeedback;
+import com.hcmute.careergraph.persistence.models.InterviewRecording;
 import com.hcmute.careergraph.persistence.models.InterviewTimeProposal;
 import com.hcmute.careergraph.services.InterviewService;
 import jakarta.validation.Valid;
@@ -182,6 +185,54 @@ public class InterviewController {
                 .status(HttpStatus.OK)
                 .message("Interview completed")
                 .data(interviewMapper.toResponse(interview, false))
+                .build();
+    }
+
+    @PostMapping("/{id}/start")
+    public RestResponse<InterviewResponse> startInterview(
+            @PathVariable String id,
+            Authentication authentication) {
+
+        String companyId = securityUtils.extractCompanyId(authentication);
+        if (!StringUtils.hasText(companyId)) {
+            throw new BadRequestException("Company ID is required");
+        }
+
+        Interview interview = interviewService.startInterview(id, companyId);
+        return RestResponse.<InterviewResponse>builder()
+                .status(HttpStatus.OK)
+                .message("Interview started")
+                .data(interviewMapper.toResponse(interview, false))
+                .build();
+    }
+
+    // ==================== Recording Endpoints ====================
+
+    @PostMapping("/{id}/recordings")
+    public RestResponse<InterviewRecordingResponse> saveRecording(
+            @PathVariable String id,
+            @Valid @RequestBody InterviewRecordingRequest request,
+            Authentication authentication) {
+
+        String accountId = securityUtils.getCurrentAccount()
+                .map(a -> a.getId())
+                .orElseThrow(() -> new BadRequestException("Account not found"));
+
+        InterviewRecording recording = interviewService.saveRecording(id, request, accountId);
+        return RestResponse.<InterviewRecordingResponse>builder()
+                .status(HttpStatus.CREATED)
+                .message("Recording saved successfully")
+                .data(interviewMapper.toRecordingResponse(recording))
+                .build();
+    }
+
+    @GetMapping("/{id}/recordings")
+    public RestResponse<List<InterviewRecordingResponse>> getRecordings(@PathVariable String id) {
+        List<InterviewRecording> recordings = interviewService.getRecordings(id);
+        return RestResponse.<List<InterviewRecordingResponse>>builder()
+                .status(HttpStatus.OK)
+                .message("Recordings retrieved successfully")
+                .data(recordings.stream().map(interviewMapper::toRecordingResponse).toList())
                 .build();
     }
 

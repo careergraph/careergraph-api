@@ -1,6 +1,7 @@
 package com.hcmute.careergraph.mapper;
 
 import com.hcmute.careergraph.persistence.dtos.response.InterviewFeedbackResponse;
+import com.hcmute.careergraph.persistence.dtos.response.InterviewRecordingResponse;
 import com.hcmute.careergraph.persistence.dtos.response.InterviewResponse;
 import com.hcmute.careergraph.persistence.dtos.response.InterviewTimeProposalResponse;
 import com.hcmute.careergraph.persistence.models.*;
@@ -146,5 +147,24 @@ public class InterviewMapper {
                 .filter(Objects::nonNull)
                 .map(this::toProposalResponse)
                 .toList();
+    }
+
+    public InterviewRecordingResponse toRecordingResponse(InterviewRecording recording) {
+        if (recording == null) return null;
+        return InterviewRecordingResponse.builder()
+                .id(recording.getId())
+                .interviewId(recording.getInterview() != null ? recording.getInterview().getId() : null)
+                .fileKey(recording.getFileKey())
+                .fileSize(recording.getFileSize())
+                .durationSeconds(recording.getDurationSeconds())
+                .mimeType(recording.getMimeType())
+                .recordingStatus(recording.getRecordingStatus())
+                .recordedBy(recording.getRecordedBy())
+                .thumbnailKey(recording.getThumbnailKey())
+                .transcriptKey(recording.getTranscriptKey())
+                .analysisSummary(recording.getAnalysisSummary())
+                .analyzedAt(recording.getAnalyzedAt())
+                .createdDate(recording.getCreatedDate())
+                .build();
     }
 }

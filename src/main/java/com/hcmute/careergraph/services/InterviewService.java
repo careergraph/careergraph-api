@@ -1,13 +1,11 @@
 package com.hcmute.careergraph.services;
 
 import com.hcmute.careergraph.persistence.dtos.request.InterviewFeedbackRequest;
+import com.hcmute.careergraph.persistence.dtos.request.InterviewRecordingRequest;
 import com.hcmute.careergraph.persistence.dtos.request.InterviewRequest;
 import com.hcmute.careergraph.persistence.dtos.request.InterviewRescheduleRequest;
 import com.hcmute.careergraph.persistence.dtos.request.InterviewTimeProposalRequest;
-import com.hcmute.careergraph.persistence.models.Application;
-import com.hcmute.careergraph.persistence.models.Interview;
-import com.hcmute.careergraph.persistence.models.InterviewFeedback;
-import com.hcmute.careergraph.persistence.models.InterviewTimeProposal;
+import com.hcmute.careergraph.persistence.models.*;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 
@@ -55,4 +53,10 @@ public interface InterviewService {
     void rejectProposal(String interviewId, String proposalId, String companyId);
 
     Interview getInterviewByRoomCode(String roomCode);
+
+    InterviewRecording saveRecording(String interviewId, InterviewRecordingRequest request, String recordedBy);
+
+    List<InterviewRecording> getRecordings(String interviewId);
+
+    Interview startInterview(String id, String companyId);
 }

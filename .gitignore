@@ -39,4 +39,4 @@ build/
 .vscode/
 
 docker run
-/docs
+/docs.*
