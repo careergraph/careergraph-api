@@ -82,6 +82,16 @@ public class InterviewController {
                 .build();
     }
 
+    @GetMapping("/room/{roomCode}/all")
+    public RestResponse<List<InterviewResponse>> getInterviewsByRoomCode(@PathVariable String roomCode) {
+        List<Interview> interviews = interviewService.getInterviewsByRoomCode(roomCode);
+        return RestResponse.<List<InterviewResponse>>builder()
+                .status(HttpStatus.OK)
+                .message("Room interviews retrieved successfully")
+                .data(interviewMapper.toResponseList(interviews, false))
+                .build();
+    }
+
     @GetMapping
     public RestResponse<Page<InterviewResponse>> getInterviews(
             @RequestParam(defaultValue = "0") int page,
@@ -416,7 +426,7 @@ public class InterviewController {
         return RestResponse.<List<InterviewResponse>>builder()
                 .status(HttpStatus.OK)
                 .message("Interviews by application retrieved successfully")
-                .data(interviewMapper.toResponseList(interviews, false))
+                .data(interviewMapper.toResponseList(interviews, true))
                 .build();
     }
 

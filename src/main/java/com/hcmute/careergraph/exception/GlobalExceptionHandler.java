@@ -40,13 +40,14 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(value = AppException.class)
     ResponseEntity<RestResponse> handlingAppException(AppException exception) {
         ErrorType errorCode = exception.getErrorCode();
+        HttpStatus status = HttpStatus.valueOf(errorCode.getCode());
         RestResponse restResponse = new RestResponse();
 
-        restResponse.setStatus(HttpStatus.OK);
+        restResponse.setStatus(status);
         restResponse.setMessage(exception.getErrorMessage());
         restResponse.setData(exception.getData());
 
-        return ResponseEntity.status(errorCode.getCode()).body(restResponse);
+        return ResponseEntity.status(status).body(restResponse);
     }
 
     @ExceptionHandler(value = AccessDeniedException.class)

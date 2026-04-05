@@ -14,29 +14,38 @@ import java.util.Optional;
 @Repository
 public interface RoomParticipantRepository extends JpaRepository<RoomParticipant, String> {
 
-    List<RoomParticipant> findByRoomId(String roomId);
+  List<RoomParticipant> findByRoomId(String roomId);
 
-    Optional<RoomParticipant> findByRoomIdAndCandidateId(String roomId, String candidateId);
+  Optional<RoomParticipant> findByRoomIdAndCandidateId(String roomId, String candidateId);
 
-    Optional<RoomParticipant> findByRoomIdAndApplicationId(String roomId, String applicationId);
+  Optional<RoomParticipant> findByRoomIdAndApplicationId(String roomId, String applicationId);
 
-    @Query("""
-        SELECT rp FROM RoomParticipant rp
-        WHERE rp.room.id = :roomId
-          AND rp.admitStatus IN :statuses
-        ORDER BY rp.slotStart ASC
-        """)
-    List<RoomParticipant> findByRoomIdAndAdmitStatusIn(
-            @Param("roomId") String roomId,
-            @Param("statuses") List<AdmitStatus> statuses);
+  @Query("""
+      SELECT rp FROM RoomParticipant rp
+      WHERE rp.room.roomCode = :roomCode
+        AND rp.application.id = :applicationId
+      """)
+  Optional<RoomParticipant> findByRoomCodeAndApplicationId(
+      @Param("roomCode") String roomCode,
+      @Param("applicationId") String applicationId);
 
-    @Query("""
-        SELECT rp FROM RoomParticipant rp
-        WHERE rp.slotEnd < :before
-          AND rp.admitStatus NOT IN :excludeStatuses
-          AND rp.joinedAt IS NULL
-        """)
-    List<RoomParticipant> findNoShows(
-            @Param("before") LocalDateTime before,
-            @Param("excludeStatuses") List<AdmitStatus> excludeStatuses);
+  @Query("""
+      SELECT rp FROM RoomParticipant rp
+      WHERE rp.room.id = :roomId
+        AND rp.admitStatus IN :statuses
+      ORDER BY rp.slotStart ASC
+      """)
+  List<RoomParticipant> findByRoomIdAndAdmitStatusIn(
+      @Param("roomId") String roomId,
+      @Param("statuses") List<AdmitStatus> statuses);
+
+  @Query("""
+      SELECT rp FROM RoomParticipant rp
+      WHERE rp.slotEnd < :before
+        AND rp.admitStatus NOT IN :excludeStatuses
+        AND rp.joinedAt IS NULL
+      """)
+  List<RoomParticipant> findNoShows(
+      @Param("before") LocalDateTime before,
+      @Param("excludeStatuses") List<AdmitStatus> excludeStatuses);
 }

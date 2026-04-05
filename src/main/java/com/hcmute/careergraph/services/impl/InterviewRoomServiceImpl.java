@@ -64,7 +64,7 @@ public class InterviewRoomServiceImpl implements InterviewRoomService {
 
     @Override
     public RoomParticipant addParticipantSlot(String roomId, String applicationId, String candidateId,
-                                              LocalDateTime slotStart, LocalDateTime slotEnd) {
+            LocalDateTime slotStart, LocalDateTime slotEnd) {
         InterviewRoom room = getRoomById(roomId);
         Application application = applicationRepository.findById(applicationId)
                 .orElseThrow(() -> new BadRequestException("Application not found"));
@@ -179,6 +179,15 @@ public class InterviewRoomServiceImpl implements InterviewRoomService {
     public RoomParticipant completeParticipant(String roomId, String candidateId) {
         RoomParticipant participant = participantRepository.findByRoomIdAndCandidateId(roomId, candidateId)
                 .orElseThrow(() -> new BadRequestException("Participant not found in this room"));
+
+        if (participant.getJoinedAt() == null) {
+            throw new BadRequestException("Participant has not joined the room yet");
+        }
+
+        if (participant.getAdmitStatus() != AdmitStatus.ADMITTED
+                && participant.getAdmitStatus() != AdmitStatus.COMPLETED) {
+            throw new BadRequestException("Participant cannot be completed in current status");
+        }
 
         participant.setAdmitStatus(AdmitStatus.COMPLETED);
         participant.setLeftAt(LocalDateTime.now());

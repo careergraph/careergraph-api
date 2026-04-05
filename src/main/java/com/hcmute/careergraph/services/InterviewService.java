@@ -44,7 +44,8 @@ public interface InterviewService {
 
     List<Application> getUnscheduledApplicationsByJob(String jobId, String companyId);
 
-    List<InterviewTimeProposal> proposeAlternativeTimes(String interviewId, InterviewTimeProposalRequest request, String candidateId);
+    List<InterviewTimeProposal> proposeAlternativeTimes(String interviewId, InterviewTimeProposalRequest request,
+            String candidateId);
 
     List<InterviewTimeProposal> getProposals(String interviewId);
 
@@ -53,6 +54,8 @@ public interface InterviewService {
     void rejectProposal(String interviewId, String proposalId, String companyId);
 
     Interview getInterviewByRoomCode(String roomCode);
+
+    List<Interview> getInterviewsByRoomCode(String roomCode);
 
     InterviewRecording saveRecording(String interviewId, InterviewRecordingRequest request, String recordedBy);
 

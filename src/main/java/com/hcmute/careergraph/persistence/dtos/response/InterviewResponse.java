@@ -33,6 +33,7 @@ public class InterviewResponse {
     private String cancellationReason;
     private List<ParticipantResponse> interviewers;
     private List<InterviewFeedbackResponse> feedback;
+    private List<InterviewRecordingResponse> recordings;
     private LocalDateTime createdDate;
     private LocalDateTime lastModifiedDate;
 

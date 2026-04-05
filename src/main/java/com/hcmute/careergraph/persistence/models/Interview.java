@@ -18,8 +18,10 @@ import java.util.List;
 @SuperBuilder
 @NoArgsConstructor
 @AllArgsConstructor
-@ToString(callSuper = true, exclude = {"application", "company", "job", "candidate", "participants", "recordings", "feedbacks", "timeProposals"})
-@EqualsAndHashCode(callSuper = true, exclude = {"application", "company", "job", "candidate", "participants", "recordings", "feedbacks", "timeProposals"})
+@ToString(callSuper = true, exclude = { "application", "company", "job", "candidate", "participants", "recordings",
+        "feedbacks", "timeProposals" })
+@EqualsAndHashCode(callSuper = true, exclude = { "application", "company", "job", "candidate", "participants",
+        "recordings", "feedbacks", "timeProposals" })
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class Interview extends BaseEntity {
 
@@ -70,6 +72,10 @@ public class Interview extends BaseEntity {
 
     @Column(name = "rescheduled_from_id")
     private String rescheduledFromId;
+
+    @Column(name = "hidden_from_candidate", nullable = false)
+    @lombok.Builder.Default
+    private boolean hiddenFromCandidate = false;
 
     @Column(name = "reminder_24h_sent", nullable = false)
     @lombok.Builder.Default

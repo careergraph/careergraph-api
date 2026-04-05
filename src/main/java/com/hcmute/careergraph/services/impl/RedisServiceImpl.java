@@ -7,9 +7,11 @@ import com.hcmute.careergraph.services.RedisService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.RedisConnectionFailureException;
+import org.springframework.data.redis.core.RedisCallback;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.HashMap;
 import java.util.Map;
@@ -56,16 +58,16 @@ public class RedisServiceImpl implements RedisService {
 
             // Handle LinkedHashMap or other Map types for complex objects
             return objectMapper.convertValue(value, clazz);
-            
+
         } catch (JsonProcessingException e) {
             log.error("Failed to deserialize object for key '{}': {}", key, e.getMessage());
-            return null;
+            return tryReadFromRawJson(key, clazz);
         } catch (RedisConnectionFailureException e) {
             log.error("Redis connection failed while getting key '{}': {}", key, e.getMessage());
             throw e; // Re-throw connection failures for circuit breaker handling
         } catch (Exception e) {
             log.error("Unexpected error getting object for key '{}': {}", key, e.getMessage());
-            return null;
+            return tryReadFromRawJson(key, clazz);
         }
     }
 
@@ -142,10 +144,10 @@ public class RedisServiceImpl implements RedisService {
             Long ttl = getTtl(key);
             // Default to 1 hour if no TTL found
             int effectiveTtl = (ttl == null || ttl < 0) ? 3600 : ttl.intValue();
-            
+
             setObject(key, meta, effectiveTtl);
             log.debug("Updated field '{}' in key '{}' with TTL {} seconds", field, key, effectiveTtl);
-            
+
         } catch (Exception e) {
             log.error("Failed to update field '{}' in key '{}': {}", field, key, e.getMessage());
             throw new RuntimeException("Failed to update field in Redis", e);
@@ -167,14 +169,14 @@ public class RedisServiceImpl implements RedisService {
             if (data == null || !data.containsKey(field)) {
                 return null;
             }
-            
+
             Object fieldValue = data.get(field);
             if (fieldValue == null) {
                 return null;
             }
-            
+
             return objectMapper.convertValue(fieldValue, clazz);
-            
+
         } catch (Exception e) {
             log.error("Failed to get field '{}' from key '{}': {}", field, key, e.getMessage());
             return null;
@@ -191,19 +193,66 @@ public class RedisServiceImpl implements RedisService {
             if (value == null) {
                 return null;
             }
-            
+
             if (value instanceof Map) {
                 return (Map<String, Object>) value;
             }
-            
+
             if (value instanceof String json) {
-                return objectMapper.readValue(json, new TypeReference<Map<String, Object>>() {});
+                return objectMapper.readValue(json, new TypeReference<Map<String, Object>>() {
+                });
             }
-            
-            return objectMapper.convertValue(value, new TypeReference<Map<String, Object>>() {});
-            
+
+            return objectMapper.convertValue(value, new TypeReference<Map<String, Object>>() {
+            });
+
         } catch (Exception e) {
             log.error("Failed to get object as map for key '{}': {}", key, e.getMessage());
+            return tryReadMapFromRawJson(key);
+        }
+    }
+
+    private <T> T tryReadFromRawJson(String key, Class<T> clazz) {
+        String raw = getRawStringValue(key);
+        if (raw == null || raw.isBlank()) {
+            return null;
+        }
+
+        try {
+            return objectMapper.readValue(raw, clazz);
+        } catch (Exception ex) {
+            log.warn("Fallback raw JSON parse failed for key '{}': {}", key, ex.getMessage());
+            return null;
+        }
+    }
+
+    private Map<String, Object> tryReadMapFromRawJson(String key) {
+        String raw = getRawStringValue(key);
+        if (raw == null || raw.isBlank()) {
+            return null;
+        }
+
+        try {
+            return objectMapper.readValue(raw, new TypeReference<Map<String, Object>>() {
+            });
+        } catch (Exception ex) {
+            log.warn("Fallback raw JSON map parse failed for key '{}': {}", key, ex.getMessage());
+            return null;
+        }
+    }
+
+    private String getRawStringValue(String key) {
+        try {
+            byte[] keyBytes = key.getBytes(StandardCharsets.UTF_8);
+            byte[] valueBytes = redisTemplate
+                    .execute((RedisCallback<byte[]>) connection -> connection.stringCommands().get(keyBytes));
+
+            if (valueBytes == null) {
+                return null;
+            }
+            return new String(valueBytes, StandardCharsets.UTF_8);
+        } catch (Exception ex) {
+            log.warn("Unable to read raw Redis value for key '{}': {}", key, ex.getMessage());
             return null;
         }
     }

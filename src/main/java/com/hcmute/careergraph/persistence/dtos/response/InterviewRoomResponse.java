@@ -34,6 +34,7 @@ public class InterviewRoomResponse {
         private String applicationId;
         private String candidateId;
         private String candidateName;
+        private String candidateEmail;
         private String candidateAvatar;
         private LocalDateTime slotStart;
         private LocalDateTime slotEnd;
