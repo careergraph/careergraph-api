@@ -150,7 +150,7 @@ public class CandidateElasticsearchDataInitializer implements CommandLineRunner 
       int end = Math.min(start + EMBEDDING_BATCH_SIZE, texts.size());
       List<String> batchTexts = texts.subList(start, end);
 
-      List<float[]> batchEmbeddings = huggingFaceEmbeddingService.embed(batchTexts);
+      List<float[]> batchEmbeddings = embeddingModel.embed(batchTexts);
 
       allEmbeddings.addAll(batchEmbeddings);
 

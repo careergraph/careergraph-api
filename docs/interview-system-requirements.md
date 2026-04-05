@@ -45,6 +45,16 @@ job_id + interview_date  →  1 interview_room (unique)
 - Ứng viên chỉ được vào đúng slot của mình (kiểm soát bằng token + thời gian)
 - HR không cần rời phòng giữa các lượt ứng viên
 
+### Production Update 2026-04-05 (Bắt buộc)
+
+- Room có thể dùng chung cho nhiều interview trong ngày, nhưng mọi nghiệp vụ phải xử lý theo từng candidate/interview slot.
+- Không được khóa toàn room chỉ vì một interview đại diện đã `COMPLETED` nếu room còn ứng viên chưa phỏng vấn.
+- Candidate vào room phải được đối chiếu theo interview của chính candidate trong room đó.
+- Chỉ candidate đã thật sự vào phòng (`room_participants.joined_at != null`) mới được:
+    - đánh giá (feedback),
+    - gán bản ghi (recording),
+    - chuyển `COMPLETED`.
+
 ### Stack kỹ thuật (khuyến nghị)
 
 | Layer | Công nghệ |
@@ -212,6 +222,11 @@ HR trong phòng có thể:
     - Kết thúc phỏng vấn
 ```
 
+**Production UX (HR):**
+- Khi HR mở link phòng, UI luôn qua bước "Đang kiểm tra phòng" trước khi render WebRTC.
+- Nếu API trả 404 (room code không tồn tại/hết hiệu lực), hiển thị trang lỗi chuyên dụng với mã phòng + CTA quay lại danh sách phỏng vấn.
+- Nếu lỗi mạng/5xx, hiển thị trang "Không thể kết nối tới phòng" với nút thử lại (không crash trang).
+
 ---
 
 ## 6. Flow vào phòng — Ứng viên
@@ -242,6 +257,11 @@ Kiểm tra thời gian slot:
     - Có thể test camera/mic trước khi vào
     - Bấm "Gõ cửa" (knock) → HR nhận thông báo
 ```
+
+**Production UX (Candidate):**
+- Khi ứng viên mở link phòng, client phải hiển thị bước "Đang kiểm tra phòng phỏng vấn" để validate room trước.
+- Room không tồn tại/hết hiệu lực (404) phải đi đến trang lỗi chuyên dụng, không chỉ hiển thị toast.
+- Lỗi tạm thời (mạng/5xx) hiển thị màn hình lỗi có nút "Thử lại", không cho vào pre-join lobby khi chưa validate room.
 
 ---
 
@@ -437,8 +457,9 @@ Hiện modal: "Video này dành cho ứng viên nào?"
 ```
 
 - Danh sách hiển thị: ứng viên đã ADMITTED trong phòng hôm nay + slot giờ
-- Sau khi gán: cập nhật `interview_recordings.participant_id`, `assigned_by`, `assigned_at`
-- Bấm "Bỏ qua": recording vẫn lưu, `participant_id = null`
+- Production hiện tại: bản ghi được lưu theo `interview_id` (mỗi ứng viên là một interview riêng, dùng chung `meeting_link = room_code`)
+- Sau khi gán: client map ứng viên đã chọn -> interview tương ứng trong room, rồi lưu recording vào interview đó
+- Bấm "Bỏ qua": recording vẫn lưu vào interview hiện tại
 - HR có thể gán lại sau từ trang chi tiết ứng viên
 
 ### 9.3 Quy tắc recording
@@ -447,6 +468,8 @@ Hiện modal: "Video này dành cho ứng viên nào?"
 - Có thể record nhiều đoạn trong 1 phiên (mỗi lần là 1 record riêng)
 - Ứng viên được thông báo khi đang bị record (indicator "● REC" hiển thị với tất cả)
 - File recording không bị xóa khi room ENDED — lưu vĩnh viễn theo application
+- Backend phải từ chối lưu/gán recording nếu candidate của interview chưa có `joined_at` trong room participant slot.
+- UI chỉ hiển thị candidate đủ điều kiện gán recording khi candidate đã vào phòng.
 
 ---
 
@@ -467,10 +490,13 @@ Form đánh giá (xem 10.3 bên dưới)
     │
     ▼
 Bấm "Lưu đánh giá"
-    → Lưu vào interview_evaluations
+    → Lưu vào interview_feedbacks (production)
     → Icon ✏️ đổi thành ✅ (đã đánh giá)
     → HR vẫn ở trong phòng, tiếp tục phỏng vấn bình thường
 ```
+
+**Rule production:** feedback được phép gửi khi interview ở `CONFIRMED`, `IN_PROGRESS`, hoặc `COMPLETED`.
+Khi room có nhiều ứng viên, HR phải chọn đúng ứng viên (tương ứng đúng interview) trước khi submit.
 
 ### 10.2 Đánh giá sau khi kết thúc phỏng vấn
 
@@ -503,7 +529,7 @@ Kết quả đề xuất:
 [Hủy]    [Lưu đánh giá]
 ```
 
-**Lưu vào DB:** `interview_evaluations` — ghi đủ criteria, rating, recommendation, evaluator_id, evaluated_at.
+**Lưu vào DB production:** `interview_feedback` — ghi đủ criteria, rating, recommendation, reviewer_id, created_date.
 
 **Sau khi lưu:**
 - Cập nhật `applications.stage` theo `recommendation`:
@@ -556,6 +582,11 @@ Phía HR — NGAY LẬP TỨC hiện form đánh giá:
       "Bạn muốn đánh giá ứng viên nào trước?"
     - HR đánh giá xong từng người → bấm "Hoàn thành" → redirect về dashboard/kanban
 ```
+
+**Production rule:**
+
+- "Kết thúc phiên họp" chỉ đóng room/session, không tự động complete một interview đại diện.
+- Hoàn thành interview phải thao tác theo từng candidate đã vào phòng.
 
 ### 11.2 Các trường hợp kết thúc khác
 
@@ -614,6 +645,11 @@ Trong & sau phỏng vấn:
 ---
 
 ## 13. Socket Events Reference
+
+> Ghi chú: bảng dưới đây mô tả event mục tiêu. Implementation RTC hiện tại đang dùng nhóm event thực tế:
+> `join-room`, `join-request`, `admit-user`, `reject-user`, `kick-user`, `offer`, `answer`, `ice-candidate`,
+> `recording-started`, `recording-stopped`.
+> Payload `join-request` đã mở rộng thêm `displayName` để HR hiển thị đúng tên ứng viên.
 
 ### Client → Server
 
@@ -750,6 +786,8 @@ Ghi log toàn bộ:
 | Server restart trong phỏng vấn | Emit graceful shutdown trước, client reconnect tự động |
 | Recording file lỗi / không xử lý được | Notify HR qua in-app + email, lưu error log |
 | Ứng viên join từ 2 thiết bị | Chỉ cho session mới nhất, session cũ bị expire |
+| Truy cập room code không tồn tại | UI hiển thị trang lỗi room-not-found chuyên dụng (có mã phòng + CTA quay lại lịch phỏng vấn) |
+| API room tạm thời không phản hồi (5xx/network) | UI hiển thị trang "không thể kết nối" + nút thử lại, không render màn hình pre-join |
 
 ### Evaluation
 

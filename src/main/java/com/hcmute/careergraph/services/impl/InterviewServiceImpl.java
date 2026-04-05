@@ -1,6 +1,8 @@
 package com.hcmute.careergraph.services.impl;
 
+import com.hcmute.careergraph.enums.common.ErrorType;
 import com.hcmute.careergraph.enums.interview.*;
+import com.hcmute.careergraph.exception.AppException;
 import com.hcmute.careergraph.exception.BadRequestException;
 import com.hcmute.careergraph.persistence.dtos.request.InterviewFeedbackRequest;
 import com.hcmute.careergraph.persistence.dtos.request.InterviewRecordingRequest;
@@ -36,6 +38,7 @@ public class InterviewServiceImpl implements InterviewService {
 
     private final InterviewRepository interviewRepository;
     private final InterviewParticipantRepository participantRepository;
+    private final RoomParticipantRepository roomParticipantRepository;
     private final InterviewFeedbackRepository feedbackRepository;
     private final InterviewRecordingRepository recordingRepository;
     private final InterviewTimeProposalRepository timeProposalRepository;
@@ -44,8 +47,8 @@ public class InterviewServiceImpl implements InterviewService {
     private final CandidateRepository candidateRepository;
     private final InterviewRoomService roomService;
 
-    private static final List<InterviewStatus> ACTIVE_STATUSES =
-            List.of(InterviewStatus.SCHEDULED, InterviewStatus.CONFIRMED);
+    private static final List<InterviewStatus> ACTIVE_STATUSES = List.of(InterviewStatus.SCHEDULED,
+            InterviewStatus.CONFIRMED);
     private static final SecureRandom RANDOM = new SecureRandom();
 
     @Override
@@ -53,10 +56,10 @@ public class InterviewServiceImpl implements InterviewService {
         log.info("Creating interview for application: {}", request.getApplicationId());
 
         Application application = applicationRepository.findById(request.getApplicationId())
-                .orElseThrow(() -> new BadRequestException("Application not found"));
+                .orElseThrow(() -> new AppException(ErrorType.BAD_REQUEST, "Application not found"));
 
         if (!application.getJob().getCompany().getId().equals(companyId)) {
-            throw new BadRequestException("Application does not belong to your company");
+            throw new AppException(ErrorType.BAD_REQUEST, "Application does not belong to your company");
         }
 
         LocalDate date = LocalDate.parse(request.getDate(), DateTimeFormatter.ISO_LOCAL_DATE);
@@ -65,7 +68,7 @@ public class InterviewServiceImpl implements InterviewService {
         LocalDateTime endAt = scheduledAt.plusMinutes(request.getDurationMinutes());
 
         if (scheduledAt.isBefore(LocalDateTime.now())) {
-            throw new BadRequestException("Cannot schedule interview in the past");
+            throw new AppException(ErrorType.BAD_REQUEST, "Cannot schedule interview in the past");
         }
 
         InterviewType type = InterviewType.valueOf(request.getType().toUpperCase());
@@ -74,7 +77,7 @@ public class InterviewServiceImpl implements InterviewService {
         List<Interview> conflicts = interviewRepository.findOverlappingByCandidate(
                 application.getCandidate().getId(), scheduledAt, endAt, ACTIVE_STATUSES);
         if (!conflicts.isEmpty()) {
-            throw new BadRequestException("Candidate has a scheduling conflict");
+            throw new AppException(ErrorType.BAD_REQUEST, "Candidate has a scheduling conflict");
         }
 
         // Check interviewer conflicts
@@ -83,13 +86,14 @@ public class InterviewServiceImpl implements InterviewService {
                 List<Interview> interviewerConflicts = interviewRepository.findOverlappingByParticipant(
                         interviewerId, scheduledAt, endAt, ACTIVE_STATUSES);
                 if (!interviewerConflicts.isEmpty()) {
-                    throw new BadRequestException("Interviewer " + interviewerId + " has a scheduling conflict");
+                    throw new AppException(ErrorType.BAD_REQUEST,
+                            "Interviewer " + interviewerId + " has a scheduling conflict");
                 }
             }
         }
 
         if (type == InterviewType.OFFLINE && !StringUtils.hasText(request.getLocation())) {
-            throw new BadRequestException("Offline interview requires a location");
+            throw new AppException(ErrorType.BAD_REQUEST, "Offline interview requires a location");
         }
 
         // Daily Room Model: reuse room by job + date for ONLINE interviews
@@ -105,8 +109,7 @@ public class InterviewServiceImpl implements InterviewService {
                     application.getId(),
                     application.getCandidate().getId(),
                     scheduledAt,
-                    endAt
-            );
+                    endAt);
         }
 
         Interview interview = Interview.builder()
@@ -160,7 +163,7 @@ public class InterviewServiceImpl implements InterviewService {
     @Transactional(readOnly = true)
     public Interview getInterviewById(String id) {
         return interviewRepository.findById(id)
-                .orElseThrow(() -> new BadRequestException("Interview not found with id: " + id));
+                .orElseThrow(() -> new AppException(ErrorType.BAD_REQUEST, "Interview not found with id: " + id));
     }
 
     @Override
@@ -179,9 +182,10 @@ public class InterviewServiceImpl implements InterviewService {
     public List<Interview> getInterviewsByCandidate(String candidateId, String statusFilter) {
         if (StringUtils.hasText(statusFilter)) {
             List<InterviewStatus> statuses = resolveStatusFilter(statusFilter);
-            return interviewRepository.findByCandidateIdAndInterviewStatusIn(candidateId, statuses);
+            return interviewRepository.findByCandidateIdAndInterviewStatusInAndHiddenFromCandidateFalse(candidateId,
+                    statuses);
         }
-        return interviewRepository.findByCandidateIdAndInterviewStatusIn(
+        return interviewRepository.findByCandidateIdAndInterviewStatusInAndHiddenFromCandidateFalse(
                 candidateId, List.of(InterviewStatus.values()));
     }
 
@@ -202,10 +206,10 @@ public class InterviewServiceImpl implements InterviewService {
     public Interview confirmInterview(String id, String candidateId) {
         Interview interview = getInterviewById(id);
         if (!interview.getCandidate().getId().equals(candidateId)) {
-            throw new BadRequestException("This interview does not belong to you");
+            throw new AppException(ErrorType.BAD_REQUEST, "This interview does not belong to you");
         }
         if (interview.getInterviewStatus() != InterviewStatus.SCHEDULED) {
-            throw new BadRequestException("Interview can only be confirmed when in SCHEDULED status");
+            throw new AppException(ErrorType.BAD_REQUEST, "Interview can only be confirmed when in SCHEDULED status");
         }
         interview.setInterviewStatus(InterviewStatus.CONFIRMED);
         return interviewRepository.save(interview);
@@ -215,11 +219,11 @@ public class InterviewServiceImpl implements InterviewService {
     public Interview declineInterview(String id, String candidateId, String reason) {
         Interview interview = getInterviewById(id);
         if (!interview.getCandidate().getId().equals(candidateId)) {
-            throw new BadRequestException("This interview does not belong to you");
+            throw new AppException(ErrorType.BAD_REQUEST, "This interview does not belong to you");
         }
         if (interview.getInterviewStatus() != InterviewStatus.SCHEDULED
                 && interview.getInterviewStatus() != InterviewStatus.CONFIRMED) {
-            throw new BadRequestException("Interview cannot be declined in current status");
+            throw new AppException(ErrorType.BAD_REQUEST, "Interview cannot be declined in current status");
         }
         interview.setInterviewStatus(InterviewStatus.CANCELLED);
         interview.setCancellationReason(reason);
@@ -230,14 +234,16 @@ public class InterviewServiceImpl implements InterviewService {
     public Interview cancelInterview(String id, String companyId, String reason) {
         Interview interview = getInterviewById(id);
         if (!interview.getCompany().getId().equals(companyId)) {
-            throw new BadRequestException("Interview does not belong to your company");
+            throw new AppException(ErrorType.BAD_REQUEST, "Interview does not belong to your company");
         }
         if (interview.getInterviewStatus() == InterviewStatus.COMPLETED
                 || interview.getInterviewStatus() == InterviewStatus.CANCELLED) {
-            throw new BadRequestException("Interview cannot be cancelled in current status");
+            throw new AppException(ErrorType.BAD_REQUEST, "Interview cannot be cancelled in current status");
         }
+        boolean cancelledBeforeCandidateConfirmed = interview.getInterviewStatus() == InterviewStatus.SCHEDULED;
         interview.setInterviewStatus(InterviewStatus.CANCELLED);
         interview.setCancellationReason(reason);
+        interview.setHiddenFromCandidate(cancelledBeforeCandidateConfirmed);
         return interviewRepository.save(interview);
     }
 
@@ -245,12 +251,14 @@ public class InterviewServiceImpl implements InterviewService {
     public Interview rescheduleInterview(String id, InterviewRescheduleRequest request, String companyId) {
         Interview original = getInterviewById(id);
         if (!original.getCompany().getId().equals(companyId)) {
-            throw new BadRequestException("Interview does not belong to your company");
+            throw new AppException(ErrorType.BAD_REQUEST, "Interview does not belong to your company");
         }
 
         // Cancel the original
+        boolean cancelledBeforeCandidateConfirmed = original.getInterviewStatus() == InterviewStatus.SCHEDULED;
         original.setInterviewStatus(InterviewStatus.CANCELLED);
         original.setCancellationReason("Rescheduled");
+        original.setHiddenFromCandidate(cancelledBeforeCandidateConfirmed);
         interviewRepository.save(original);
 
         // Create new interview
@@ -260,7 +268,7 @@ public class InterviewServiceImpl implements InterviewService {
         LocalDateTime endAt = scheduledAt.plusMinutes(request.getDurationMinutes());
 
         if (scheduledAt.isBefore(LocalDateTime.now())) {
-            throw new BadRequestException("Cannot schedule interview in the past");
+            throw new AppException(ErrorType.BAD_REQUEST, "Cannot schedule interview in the past");
         }
 
         String meetingLink = original.getType() == InterviewType.ONLINE ? generateMeetingLink() : null;
@@ -302,29 +310,42 @@ public class InterviewServiceImpl implements InterviewService {
     public Interview completeInterview(String id, String companyId) {
         Interview interview = getInterviewById(id);
         if (!interview.getCompany().getId().equals(companyId)) {
-            throw new BadRequestException("Interview does not belong to your company");
+            throw new AppException(ErrorType.BAD_REQUEST, "Interview does not belong to your company");
         }
         if (interview.getInterviewStatus() != InterviewStatus.CONFIRMED
                 && interview.getInterviewStatus() != InterviewStatus.IN_PROGRESS) {
-            throw new BadRequestException("Interview can only be completed from CONFIRMED or IN_PROGRESS status");
+            throw new AppException(ErrorType.BAD_REQUEST,
+                    "Interview can only be completed from CONFIRMED or IN_PROGRESS status");
         }
+
+        validateCandidateJoinedForRoomInterview(interview,
+                "Cannot complete interview because candidate has not joined this interview room yet");
+
         interview.setInterviewStatus(InterviewStatus.COMPLETED);
         return interviewRepository.save(interview);
     }
 
     @Override
-    public InterviewFeedback addFeedback(String interviewId, InterviewFeedbackRequest request, String reviewerAccountId) {
+    public InterviewFeedback addFeedback(String interviewId, InterviewFeedbackRequest request,
+            String reviewerAccountId) {
         Interview interview = getInterviewById(interviewId);
-        if (interview.getInterviewStatus() != InterviewStatus.COMPLETED) {
-            throw new BadRequestException("Feedback can only be added to completed interviews");
+
+        validateCandidateJoinedForRoomInterview(interview,
+                "Cannot add feedback because candidate has not joined this interview room yet");
+
+        if (interview.getInterviewStatus() != InterviewStatus.CONFIRMED
+                && interview.getInterviewStatus() != InterviewStatus.IN_PROGRESS
+                && interview.getInterviewStatus() != InterviewStatus.COMPLETED) {
+            throw new AppException(ErrorType.BAD_REQUEST,
+                    "Feedback can only be added to CONFIRMED, IN_PROGRESS, or COMPLETED interviews");
         }
 
         if (feedbackRepository.existsByInterviewIdAndReviewerId(interviewId, reviewerAccountId)) {
-            throw new BadRequestException("You have already submitted feedback for this interview");
+            throw new AppException(ErrorType.BAD_REQUEST, "You have already submitted feedback for this interview");
         }
 
         Account reviewer = accountRepository.findById(reviewerAccountId)
-                .orElseThrow(() -> new BadRequestException("Reviewer account not found"));
+                .orElseThrow(() -> new AppException(ErrorType.BAD_REQUEST, "Reviewer account not found"));
 
         FeedbackRecommendation recommendation = FeedbackRecommendation.valueOf(
                 request.getRecommendation().toUpperCase());
@@ -378,11 +399,11 @@ public class InterviewServiceImpl implements InterviewService {
             String interviewId, InterviewTimeProposalRequest request, String candidateId) {
         Interview interview = getInterviewById(interviewId);
         if (!interview.getCandidate().getId().equals(candidateId)) {
-            throw new BadRequestException("This interview does not belong to you");
+            throw new AppException(ErrorType.BAD_REQUEST, "This interview does not belong to you");
         }
         if (interview.getInterviewStatus() != InterviewStatus.SCHEDULED
                 && interview.getInterviewStatus() != InterviewStatus.PENDING_RESCHEDULE) {
-            throw new BadRequestException("Can only propose alternatives for SCHEDULED interviews");
+            throw new AppException(ErrorType.BAD_REQUEST, "Can only propose alternatives for SCHEDULED interviews");
         }
 
         List<InterviewTimeProposal> proposals = new ArrayList<>();
@@ -419,21 +440,21 @@ public class InterviewServiceImpl implements InterviewService {
     public Interview acceptProposal(String interviewId, String proposalId, String companyId) {
         Interview interview = getInterviewById(interviewId);
         if (!interview.getCompany().getId().equals(companyId)) {
-            throw new BadRequestException("Interview does not belong to your company");
+            throw new AppException(ErrorType.BAD_REQUEST, "Interview does not belong to your company");
         }
 
         InterviewTimeProposal proposal = timeProposalRepository.findById(proposalId)
-                .orElseThrow(() -> new BadRequestException("Proposal not found"));
+                .orElseThrow(() -> new AppException(ErrorType.BAD_REQUEST, "Proposal not found"));
         if (!proposal.getInterview().getId().equals(interviewId)) {
-            throw new BadRequestException("Proposal does not belong to this interview");
+            throw new AppException(ErrorType.BAD_REQUEST, "Proposal does not belong to this interview");
         }
         if (proposal.getProposalStatus() != ProposalStatus.PENDING) {
-            throw new BadRequestException("Proposal is not in PENDING status");
+            throw new AppException(ErrorType.BAD_REQUEST, "Proposal is not in PENDING status");
         }
 
         // Reject all other pending proposals
-        List<InterviewTimeProposal> pendingProposals =
-                timeProposalRepository.findByInterviewIdAndProposalStatus(interviewId, ProposalStatus.PENDING);
+        List<InterviewTimeProposal> pendingProposals = timeProposalRepository
+                .findByInterviewIdAndProposalStatus(interviewId, ProposalStatus.PENDING);
         for (InterviewTimeProposal p : pendingProposals) {
             if (!p.getId().equals(proposalId)) {
                 p.setProposalStatus(ProposalStatus.REJECTED);
@@ -466,8 +487,7 @@ public class InterviewServiceImpl implements InterviewService {
                     interview.getApplication().getId(),
                     interview.getCandidate().getId(),
                     scheduledAt,
-                    endAt
-            );
+                    endAt);
         }
 
         Interview rescheduled = Interview.builder()
@@ -507,21 +527,21 @@ public class InterviewServiceImpl implements InterviewService {
     public void rejectProposal(String interviewId, String proposalId, String companyId) {
         Interview interview = getInterviewById(interviewId);
         if (!interview.getCompany().getId().equals(companyId)) {
-            throw new BadRequestException("Interview does not belong to your company");
+            throw new AppException(ErrorType.BAD_REQUEST, "Interview does not belong to your company");
         }
 
         InterviewTimeProposal proposal = timeProposalRepository.findById(proposalId)
-                .orElseThrow(() -> new BadRequestException("Proposal not found"));
+                .orElseThrow(() -> new AppException(ErrorType.BAD_REQUEST, "Proposal not found"));
         if (!proposal.getInterview().getId().equals(interviewId)) {
-            throw new BadRequestException("Proposal does not belong to this interview");
+            throw new AppException(ErrorType.BAD_REQUEST, "Proposal does not belong to this interview");
         }
 
         proposal.setProposalStatus(ProposalStatus.REJECTED);
         timeProposalRepository.save(proposal);
 
         // If no more pending proposals, revert interview back to SCHEDULED
-        List<InterviewTimeProposal> remaining =
-                timeProposalRepository.findByInterviewIdAndProposalStatus(interviewId, ProposalStatus.PENDING);
+        List<InterviewTimeProposal> remaining = timeProposalRepository.findByInterviewIdAndProposalStatus(interviewId,
+                ProposalStatus.PENDING);
         if (remaining.isEmpty()) {
             interview.setInterviewStatus(InterviewStatus.SCHEDULED);
             interviewRepository.save(interview);
@@ -540,13 +560,15 @@ public class InterviewServiceImpl implements InterviewService {
     }
 
     private Account findAccountByCandidate(Candidate candidate) {
-        if (candidate == null) return null;
+        if (candidate == null)
+            return null;
         return accountRepository.findByCandidateId(candidate.getId()).orElse(null);
     }
 
     private List<InterviewStatus> resolveStatusFilter(String filter) {
         return switch (filter.toUpperCase()) {
-            case "UPCOMING" -> List.of(InterviewStatus.SCHEDULED, InterviewStatus.CONFIRMED, InterviewStatus.PENDING_RESCHEDULE);
+            case "UPCOMING" ->
+                List.of(InterviewStatus.SCHEDULED, InterviewStatus.CONFIRMED, InterviewStatus.PENDING_RESCHEDULE);
             case "PAST" -> List.of(InterviewStatus.COMPLETED, InterviewStatus.NO_SHOW);
             case "CANCELLED" -> List.of(InterviewStatus.CANCELLED);
             default -> {
@@ -561,13 +583,34 @@ public class InterviewServiceImpl implements InterviewService {
 
     @Override
     public Interview getInterviewByRoomCode(String roomCode) {
-        return interviewRepository.findByMeetingLink(roomCode)
-                .orElseThrow(() -> new BadRequestException("Interview room not found"));
+        List<Interview> interviews = getInterviewsByRoomCode(roomCode);
+
+        return interviews.stream()
+                .filter(i -> i.getInterviewStatus() == InterviewStatus.IN_PROGRESS)
+                .findFirst()
+                .or(() -> interviews.stream().filter(i -> i.getInterviewStatus() == InterviewStatus.CONFIRMED)
+                        .findFirst())
+                .or(() -> interviews.stream().filter(i -> i.getInterviewStatus() == InterviewStatus.SCHEDULED)
+                        .findFirst())
+                .orElse(interviews.get(0));
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<Interview> getInterviewsByRoomCode(String roomCode) {
+        List<Interview> interviews = interviewRepository.findByMeetingLinkOrderByScheduledAtAsc(roomCode);
+        if (interviews.isEmpty()) {
+            throw new AppException(ErrorType.BAD_REQUEST, "Interview room not found");
+        }
+        return interviews;
     }
 
     @Override
     public InterviewRecording saveRecording(String interviewId, InterviewRecordingRequest request, String recordedBy) {
         Interview interview = getInterviewById(interviewId);
+
+        validateCandidateJoinedForRoomInterview(interview,
+                "Cannot save recording because candidate has not joined this interview room yet");
 
         InterviewRecording recording = InterviewRecording.builder()
                 .interview(interview)
@@ -594,20 +637,41 @@ public class InterviewServiceImpl implements InterviewService {
     public Interview startInterview(String id, String companyId) {
         Interview interview = getInterviewById(id);
         if (!interview.getCompany().getId().equals(companyId)) {
-            throw new BadRequestException("Interview does not belong to your company");
+            throw new AppException(ErrorType.BAD_REQUEST, "Interview does not belong to your company");
         }
         if (interview.getInterviewStatus() != InterviewStatus.SCHEDULED
                 && interview.getInterviewStatus() != InterviewStatus.CONFIRMED) {
-            throw new BadRequestException("Interview can only be started from SCHEDULED or CONFIRMED status");
+            throw new AppException(ErrorType.BAD_REQUEST,
+                    "Interview can only be started from SCHEDULED or CONFIRMED status");
         }
         interview.setInterviewStatus(InterviewStatus.IN_PROGRESS);
         return interviewRepository.save(interview);
     }
 
+    private void validateCandidateJoinedForRoomInterview(Interview interview, String errorMessage) {
+        if (interview == null || interview.getType() != InterviewType.ONLINE) {
+            return;
+        }
+
+        if (!StringUtils.hasText(interview.getMeetingLink()) || interview.getApplication() == null) {
+            return;
+        }
+
+        RoomParticipant participant = roomParticipantRepository
+                .findByRoomCodeAndApplicationId(interview.getMeetingLink(), interview.getApplication().getId())
+                .orElseThrow(() -> new AppException(ErrorType.BAD_REQUEST,
+                        "Room participant slot not found for this interview"));
+
+        if (participant.getJoinedAt() == null) {
+            throw new AppException(ErrorType.BAD_REQUEST, errorMessage);
+        }
+    }
+
     private void updateApplicationStageFromFeedback(Interview interview, FeedbackRecommendation recommendation) {
         try {
             Application application = interview.getApplication();
-            if (application == null) return;
+            if (application == null)
+                return;
 
             com.hcmute.careergraph.enums.application.ApplicationStage newStage = switch (recommendation) {
                 case NEXT_ROUND -> com.hcmute.careergraph.enums.application.ApplicationStage.INTERVIEW_COMPLETED;
