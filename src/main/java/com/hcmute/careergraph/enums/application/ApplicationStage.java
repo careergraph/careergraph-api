@@ -31,15 +31,15 @@ public enum ApplicationStage {
     static {
         Map<ApplicationStage, Set<ApplicationStage>> transitions = new EnumMap<>(ApplicationStage.class);
 
-        transitions.put(APPLIED, EnumSet.of(SCHEDULED, SCREENING, WITHDRAWN));
-        transitions.put(SCHEDULED , EnumSet.of(INTERVIEW, WITHDRAWN));
+        transitions.put(APPLIED, EnumSet.of(SCHEDULED, SCREENING, INTERVIEW_SCHEDULED, REJECTED, WITHDRAWN));
+        transitions.put(SCHEDULED , EnumSet.of(INTERVIEW, REJECTED, WITHDRAWN));
         transitions.put(SCREENING, EnumSet.of(HR_CONTACTED, REJECTED, WITHDRAWN, INTERVIEW));
         transitions.put(INTERVIEW, EnumSet.of(TRIAL, REJECTED));
         transitions.put(HR_CONTACTED, EnumSet.of(INTERVIEW_SCHEDULED, REJECTED, WITHDRAWN));
         transitions.put(INTERVIEW_SCHEDULED, EnumSet.of(INTERVIEW_COMPLETED, REJECTED, WITHDRAWN));
         transitions.put(INTERVIEW_COMPLETED, EnumSet.of(TRIAL, OFFER_EXTENDED, REJECTED));
         transitions.put(TRIAL, EnumSet.of(OFFER_EXTENDED, REJECTED, HIRED));
-        transitions.put(OFFER_EXTENDED, EnumSet.of(OFFER_ACCEPTED, OFFER_DECLINED, WITHDRAWN, HIRED));
+        transitions.put(OFFER_EXTENDED, EnumSet.of(OFFER_ACCEPTED, OFFER_DECLINED, WITHDRAWN, HIRED, REJECTED));
         transitions.put(OFFER_ACCEPTED, EnumSet.of(HIRED, TRIAL));
         transitions.put(OFFER_DECLINED, Collections.emptySet());
         transitions.put(HIRED, Collections.emptySet());

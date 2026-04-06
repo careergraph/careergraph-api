@@ -308,6 +308,7 @@ Set admit_status = REMOVED, left_at = now()
     - Không thể knock lại trong phiên này
     - Nếu reload/truy cập lại → thấy màn hình "Bạn đã bị loại khỏi phòng phỏng vấn này"
     - Không có nút thử lại
+    - HR phải xóa participant khỏi danh sách đang hoạt động để room state không còn slot rỗng
 ```
 
 ### 7.3 Reload / Reconnect (QUAN TRỌNG)
@@ -603,31 +604,32 @@ Phía HR — NGAY LẬP TỨC hiện form đánh giá:
 
 ### 12.1 Vấn đề cần sửa
 
-> **Bug hiện tại:** Sau khi phỏng vấn xong, ứng viên bị quay về cột "Ứng tuyển" — SAI.
+> **Bug hiện tại:** Sau khi phỏng vấn xong hoặc lên lịch phỏng vấn, ứng viên bị hiển thị sai cột trên Kanban — SAI.
 
 ### 12.2 Logic đúng
 
 ```
-Trước phỏng vấn:   application.stage = "Phỏng vấn" (đã ở cột Phỏng vấn)
+Khi HR tạo lịch phỏng vấn: application.stage = "INTERVIEW_SCHEDULED"
     │
     ▼
 Trong & sau phỏng vấn:
     │
-    ├─ HR chưa đánh giá     → Giữ nguyên stage = "Phỏng vấn"
+    ├─ HR chưa đánh giá     → Giữ nguyên stage = "INTERVIEW_SCHEDULED"
     │                          Hiển thị badge "Chờ đánh giá" trên Kanban
     │
     ├─ HR đánh giá PASS     → stage = stage_tiếp_theo (vd: "Offer")
     │
-    ├─ HR đánh giá FAIL     → stage = "Từ chối"
+    ├─ HR đánh giá FAIL     → stage = "REJECTED"
     │                          Color: đỏ / muted
     │
-    └─ HR đánh giá HOLD     → Giữ nguyên stage = "Phỏng vấn"
+    └─ HR đánh giá HOLD     → Giữ nguyên stage = "INTERVIEW_SCHEDULED"
                                Hiển thị badge "Cần xem xét"
 ```
 
 **Quy tắc:**
 - Kết thúc phỏng vấn KHÔNG tự động thay đổi stage
 - Chỉ `interview_evaluations.recommendation` mới trigger thay đổi stage
+- Lên lịch phỏng vấn từ Kanban phải cập nhật application sang `INTERVIEW_SCHEDULED`, không đẩy trực tiếp sang `INTERVIEW`
 - Kanban real-time cập nhật ngay khi HR lưu đánh giá (socket emit hoặc polling 30s)
 
 ### 12.3 Hiển thị trên Kanban card sau phỏng vấn

@@ -3,7 +3,6 @@ package com.hcmute.careergraph.services.impl;
 import com.hcmute.careergraph.enums.common.ErrorType;
 import com.hcmute.careergraph.enums.interview.*;
 import com.hcmute.careergraph.exception.AppException;
-import com.hcmute.careergraph.exception.BadRequestException;
 import com.hcmute.careergraph.persistence.dtos.request.InterviewFeedbackRequest;
 import com.hcmute.careergraph.persistence.dtos.request.InterviewRecordingRequest;
 import com.hcmute.careergraph.persistence.dtos.request.InterviewRequest;
@@ -16,7 +15,6 @@ import com.hcmute.careergraph.services.InterviewService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -44,7 +42,6 @@ public class InterviewServiceImpl implements InterviewService {
     private final InterviewTimeProposalRepository timeProposalRepository;
     private final ApplicationRepository applicationRepository;
     private final AccountRepository accountRepository;
-    private final CandidateRepository candidateRepository;
     private final InterviewRoomService roomService;
 
     private static final List<InterviewStatus> ACTIVE_STATUSES = List.of(InterviewStatus.SCHEDULED,
@@ -595,7 +592,6 @@ public class InterviewServiceImpl implements InterviewService {
                 .orElse(interviews.get(0));
     }
 
-    @Override
     @Transactional(readOnly = true)
     public List<Interview> getInterviewsByRoomCode(String roomCode) {
         List<Interview> interviews = interviewRepository.findByMeetingLinkOrderByScheduledAtAsc(roomCode);
