@@ -19,7 +19,6 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.annotation.Order;
 import org.springframework.data.elasticsearch.core.ElasticsearchOperations;
 import org.springframework.stereotype.Component;
-import org.springframework.ai.embedding.EmbeddingModel;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.concurrent.TimeUnit;

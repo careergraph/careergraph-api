@@ -60,15 +60,33 @@ public class RedisServiceImpl implements RedisService {
             return objectMapper.convertValue(value, clazz);
 
         } catch (JsonProcessingException e) {
-            log.error("Failed to deserialize object for key '{}': {}", key, e.getMessage());
-            return tryReadFromRawJson(key, clazz);
+            log.warn("Failed to deserialize object for key '{}': {}", key, e.getMessage());
+            return handleStaleOrIncompatibleValue(key, clazz);
         } catch (RedisConnectionFailureException e) {
             log.error("Redis connection failed while getting key '{}': {}", key, e.getMessage());
             throw e; // Re-throw connection failures for circuit breaker handling
         } catch (Exception e) {
-            log.error("Unexpected error getting object for key '{}': {}", key, e.getMessage());
-            return tryReadFromRawJson(key, clazz);
+            log.warn("Unexpected error getting object for key '{}': {}", key, e.getMessage());
+            return handleStaleOrIncompatibleValue(key, clazz);
         }
+    }
+
+    private <T> T handleStaleOrIncompatibleValue(String key, Class<T> clazz) {
+        T fallback = tryReadFromRawJson(key, clazz);
+        if (fallback != null) {
+            return fallback;
+        }
+
+        // Old cache payload format (e.g. without @class) can keep throwing repeatedly.
+        // Evict once so subsequent requests repopulate with the current serializer.
+        try {
+            deleteObject(key);
+            log.info("Evicted stale/incompatible Redis cache key '{}'", key);
+        } catch (Exception ex) {
+            log.warn("Failed to evict Redis key '{}' after deserialization error: {}", key, ex.getMessage());
+        }
+
+        return null;
     }
 
     /**
