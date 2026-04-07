@@ -74,6 +74,8 @@ public class CompanyMapper {
                 .ceoName(company.getCeoName())
                 .noOfMembers(company.getNoOfMembers())
                 .yearFounded(company.getYearFounded())
+                .offerBeforeTrial(company.getOfferBeforeTrial())
+                .enableOffboardedStage(company.getEnableOffboardedStage())
 
                 // Nested objects mapping
                 .contacts(contacts)

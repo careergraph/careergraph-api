@@ -40,6 +40,12 @@ public class Company extends Party {
     @Column(name = "year_founded")
     private Integer yearFounded;
 
+    @Column(name = "offer_before_trial", nullable = false, columnDefinition = "boolean default true")
+    private Boolean offerBeforeTrial;
+
+    @Column(name = "enable_offboarded_stage", nullable = false, columnDefinition = "boolean default false")
+    private Boolean enableOffboardedStage;
+
     // Account
     @OneToOne(mappedBy = "company", cascade = CascadeType.ALL, orphanRemoval = true)
     private Account account;

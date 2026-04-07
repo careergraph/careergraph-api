@@ -130,10 +130,15 @@ Kiểm tra: cột B có trigger action không?
 
 | Từ | Đến | Ghi chú |
 |---|---|---|
-| Bất kỳ | Bất kỳ (tiến) | Luôn cho phép |
-| Bất kỳ | Bất kỳ (lùi) | Cho phép, có confirm dialog |
+| Bất kỳ | Bất kỳ (tiến) | Luôn cho phép nếu đi về phía trước trong pipeline |
+| Bất kỳ | Bất kỳ (lùi) | Bị chặn ở UI và backend |
 | Bất kỳ | `REJECTED` | Confirm + nhập lý do từ chối |
-| `INTERVIEW` | `APPLIED`/`CONTACTED` | Cảnh báo "Ứng viên có lịch phỏng vấn đang chờ" |
+| `INTERVIEW` | `APPLIED`/`CONTACTED` | Không cho kéo lùi; nếu cần hạ stage phải đi qua quy trình riêng |
+
+**Điểm điều khiển rule:**
+- Backend kiểm soát ở `ApplicationServiceImpl.validateStageTransition(...)`.
+- Danh sách stage forward-only nằm trong `APPLICATION_STAGE_FLOW`.
+- Muốn nới/siết quy tắc, chỉ sửa một điểm này thay vì sửa từng màn hình.
 
 ### Lùi stage (kéo ngược)
 
@@ -224,10 +229,13 @@ Ghi chú:        [Textarea]
 ```
 
 **Validation:**
-- Ngày không được là ngày trong quá khứ
-- Giờ bắt đầu phải cách hiện tại ít nhất 1 giờ
+- Ngày và giờ bắt đầu là bắt buộc, không được ở quá khứ
 - Nếu cùng ngày đã có room cho job này → gắn vào room đó (Daily Room Model)
 - Nếu chưa có room → tạo room mới
+- Nếu cùng room + cùng application đã có slot trước đó nhưng slot chưa diễn ra, backend sẽ cập nhật row slot hiện có thay vì tạo slot mới
+- Nếu đã tồn tại interview active cho cùng application + job, UI phải bật popup xác nhận ghi đè trước khi gửi lại request
+- Khi HR xác nhận ghi đè, hệ thống tự động hủy interview active cũ rồi tạo lịch mới
+- Chỉ cho phép lên lịch nếu hồ sơ ứng tuyển đang ở stage hợp lệ cho phỏng vấn
 
 ### 5.3 Sau khi lưu lịch
 
@@ -243,6 +251,12 @@ API tạo interview thành công
 6. Card trên Kanban cập nhật: hiển thị ngày phỏng vấn
 7. Toast: "Đã lên lịch phỏng vấn thành công"
 ```
+
+**Quy tắc production cho rebook cùng ngày:**
+- Nếu HR hẹn lại ứng viên cùng job/cùng ngày/cùng room, hệ thống giữ 1 slot canonical cho application đó trong room.
+- Việc hẹn lại sẽ cập nhật `slot_start` và `slot_end` của row hiện có.
+- Nếu slot đã được dùng thật sự (`ADMITTED` hoặc `COMPLETED`), backend chặn để tránh ghi đè lịch sử thực thi.
+- Audit lịch sử phỏng vấn vẫn nằm ở `interviews`, không phụ thuộc vào room slot.
 
 ---
 

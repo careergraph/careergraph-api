@@ -37,5 +37,8 @@ public class InterviewRequest {
     private String notes;
 
     @Builder.Default
+    private boolean confirmOverwrite = false;
+
+    @Builder.Default
     private boolean notifyCandidate = true;
 }

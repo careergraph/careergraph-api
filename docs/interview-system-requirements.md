@@ -54,6 +54,10 @@ job_id + interview_date  →  1 interview_room (unique)
     - đánh giá (feedback),
     - gán bản ghi (recording),
     - chuyển `COMPLETED`.
+- Khi HR hẹn lại cùng `room_code + application_id` trong cùng ngày, backend phải cập nhật slot hiện có thay vì tạo slot mới vô hạn.
+- Một candidate có thể có nhiều interview ở các ngày khác nhau trong cùng job, nhưng mỗi room/day chỉ giữ 1 slot canonical cho đúng application.
+- Trong cùng một job, mỗi application chỉ được phép có tối đa 1 interview active tại một thời điểm (`SCHEDULED/CONFIRMED/PENDING_RESCHEDULE/IN_PROGRESS`).
+- Nếu HR tạo lịch mới khi đã có interview active, hệ thống bắt buộc hiển thị xác nhận ghi đè trước khi tự động hủy lịch active cũ.
 
 ### Stack kỹ thuật (khuyến nghị)
 
@@ -152,7 +156,7 @@ SCHEDULED → WAITING → ACTIVE → CLOSING → ENDED
 | Status | Mô tả | Ai trigger |
 |---|---|---|
 | `SCHEDULED` | Room đã tạo, chưa ai vào | Hệ thống (khi lên lịch) |
-| `WAITING` | HR đã vào lobby, chờ giờ mở | HR join trước ≤ 30 phút |
+| `WAITING` | HR đã vào lobby, chờ giờ mở | HR join trước ≤ 15 phút |
 | `ACTIVE` | Phòng mở, ứng viên có thể knock | HR bấm "Mở phòng" |
 | `CLOSING` | HR kết thúc, grace period 5 phút | HR bấm "Kết thúc phỏng vấn" |
 | `ENDED` | Phòng đã đóng hoàn toàn, không ai vào được | Tự động sau grace / cronjob |
@@ -244,8 +248,8 @@ Server validate:
     │
     ▼
 Kiểm tra thời gian slot:
-    ├─ Trước slot_start > 10 phút  → "Chưa đến giờ, vui lòng quay lại lúc HH:MM"
-    ├─ Trước slot_start ≤ 10 phút  → Vào lobby, chờ, chưa knock được
+    ├─ Trước slot_start > 15 phút  → "Chưa đến giờ, vui lòng quay lại lúc HH:MM"
+    ├─ Trước slot_start ≤ 15 phút  → Vào lobby, chờ, chưa knock được
     ├─ Trong slot (start → end)    → Vào lobby, có thể knock
     ├─ Sau slot_end ≤ 15 phút      → Cảnh báo "Bạn vào muộn", vẫn cho knock
     ├─ Sau slot_end 15-30 phút     → HR phải xác nhận override mới cho knock
@@ -279,6 +283,7 @@ HR nhận popup thông báo:
     ├─ HR bấm "Cho vào"
     │       → emit admit_granted → ứng viên kết nối WebRTC → vào phòng
     │       → set admit_status = ADMITTED, joined_at = now()
+    │       → nếu interview đang `SCHEDULED` hoặc `CONFIRMED` thì auto chuyển `IN_PROGRESS`
     │
     └─ HR bấm "Từ chối" (có thể kèm lý do tùy chọn)
             → emit admit_rejected + reason → ứng viên thấy thông báo
@@ -497,6 +502,8 @@ Bấm "Lưu đánh giá"
 ```
 
 **Rule production:** feedback được phép gửi khi interview ở `CONFIRMED`, `IN_PROGRESS`, hoặc `COMPLETED`.
+Nếu ứng viên chưa bấm Confirm nhưng đã được HR admit vào room, backend phải tự chuyển interview sang `IN_PROGRESS`
+để không chặn quy trình đánh giá trong buổi phỏng vấn thực tế.
 Khi room có nhiều ứng viên, HR phải chọn đúng ứng viên (tương ứng đúng interview) trước khi submit.
 
 ### 10.2 Đánh giá sau khi kết thúc phỏng vấn

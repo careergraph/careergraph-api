@@ -1,6 +1,7 @@
 package com.hcmute.careergraph.services.impl;
 
 import com.hcmute.careergraph.enums.interview.AdmitStatus;
+import com.hcmute.careergraph.enums.interview.InterviewStatus;
 import com.hcmute.careergraph.enums.interview.RoomStatus;
 import com.hcmute.careergraph.exception.BadRequestException;
 import com.hcmute.careergraph.persistence.models.*;
@@ -14,6 +15,8 @@ import org.springframework.transaction.annotation.Transactional;
 import java.security.SecureRandom;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.temporal.ChronoUnit;
+import java.util.Comparator;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 
@@ -29,6 +32,7 @@ public class InterviewRoomServiceImpl implements InterviewRoomService {
     private final ApplicationRepository applicationRepository;
     private final CandidateRepository candidateRepository;
     private final AccountRepository accountRepository;
+    private final InterviewRepository interviewRepository;
 
     private static final SecureRandom RANDOM = new SecureRandom();
     private static final DateTimeFormatter DATE_CODE_FMT = DateTimeFormatter.ofPattern("yyyyMMdd");
@@ -71,11 +75,33 @@ public class InterviewRoomServiceImpl implements InterviewRoomService {
         Candidate candidate = candidateRepository.findById(candidateId)
                 .orElseThrow(() -> new BadRequestException("Candidate not found"));
 
-        // Check for duplicate slot
-        participantRepository.findByRoomIdAndApplicationId(roomId, applicationId)
-                .ifPresent(existing -> {
-                    throw new BadRequestException("Candidate already has a slot in this room");
-                });
+        RoomParticipant existing = participantRepository.findByRoomIdAndApplicationId(roomId, applicationId)
+            .orElse(null);
+
+        if (existing != null) {
+            if (existing.getAdmitStatus() == AdmitStatus.ADMITTED
+                || existing.getAdmitStatus() == AdmitStatus.COMPLETED) {
+            throw new BadRequestException("Candidate already has an active slot in this room");
+            }
+
+            existing.setCandidate(candidate);
+            existing.setApplication(application);
+            existing.setSlotStart(slotStart);
+            existing.setSlotEnd(slotEnd);
+            existing.setAdmitStatus(AdmitStatus.PENDING);
+            existing.setKnockCount(0);
+            existing.setLastKnockAt(null);
+            existing.setJoinedAt(null);
+            existing.setLeftAt(null);
+            existing.setJoinToken(null);
+            existing.setSessionToken(null);
+            existing.setHrNote(null);
+
+            RoomParticipant saved = participantRepository.save(existing);
+            log.info("Updated participant slot for candidate {} in room {} ({} - {})",
+                candidateId, room.getRoomCode(), slotStart, slotEnd);
+            return saved;
+        }
 
         RoomParticipant participant = RoomParticipant.builder()
                 .room(room)
@@ -162,7 +188,9 @@ public class InterviewRoomServiceImpl implements InterviewRoomService {
 
         participant.setAdmitStatus(AdmitStatus.ADMITTED);
         participant.setJoinedAt(LocalDateTime.now());
-        return participantRepository.save(participant);
+        RoomParticipant saved = participantRepository.save(participant);
+        autoTransitionInterviewToInProgress(saved);
+        return saved;
     }
 
     @Override
@@ -217,6 +245,34 @@ public class InterviewRoomServiceImpl implements InterviewRoomService {
     @Transactional(readOnly = true)
     public List<RoomParticipant> getRoomParticipants(String roomId) {
         return participantRepository.findByRoomId(roomId);
+    }
+
+    private void autoTransitionInterviewToInProgress(RoomParticipant participant) {
+        if (participant.getApplication() == null || participant.getRoom() == null) {
+            return;
+        }
+
+        String applicationId = participant.getApplication().getId();
+        String roomCode = participant.getRoom().getRoomCode();
+        LocalDateTime slotStart = participant.getSlotStart();
+
+        interviewRepository.findByApplicationId(applicationId).stream()
+                .filter(i -> roomCode.equals(i.getMeetingLink()))
+                .filter(i -> i.getInterviewStatus() == InterviewStatus.SCHEDULED
+                        || i.getInterviewStatus() == InterviewStatus.CONFIRMED)
+                .min(Comparator.comparingLong(i -> {
+                    if (slotStart == null || i.getScheduledAt() == null) {
+                        return Long.MAX_VALUE;
+                    }
+                    return Math.abs(ChronoUnit.SECONDS.between(i.getScheduledAt(), slotStart));
+                }))
+                .ifPresent(i -> {
+                    i.setInterviewStatus(InterviewStatus.IN_PROGRESS);
+                    interviewRepository.save(i);
+                    log.info("Interview {} auto-transitioned to IN_PROGRESS when candidate {} admitted in room {}",
+                            i.getId(), participant.getCandidate() != null ? participant.getCandidate().getId() : "unknown",
+                            roomCode);
+                });
     }
 
     private String generateRoomCode(LocalDate date) {
