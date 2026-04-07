@@ -92,12 +92,16 @@ jobs:
     environment: production
 
     steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
       - name: Validate SSH deploy secrets
         env:
           VPS_HOST: ${{ secrets.VPS_HOST }}
           VPS_USER: ${{ secrets.VPS_USER }}
+          VPS_APP_DIR: ${{ secrets.VPS_APP_DIR }}
           VPS_SSH_PRIVATE_KEY: ${{ secrets.VPS_SSH_PRIVATE_KEY || secrets.VPS_SSH_KEY }}
-          APP_DOCKER_COMPOSE_PROD: ${{ secrets.APP_DOCKER_COMPOSE_PROD }}
+          APP_ENV_PROD: ${{ secrets.APP_ENV_PROD }}
         run: |
           if [ -z "$VPS_HOST" ]; then
             echo "Missing secret: VPS_HOST"
@@ -114,15 +118,35 @@ jobs:
             exit 1
           fi
 
-          if [ -z "$APP_DOCKER_COMPOSE_PROD" ]; then
-            echo "Missing secret: APP_DOCKER_COMPOSE_PROD"
+          if [ -z "$VPS_APP_DIR" ]; then
+            echo "Missing secret: VPS_APP_DIR"
             exit 1
           fi
+
+          if [ -z "$APP_ENV_PROD" ]; then
+            echo "Missing secret: APP_ENV_PROD"
+            exit 1
+          fi
+
+          if [ ! -f "docker-compose.prod.yaml" ]; then
+            echo "Missing file: docker-compose.prod.yaml"
+            exit 1
+          fi
+
+      - name: Upload compose file to VPS
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_PRIVATE_KEY || secrets.VPS_SSH_KEY }}
+          passphrase: ${{ secrets.VPS_SSH_PASSPHRASE }}
+          port: ${{ secrets.VPS_PORT || secrets.VPS_SSH_PORT || 22 }}
+          source: docker-compose.prod.yaml
+          target: ${{ secrets.VPS_APP_DIR }}
 
       - name: Deploy over SSH
         uses: appleboy/ssh-action@v1.0.3
         env:
-          APP_DOCKER_COMPOSE_PROD: ${{ secrets.APP_DOCKER_COMPOSE_PROD }}
           APP_ENV_PROD: ${{ secrets.APP_ENV_PROD }}
           DOCKER_HUB_USERNAME: ${{ secrets.DOCKER_HUB_USERNAME }}
           DOCKER_HUB_ACCESS_TOKEN: ${{ secrets.DOCKER_HUB_ACCESS_TOKEN }}
@@ -136,7 +160,7 @@ jobs:
           key: ${{ secrets.VPS_SSH_PRIVATE_KEY || secrets.VPS_SSH_KEY }}
           passphrase: ${{ secrets.VPS_SSH_PASSPHRASE }}
           port: ${{ secrets.VPS_PORT || secrets.VPS_SSH_PORT || 22 }}
-          envs: APP_DOCKER_COMPOSE_PROD,APP_ENV_PROD,DOCKER_HUB_USERNAME,DOCKER_HUB_ACCESS_TOKEN,VPS_APP_DIR,IMAGE_REPO,IMAGE_TAG,APP_HEALTHCHECK_URL
+          envs: APP_ENV_PROD,DOCKER_HUB_USERNAME,DOCKER_HUB_ACCESS_TOKEN,VPS_APP_DIR,IMAGE_REPO,IMAGE_TAG,APP_HEALTHCHECK_URL
           script_stop: true
           script: |
             set -e
@@ -152,11 +176,6 @@ jobs:
               exit 1
             fi
 
-            if [ -z "$APP_DOCKER_COMPOSE_PROD" ]; then
-              echo "APP_DOCKER_COMPOSE_PROD is empty. Add docker compose content to this GitHub Secret."
-              exit 1
-            fi
-
             cd "$VPS_APP_DIR"
             log_step "Changed directory to $VPS_APP_DIR"
 
@@ -164,6 +183,7 @@ jobs:
             find "$VPS_APP_DIR" -maxdepth 1 -type f \( -name "docker-compose-api-*.yaml" -o -name "env-api-*.list" \) -delete || true
 
             DEPLOY_TMP_DIR="$(mktemp -d)"
+            COMPOSE_SOURCE_FILE="$VPS_APP_DIR/docker-compose.prod.yaml"
             COMPOSE_FILE_TMP="$DEPLOY_TMP_DIR/docker-compose.yaml"
             ENV_FILE_TMP="$DEPLOY_TMP_DIR/.env"
             log_step "Created temporary deploy directory: $DEPLOY_TMP_DIR"
@@ -171,6 +191,7 @@ jobs:
             cleanup() {
               log_step "Cleaning up temporary deploy directory"
               rm -rf "$DEPLOY_TMP_DIR"
+              rm -f "$COMPOSE_SOURCE_FILE"
               find "$VPS_APP_DIR" -maxdepth 1 -type f \( -name "docker-compose-api-*.yaml" -o -name "env-api-*.list" \) -delete || true
             }
             trap cleanup EXIT
@@ -185,8 +206,13 @@ jobs:
               exit 1
             fi
 
-            printf "%s\n" "$APP_DOCKER_COMPOSE_PROD" > "$COMPOSE_FILE_TMP"
-            log_step "Wrote compose content to temporary file"
+            if [ ! -f "$COMPOSE_SOURCE_FILE" ]; then
+              echo "docker-compose.prod.yaml is missing on VPS. Upload step may have failed."
+              exit 1
+            fi
+
+            cp "$COMPOSE_SOURCE_FILE" "$COMPOSE_FILE_TMP"
+            log_step "Copied docker-compose.prod.yaml to temporary compose file"
 
             {
               printf "%s\n" "$APP_ENV_PROD"
