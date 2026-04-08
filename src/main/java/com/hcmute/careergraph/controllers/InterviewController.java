@@ -8,7 +8,9 @@ import com.hcmute.careergraph.persistence.dtos.request.InterviewFeedbackRequest;
 import com.hcmute.careergraph.persistence.dtos.request.InterviewRecordingRequest;
 import com.hcmute.careergraph.persistence.dtos.request.InterviewRequest;
 import com.hcmute.careergraph.persistence.dtos.request.InterviewRescheduleRequest;
+import com.hcmute.careergraph.persistence.dtos.request.InterviewStatusUpdateRequest;
 import com.hcmute.careergraph.persistence.dtos.request.InterviewTimeProposalRequest;
+import com.hcmute.careergraph.persistence.dtos.request.InterviewUpdateRequest;
 import com.hcmute.careergraph.persistence.dtos.response.InterviewFeedbackResponse;
 import com.hcmute.careergraph.persistence.dtos.response.InterviewRecordingResponse;
 import com.hcmute.careergraph.persistence.dtos.response.InterviewResponse;
@@ -176,6 +178,44 @@ public class InterviewController {
         return RestResponse.<InterviewResponse>builder()
                 .status(HttpStatus.CREATED)
                 .message("Interview rescheduled")
+                .data(interviewMapper.toResponse(interview, false))
+                .build();
+    }
+
+    @PatchMapping("/{id}")
+    public RestResponse<InterviewResponse> updateInterview(
+            @PathVariable String id,
+            @RequestBody InterviewUpdateRequest request,
+            Authentication authentication) {
+
+        String companyId = securityUtils.extractCompanyId(authentication);
+        if (!StringUtils.hasText(companyId)) {
+            throw new BadRequestException("Company ID is required");
+        }
+
+        Interview interview = interviewService.updateInterview(id, request, companyId);
+        return RestResponse.<InterviewResponse>builder()
+                .status(HttpStatus.OK)
+                .message("Interview updated")
+                .data(interviewMapper.toResponse(interview, false))
+                .build();
+    }
+
+    @PostMapping("/{id}/status")
+    public RestResponse<InterviewResponse> updateInterviewStatus(
+            @PathVariable String id,
+            @Valid @RequestBody InterviewStatusUpdateRequest request,
+            Authentication authentication) {
+
+        String companyId = securityUtils.extractCompanyId(authentication);
+        if (!StringUtils.hasText(companyId)) {
+            throw new BadRequestException("Company ID is required");
+        }
+
+        Interview interview = interviewService.updateInterviewStatus(id, request, companyId);
+        return RestResponse.<InterviewResponse>builder()
+                .status(HttpStatus.OK)
+                .message("Interview status updated")
                 .data(interviewMapper.toResponse(interview, false))
                 .build();
     }
