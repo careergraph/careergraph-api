@@ -54,6 +54,58 @@ job_id + interview_date  →  1 interview_room (unique)
     - đánh giá (feedback),
     - gán bản ghi (recording),
     - chuyển `COMPLETED`.
+- Khi HR hẹn lại cùng `room_code + application_id` trong cùng ngày, backend phải cập nhật slot hiện có thay vì tạo slot mới vô hạn.
+- Một candidate có thể có nhiều interview ở các ngày khác nhau trong cùng job, nhưng mỗi room/day chỉ giữ 1 slot canonical cho đúng application.
+- Trong cùng một job, mỗi application chỉ được phép có tối đa 1 interview active tại một thời điểm (`SCHEDULED/CONFIRMED/PENDING_RESCHEDULE/IN_PROGRESS`).
+- Nếu HR tạo lịch mới khi đã có interview active, hệ thống bắt buộc hiển thị xác nhận ghi đè trước khi tự động hủy lịch active cũ.
+
+### Production Update 2026-04-08 (Bắt buộc)
+
+- HR không bị giới hạn vào phòng theo mốc "vào trước 15 phút" như candidate. HR có thể vào phòng bất kỳ lúc nào để chuẩn bị/vận hành phiên.
+- Nếu room/day có nhiều interview slot, UI phải chọn slot đại diện theo ngữ cảnh thực tế:
+    - Ưu tiên `IN_PROGRESS`.
+    - Nếu không có `IN_PROGRESS`, ưu tiên slot chưa kết thúc gần nhất (upcoming/active).
+    - Chỉ fallback về slot quá khứ khi toàn bộ slot hợp lệ đã kết thúc.
+- Khi toàn bộ slot hợp lệ trong room đã kết thúc, màn hình HR phải hiển thị trạng thái "Phòng phỏng vấn đã kết thúc" riêng biệt; không dùng wording "Chưa đến giờ phỏng vấn".
+- Với room có nhiều ứng viên, phần tóm tắt phòng phải hiển thị thông tin tổng quan (job/date/total candidates), tránh hiển thị duy nhất một ứng viên gây hiểu sai ngữ cảnh.
+- Nút "Đánh giá ứng viên" chỉ được hiển thị khi còn ít nhất 1 ứng viên `COMPLETED` và chưa có feedback.
+- Modal đánh giá chỉ được nạp danh sách ứng viên `COMPLETED` chưa đánh giá. Nếu tại thời điểm mở modal không còn ứng viên hợp lệ, ẩn hành động đánh giá và hiển thị thông báo trạng thái đã được cập nhật.
+- Ở candidate portal, cảnh báo "Lịch phỏng vấn này đã quá thời gian..." chỉ dùng cho lịch quá hạn nhưng chưa ở trạng thái kết thúc nghiệp vụ (`COMPLETED/CANCELLED/NO_SHOW`).
+
+### Production Update 2026-04-08-B (Calendar & Reschedule Governance)
+
+- Calendar edit phải tách rõ 3 nhóm thao tác nghiệp vụ:
+    - `Reschedule` (đổi ngày/giờ): tạo interview version mới + đóng interview cũ (`CANCELLED`, có `rescheduled_from_id`).
+    - `Update content` (ghi chú, địa điểm, thời lượng cùng slot): cập nhật trực tiếp trên record hiện tại, không tạo record mới.
+    - `Update status` (SCHEDULED/CONFIRMED/PENDING_RESCHEDULE/CANCELLED...): cập nhật trạng thái trên record hiện tại, không đi qua luồng reschedule.
+- Cấm dùng luồng reschedule để xử lý thao tác đổi status thuần túy.
+- Nếu HR hủy hoặc dời lịch, record cũ phải vẫn hiển thị cho candidate theo policy lịch sử (không hidden mặc định cho trường hợp này).
+- Candidate portal cần có chế độ xem lịch sử (`HISTORY`) để theo dõi toàn bộ biến động lịch hẹn liên quan phiên bản cũ/mới.
+- Calendar sorting cho danh sách theo ngày phải theo mức độ vận hành:
+    1. Cần theo dõi (`IN_PROGRESS`, `PENDING_RESCHEDULE`)
+    2. Đã xác nhận (`CONFIRMED`)
+    3. Chờ xác nhận (`SCHEDULED`)
+    4. Cần xử lý (`CANCELLED`, `NO_SHOW`)
+    5. Hoàn thành (`COMPLETED`)
+    Sau đó mới đến thứ tự thời gian trong ngày.
+
+### Production Update 2026-04-08-C (HR Interview List & Scheduling Consistency)
+
+- Thống kê room ở màn HR `/interviews` phải đếm theo **ứng viên duy nhất** (`application_id`), không đếm theo số bản ghi interview version.
+- Mỗi `application_id` trong room chỉ lấy **version mới nhất** làm bản ghi đại diện cho trạng thái hiện tại của ứng viên.
+- Số lượng "đã hủy/không tham gia" phải tính theo số ứng viên có trạng thái hiện tại là `CANCELLED` hoặc `NO_SHOW`, không tính theo số lịch sử bị hủy.
+- UI room card phải cho phép mở danh sách chi tiết các ứng viên đã hủy/không tham gia và click vào từng record để xem chi tiết.
+
+- Ở màn chỉnh sửa lịch hẹn:
+        - Nếu người dùng không thay đổi dữ liệu (thời gian, trạng thái, ghi chú), frontend **không được gửi request update**.
+        - Khi lịch đã `CANCELLED` và người dùng chọn lại đúng trạng thái hủy, frontend phải chặn submit và hiển thị thông báo no-op.
+        - Nút hành động phải tách rõ intent: `Lưu thay đổi` (update/reschedule) và `Hủy lịch phỏng vấn` (cancel).
+
+- Eligibility cho API danh sách ứng viên có thể lên lịch (`/interviews/job/{jobId}/unscheduled`):
+        - Cho phép các hồ sơ ở stage `INTERVIEW_COMPLETED` được lên lịch lại nếu **không có interview active**.
+        - Điều kiện loại trừ vẫn dựa trên active interview statuses:
+            `SCHEDULED`, `CONFIRMED`, `PENDING_RESCHEDULE`, `IN_PROGRESS`.
+        - Điều này đảm bảo ứng viên có lịch đã hủy hoặc đã hoàn tất vòng trước nhưng cần hẹn vòng tiếp theo vẫn xuất hiện đúng trong luồng tạo lịch.
 
 ### Stack kỹ thuật (khuyến nghị)
 
@@ -152,7 +204,7 @@ SCHEDULED → WAITING → ACTIVE → CLOSING → ENDED
 | Status | Mô tả | Ai trigger |
 |---|---|---|
 | `SCHEDULED` | Room đã tạo, chưa ai vào | Hệ thống (khi lên lịch) |
-| `WAITING` | HR đã vào lobby, chờ giờ mở | HR join trước ≤ 30 phút |
+| `WAITING` | HR đã vào lobby, chờ giờ mở | HR join trước ≤ 15 phút |
 | `ACTIVE` | Phòng mở, ứng viên có thể knock | HR bấm "Mở phòng" |
 | `CLOSING` | HR kết thúc, grace period 5 phút | HR bấm "Kết thúc phỏng vấn" |
 | `ENDED` | Phòng đã đóng hoàn toàn, không ai vào được | Tự động sau grace / cronjob |
@@ -244,8 +296,8 @@ Server validate:
     │
     ▼
 Kiểm tra thời gian slot:
-    ├─ Trước slot_start > 10 phút  → "Chưa đến giờ, vui lòng quay lại lúc HH:MM"
-    ├─ Trước slot_start ≤ 10 phút  → Vào lobby, chờ, chưa knock được
+    ├─ Trước slot_start > 15 phút  → "Chưa đến giờ, vui lòng quay lại lúc HH:MM"
+    ├─ Trước slot_start ≤ 15 phút  → Vào lobby, chờ, chưa knock được
     ├─ Trong slot (start → end)    → Vào lobby, có thể knock
     ├─ Sau slot_end ≤ 15 phút      → Cảnh báo "Bạn vào muộn", vẫn cho knock
     ├─ Sau slot_end 15-30 phút     → HR phải xác nhận override mới cho knock
@@ -279,6 +331,7 @@ HR nhận popup thông báo:
     ├─ HR bấm "Cho vào"
     │       → emit admit_granted → ứng viên kết nối WebRTC → vào phòng
     │       → set admit_status = ADMITTED, joined_at = now()
+    │       → nếu interview đang `SCHEDULED` hoặc `CONFIRMED` thì auto chuyển `IN_PROGRESS`
     │
     └─ HR bấm "Từ chối" (có thể kèm lý do tùy chọn)
             → emit admit_rejected + reason → ứng viên thấy thông báo
@@ -497,6 +550,8 @@ Bấm "Lưu đánh giá"
 ```
 
 **Rule production:** feedback được phép gửi khi interview ở `CONFIRMED`, `IN_PROGRESS`, hoặc `COMPLETED`.
+Nếu ứng viên chưa bấm Confirm nhưng đã được HR admit vào room, backend phải tự chuyển interview sang `IN_PROGRESS`
+để không chặn quy trình đánh giá trong buổi phỏng vấn thực tế.
 Khi room có nhiều ứng viên, HR phải chọn đúng ứng viên (tương ứng đúng interview) trước khi submit.
 
 ### 10.2 Đánh giá sau khi kết thúc phỏng vấn

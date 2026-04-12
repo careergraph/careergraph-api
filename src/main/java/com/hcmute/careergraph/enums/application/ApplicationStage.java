@@ -23,6 +23,7 @@ public enum ApplicationStage {
     OFFER_ACCEPTED("Offer accepted"),
     OFFER_DECLINED("Offer declined"),
     HIRED("Officially hired"),
+    OFFBOARDED("Employee has left company"),
     REJECTED("Application rejected"),
     WITHDRAWN("Application withdrawn");
 
@@ -38,11 +39,12 @@ public enum ApplicationStage {
         transitions.put(HR_CONTACTED, EnumSet.of(INTERVIEW_SCHEDULED, REJECTED, WITHDRAWN));
         transitions.put(INTERVIEW_SCHEDULED, EnumSet.of(INTERVIEW_COMPLETED, REJECTED, WITHDRAWN));
         transitions.put(INTERVIEW_COMPLETED, EnumSet.of(TRIAL, OFFER_EXTENDED, REJECTED));
-        transitions.put(TRIAL, EnumSet.of(OFFER_EXTENDED, REJECTED, HIRED));
+        transitions.put(TRIAL, EnumSet.of(OFFER_EXTENDED, REJECTED, HIRED, OFFBOARDED));
         transitions.put(OFFER_EXTENDED, EnumSet.of(OFFER_ACCEPTED, OFFER_DECLINED, WITHDRAWN, HIRED, REJECTED));
         transitions.put(OFFER_ACCEPTED, EnumSet.of(HIRED, TRIAL));
         transitions.put(OFFER_DECLINED, Collections.emptySet());
-        transitions.put(HIRED, Collections.emptySet());
+        transitions.put(HIRED, EnumSet.of(OFFBOARDED));
+        transitions.put(OFFBOARDED, Collections.emptySet());
         transitions.put(REJECTED, Collections.emptySet());
         transitions.put(WITHDRAWN, Collections.emptySet());
 

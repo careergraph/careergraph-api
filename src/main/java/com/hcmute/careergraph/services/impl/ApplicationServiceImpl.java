@@ -21,8 +21,12 @@ import org.springframework.util.StringUtils;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.Comparator;
+import java.util.EnumMap;
+import java.util.EnumSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 
 @Service
 @Transactional
@@ -37,7 +41,8 @@ public class ApplicationServiceImpl implements ApplicationService {
 
 
 
-    private static final String SUBMISSION_NOTE = "Application submitted by candidate";
+    private static final String SUBMISSION_NOTE = "Ứng viên đã nộp hồ sơ.";
+    private static final Map<ApplicationStage, Set<ApplicationStage>> BASE_TRANSITIONS = buildBaseTransitions();
 
     @Override
     public Application createApplication(ApplicationRequest request) {
@@ -202,7 +207,7 @@ public class ApplicationServiceImpl implements ApplicationService {
         }
 
         // Enforce the curated pipeline transitions before mutating state.
-        validateStageTransition(currentStage, targetStage, id);
+        validateStageTransition(application, currentStage, targetStage, id);
 
         LocalDateTime now = LocalDateTime.now();
         String note = resolveStageNote(targetStage, request.getNote());
@@ -227,17 +232,114 @@ public class ApplicationServiceImpl implements ApplicationService {
         return saved;
     }
 
-    private void validateStageTransition(ApplicationStage currentStage, ApplicationStage targetStage, String applicationId) {
+    private void validateStageTransition(
+            Application application,
+            ApplicationStage currentStage,
+            ApplicationStage targetStage,
+            String applicationId) {
         if (currentStage == null) {
             return;
         }
-        if (currentStage.getAllowedNextStages().contains(targetStage)) {
+        if (currentStage == targetStage) {
             return;
         }
-        throw new RuntimeException(String.format(
+        if (currentStage.isTerminal()) {
+            throw new RuntimeException(String.format(
+                    "Stage transition from %s to %s is not allowed for application %s",
+                    currentStage, targetStage, applicationId));
+        }
+
+        Set<ApplicationStage> allowedTargets = BASE_TRANSITIONS.getOrDefault(currentStage, Set.of());
+        if (!allowedTargets.contains(targetStage)) {
+            throw new RuntimeException(String.format(
                 "Stage transition from %s to %s is not allowed for application %s",
                 currentStage, targetStage, applicationId));
+        }
+
+        Company company = Optional.ofNullable(application)
+            .map(Application::getJob)
+            .map(Job::getCompany)
+            .orElse(null);
+
+        boolean offerBeforeTrial = company == null || !Boolean.FALSE.equals(company.getOfferBeforeTrial());
+        boolean enableOffboardedStage = company != null && Boolean.TRUE.equals(company.getEnableOffboardedStage());
+
+        if (offerBeforeTrial
+            && currentStage == ApplicationStage.INTERVIEW_COMPLETED
+            && targetStage == ApplicationStage.TRIAL) {
+            throw new RuntimeException("Company pipeline yêu cầu gửi Offer trước khi chuyển sang Thử việc");
+        }
+
+        if (!offerBeforeTrial
+            && currentStage == ApplicationStage.INTERVIEW_COMPLETED
+            && targetStage == ApplicationStage.OFFER_EXTENDED) {
+            throw new RuntimeException("Company pipeline yêu cầu qua Thử việc trước khi gửi Offer");
+        }
+
+        if (targetStage == ApplicationStage.OFFBOARDED && !enableOffboardedStage) {
+            throw new RuntimeException("Company chưa bật cột Nghỉ việc trong pipeline");
+        }
+
+        if (currentStage == ApplicationStage.OFFBOARDED && targetStage != ApplicationStage.OFFBOARDED) {
+            throw new RuntimeException("Không thể chuyển stage sau khi hồ sơ đã ở trạng thái Nghỉ việc");
+        }
+
+        if (currentStage == ApplicationStage.HIRED && targetStage == ApplicationStage.OFFBOARDED) {
+            return;
+        }
+
+        if (currentStage == ApplicationStage.OFFER_ACCEPTED && targetStage == ApplicationStage.HIRED) {
+            return;
+        }
     }
+
+        private static Map<ApplicationStage, Set<ApplicationStage>> buildBaseTransitions() {
+        Map<ApplicationStage, Set<ApplicationStage>> transitions = new EnumMap<>(ApplicationStage.class);
+
+        transitions.put(ApplicationStage.APPLIED,
+            EnumSet.of(ApplicationStage.SCREENING, ApplicationStage.HR_CONTACTED, ApplicationStage.SCHEDULED,
+                ApplicationStage.INTERVIEW, ApplicationStage.REJECTED, ApplicationStage.WITHDRAWN));
+        transitions.put(ApplicationStage.SCREENING,
+            EnumSet.of(ApplicationStage.HR_CONTACTED, ApplicationStage.SCHEDULED,
+                ApplicationStage.INTERVIEW, ApplicationStage.REJECTED, ApplicationStage.WITHDRAWN));
+        transitions.put(ApplicationStage.HR_CONTACTED,
+            EnumSet.of(ApplicationStage.SCHEDULED, ApplicationStage.INTERVIEW,
+                ApplicationStage.INTERVIEW_SCHEDULED, ApplicationStage.REJECTED, ApplicationStage.WITHDRAWN));
+        transitions.put(ApplicationStage.SCHEDULED,
+            EnumSet.of(ApplicationStage.INTERVIEW, ApplicationStage.INTERVIEW_SCHEDULED,
+                ApplicationStage.REJECTED, ApplicationStage.WITHDRAWN));
+        transitions.put(ApplicationStage.INTERVIEW,
+            EnumSet.of(ApplicationStage.INTERVIEW_SCHEDULED, ApplicationStage.INTERVIEW_COMPLETED,
+                ApplicationStage.REJECTED, ApplicationStage.WITHDRAWN));
+        transitions.put(ApplicationStage.INTERVIEW_SCHEDULED,
+            EnumSet.of(ApplicationStage.INTERVIEW, ApplicationStage.INTERVIEW_COMPLETED,
+                ApplicationStage.REJECTED, ApplicationStage.WITHDRAWN));
+        transitions.put(ApplicationStage.INTERVIEW_COMPLETED,
+            EnumSet.of(ApplicationStage.TRIAL, ApplicationStage.OFFER_EXTENDED,
+                ApplicationStage.REJECTED, ApplicationStage.WITHDRAWN));
+        transitions.put(ApplicationStage.TRIAL,
+            EnumSet.of(ApplicationStage.HIRED, ApplicationStage.REJECTED,
+                ApplicationStage.WITHDRAWN, ApplicationStage.OFFER_EXTENDED,
+                ApplicationStage.OFFBOARDED));
+        transitions.put(ApplicationStage.OFFER_EXTENDED,
+            EnumSet.of(ApplicationStage.OFFER_ACCEPTED, ApplicationStage.OFFER_DECLINED,
+                ApplicationStage.HIRED, ApplicationStage.REJECTED, ApplicationStage.WITHDRAWN,
+                ApplicationStage.TRIAL));
+        transitions.put(ApplicationStage.OFFER_ACCEPTED,
+            EnumSet.of(ApplicationStage.HIRED, ApplicationStage.TRIAL));
+        transitions.put(ApplicationStage.OFFER_DECLINED,
+            EnumSet.noneOf(ApplicationStage.class));
+        transitions.put(ApplicationStage.HIRED,
+            EnumSet.of(ApplicationStage.OFFBOARDED));
+        transitions.put(ApplicationStage.OFFBOARDED,
+            EnumSet.noneOf(ApplicationStage.class));
+        transitions.put(ApplicationStage.REJECTED,
+            EnumSet.noneOf(ApplicationStage.class));
+        transitions.put(ApplicationStage.WITHDRAWN,
+            EnumSet.noneOf(ApplicationStage.class));
+
+        return transitions;
+        }
 
     private String resolveStageNote(ApplicationStage stage, String providedNote) {
         if (StringUtils.hasText(providedNote)) {
@@ -246,19 +348,20 @@ public class ApplicationServiceImpl implements ApplicationService {
 
         return switch (stage) {
             case APPLIED -> SUBMISSION_NOTE;
-            case SCHEDULED -> "Your interview has been scheduled.";
-            case SCREENING -> "We are reviewing your profile.";
-            case INTERVIEW -> "Your interview has been send. Pls check your email.";
-            case HR_CONTACTED -> "Our HR team will reach out shortly.";
-            case INTERVIEW_SCHEDULED -> "Your interview has been scheduled.";
-            case INTERVIEW_COMPLETED -> "Your interview is complete and under evaluation.";
-            case TRIAL -> "A trial or probationary period has started.";
-            case OFFER_EXTENDED -> "We have extended an offer.";
-            case OFFER_ACCEPTED -> "You have accepted our offer.";
-            case OFFER_DECLINED -> "You declined the offer.";
-            case HIRED -> "Welcome aboard!";
-            case REJECTED -> "We appreciate your interest, but we are moving forward with other candidates.";
-            case WITHDRAWN -> "You have withdrawn from the process.";
+            case SCHEDULED -> "Lịch phỏng vấn của bạn đã được tạo.";
+            case SCREENING -> "Hồ sơ của bạn đang được HR sàng lọc.";
+            case INTERVIEW -> "Bạn đã được chuyển sang giai đoạn phỏng vấn. Vui lòng kiểm tra lịch.";
+            case HR_CONTACTED -> "HR sẽ liên hệ với bạn trong thời gian sớm nhất.";
+            case INTERVIEW_SCHEDULED -> "Lịch phỏng vấn đã được sắp xếp.";
+            case INTERVIEW_COMPLETED -> "Phỏng vấn đã hoàn tất và đang được đánh giá.";
+            case TRIAL -> "Bạn đã bước vào giai đoạn thử việc.";
+            case OFFER_EXTENDED -> "Nhà tuyển dụng đã gửi đề nghị làm việc.";
+            case OFFER_ACCEPTED -> "Bạn đã chấp nhận đề nghị làm việc.";
+            case OFFER_DECLINED -> "Bạn đã từ chối đề nghị làm việc.";
+            case HIRED -> "Chào mừng bạn gia nhập công ty.";
+            case OFFBOARDED -> "Hồ sơ đã được cập nhật sang trạng thái nghỉ việc.";
+            case REJECTED -> "Chúng tôi rất tiếc, hồ sơ của bạn chưa phù hợp ở lần này.";
+            case WITHDRAWN -> "Bạn đã rút hồ sơ khỏi quy trình tuyển dụng.";
         };
     }
 

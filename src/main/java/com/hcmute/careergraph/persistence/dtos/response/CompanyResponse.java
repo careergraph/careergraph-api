@@ -25,6 +25,8 @@ public record CompanyResponse(
         String ceoName,
         Integer noOfMembers,
         Integer yearFounded,
+        Boolean offerBeforeTrial,
+        Boolean enableOffboardedStage,
 
         // Shared contact & address
         Set<ContactResponse> contacts,

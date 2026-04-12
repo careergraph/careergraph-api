@@ -63,6 +63,18 @@ public interface InterviewRepository extends JpaRepository<Interview, String> {
 
   List<Interview> findByApplicationId(String applicationId);
 
+    @Query("""
+            SELECT i FROM Interview i
+            WHERE i.application.id = :applicationId
+                AND i.job.id = :jobId
+                AND i.interviewStatus IN :statuses
+            ORDER BY i.scheduledAt ASC
+            """)
+    List<Interview> findActiveByApplicationAndJob(
+            @Param("applicationId") String applicationId,
+            @Param("jobId") String jobId,
+            @Param("statuses") List<InterviewStatus> statuses);
+
   @Query("""
       SELECT DISTINCT i.application.id FROM Interview i
       WHERE i.job.id = :jobId

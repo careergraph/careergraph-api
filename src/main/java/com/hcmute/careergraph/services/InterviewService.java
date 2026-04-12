@@ -4,7 +4,9 @@ import com.hcmute.careergraph.persistence.dtos.request.InterviewFeedbackRequest;
 import com.hcmute.careergraph.persistence.dtos.request.InterviewRecordingRequest;
 import com.hcmute.careergraph.persistence.dtos.request.InterviewRequest;
 import com.hcmute.careergraph.persistence.dtos.request.InterviewRescheduleRequest;
+import com.hcmute.careergraph.persistence.dtos.request.InterviewStatusUpdateRequest;
 import com.hcmute.careergraph.persistence.dtos.request.InterviewTimeProposalRequest;
+import com.hcmute.careergraph.persistence.dtos.request.InterviewUpdateRequest;
 import com.hcmute.careergraph.persistence.models.*;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -33,6 +35,10 @@ public interface InterviewService {
     Interview cancelInterview(String id, String companyId, String reason);
 
     Interview rescheduleInterview(String id, InterviewRescheduleRequest request, String companyId);
+
+    Interview updateInterview(String id, InterviewUpdateRequest request, String companyId);
+
+    Interview updateInterviewStatus(String id, InterviewStatusUpdateRequest request, String companyId);
 
     Interview completeInterview(String id, String companyId);
 

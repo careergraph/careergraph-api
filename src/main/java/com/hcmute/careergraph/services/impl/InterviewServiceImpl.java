@@ -1,13 +1,16 @@
 package com.hcmute.careergraph.services.impl;
 
 import com.hcmute.careergraph.enums.common.ErrorType;
+import com.hcmute.careergraph.enums.application.ApplicationStage;
 import com.hcmute.careergraph.enums.interview.*;
 import com.hcmute.careergraph.exception.AppException;
 import com.hcmute.careergraph.persistence.dtos.request.InterviewFeedbackRequest;
 import com.hcmute.careergraph.persistence.dtos.request.InterviewRecordingRequest;
 import com.hcmute.careergraph.persistence.dtos.request.InterviewRequest;
 import com.hcmute.careergraph.persistence.dtos.request.InterviewRescheduleRequest;
+import com.hcmute.careergraph.persistence.dtos.request.InterviewStatusUpdateRequest;
 import com.hcmute.careergraph.persistence.dtos.request.InterviewTimeProposalRequest;
+import com.hcmute.careergraph.persistence.dtos.request.InterviewUpdateRequest;
 import com.hcmute.careergraph.persistence.models.*;
 import com.hcmute.careergraph.repositories.*;
 import com.hcmute.careergraph.services.InterviewRoomService;
@@ -20,13 +23,15 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
-import java.security.SecureRandom;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 @Service
 @Transactional
@@ -45,36 +50,93 @@ public class InterviewServiceImpl implements InterviewService {
     private final InterviewRoomService roomService;
 
     private static final List<InterviewStatus> ACTIVE_STATUSES = List.of(InterviewStatus.SCHEDULED,
-            InterviewStatus.CONFIRMED);
-    private static final SecureRandom RANDOM = new SecureRandom();
+            InterviewStatus.CONFIRMED,
+            InterviewStatus.PENDING_RESCHEDULE,
+            InterviewStatus.IN_PROGRESS);
+        private static final Map<InterviewStatus, Integer> CALENDAR_STATUS_PRIORITY = Map.of(
+            InterviewStatus.IN_PROGRESS, 1,
+            InterviewStatus.PENDING_RESCHEDULE, 1,
+            InterviewStatus.CONFIRMED, 2,
+            InterviewStatus.SCHEDULED, 3,
+            InterviewStatus.CANCELLED, 4,
+            InterviewStatus.NO_SHOW, 4,
+            InterviewStatus.COMPLETED, 5);
+        private static final Set<ApplicationStage> SCHEDULABLE_STAGES = Set.of(
+            ApplicationStage.HR_CONTACTED,
+            ApplicationStage.SCHEDULED,
+            ApplicationStage.INTERVIEW,
+            ApplicationStage.INTERVIEW_SCHEDULED,
+            ApplicationStage.INTERVIEW_COMPLETED);
 
     @Override
     public Interview createInterview(InterviewRequest request, String companyId) {
         log.info("Creating interview for application: {}", request.getApplicationId());
 
         Application application = applicationRepository.findById(request.getApplicationId())
-                .orElseThrow(() -> new AppException(ErrorType.BAD_REQUEST, "Application not found"));
+                .orElseThrow(() -> new AppException(ErrorType.BAD_REQUEST, "Không tìm thấy hồ sơ ứng viên"));
 
         if (!application.getJob().getCompany().getId().equals(companyId)) {
-            throw new AppException(ErrorType.BAD_REQUEST, "Application does not belong to your company");
+            throw new AppException(ErrorType.BAD_REQUEST, "Hồ sơ ứng viên không thuộc công ty của bạn");
         }
 
         LocalDate date = LocalDate.parse(request.getDate(), DateTimeFormatter.ISO_LOCAL_DATE);
         LocalTime startTime = LocalTime.parse(request.getStartTime(), DateTimeFormatter.ofPattern("HH:mm"));
         LocalDateTime scheduledAt = LocalDateTime.of(date, startTime);
-        LocalDateTime endAt = scheduledAt.plusMinutes(request.getDurationMinutes());
 
         if (scheduledAt.isBefore(LocalDateTime.now())) {
-            throw new AppException(ErrorType.BAD_REQUEST, "Cannot schedule interview in the past");
+            throw new AppException(ErrorType.BAD_REQUEST, "Không thể lên lịch phỏng vấn trong quá khứ");
         }
 
+        if (request.getDurationMinutes() == null || request.getDurationMinutes() < 15) {
+            throw new AppException(ErrorType.BAD_REQUEST, "Thời lượng phỏng vấn tối thiểu là 15 phút");
+        }
+
+        validateApplicationStageForScheduling(application);
+
+        LocalDateTime endAt = scheduledAt.plusMinutes(request.getDurationMinutes());
+
         InterviewType type = InterviewType.valueOf(request.getType().toUpperCase());
+
+        List<Interview> existingActiveInterviews = interviewRepository.findActiveByApplicationAndJob(
+                application.getId(), application.getJob().getId(), ACTIVE_STATUSES);
+
+        if (!existingActiveInterviews.isEmpty()) {
+            Interview currentActive = existingActiveInterviews.get(0);
+            boolean sameDay = currentActive.getScheduledAt() != null
+                    && currentActive.getScheduledAt().toLocalDate().isEqual(date);
+
+            boolean hasInProgressInterview = existingActiveInterviews.stream()
+                .anyMatch(i -> i.getInterviewStatus() == InterviewStatus.IN_PROGRESS);
+            if (hasInProgressInterview) {
+            throw new AppException(
+                ErrorType.BAD_REQUEST,
+                "Không thể tạo lịch mới khi ứng viên đang có buổi phỏng vấn diễn ra");
+            }
+
+            if (!request.isConfirmOverwrite()) {
+                String marker = sameDay ? "ACTIVE_INTERVIEW_SAME_DAY" : "ACTIVE_INTERVIEW_EXISTS";
+                throw new AppException(
+                        ErrorType.BAD_REQUEST,
+                        String.format(
+                                "%s|Ứng viên đã có lịch phỏng vấn %s vào %s. Vui lòng xác nhận ghi đè để cập nhật lịch mới.",
+                                marker,
+                                currentActive.getInterviewStatus(),
+                                currentActive.getScheduledAt()));
+            }
+
+            for (Interview active : existingActiveInterviews) {
+                active.setInterviewStatus(InterviewStatus.CANCELLED);
+                active.setCancellationReason("Overwritten by HR scheduling");
+                active.setHiddenFromCandidate(false);
+                interviewRepository.save(active);
+            }
+        }
 
         // Check candidate conflicts
         List<Interview> conflicts = interviewRepository.findOverlappingByCandidate(
                 application.getCandidate().getId(), scheduledAt, endAt, ACTIVE_STATUSES);
         if (!conflicts.isEmpty()) {
-            throw new AppException(ErrorType.BAD_REQUEST, "Candidate has a scheduling conflict");
+            throw new AppException(ErrorType.BAD_REQUEST, "Ứng viên đang có lịch phỏng vấn trùng thời gian");
         }
 
         // Check interviewer conflicts
@@ -84,13 +146,13 @@ public class InterviewServiceImpl implements InterviewService {
                         interviewerId, scheduledAt, endAt, ACTIVE_STATUSES);
                 if (!interviewerConflicts.isEmpty()) {
                     throw new AppException(ErrorType.BAD_REQUEST,
-                            "Interviewer " + interviewerId + " has a scheduling conflict");
+                            "Người phỏng vấn " + interviewerId + " đang có lịch trùng thời gian");
                 }
             }
         }
 
         if (type == InterviewType.OFFLINE && !StringUtils.hasText(request.getLocation())) {
-            throw new AppException(ErrorType.BAD_REQUEST, "Offline interview requires a location");
+            throw new AppException(ErrorType.BAD_REQUEST, "Phỏng vấn offline bắt buộc phải có địa điểm");
         }
 
         // Daily Room Model: reuse room by job + date for ONLINE interviews
@@ -125,6 +187,21 @@ public class InterviewServiceImpl implements InterviewService {
                 .build();
 
         Interview saved = interviewRepository.save(interview);
+
+        if (application.getCurrentStage() != ApplicationStage.INTERVIEW) {
+            ApplicationStage previousStage = application.getCurrentStage();
+            application.setCurrentStage(ApplicationStage.INTERVIEW);
+            application.setStageChangedAt(LocalDateTime.now());
+            application.setCurrentStageNote("Đã lên lịch phỏng vấn.");
+            application.addStageHistory(ApplicationStageHistory.builder()
+                .fromStage(previousStage)
+                .toStage(ApplicationStage.INTERVIEW)
+                .note("Đã lên lịch phỏng vấn.")
+                .changedBy("Hệ thống")
+                .changedAt(LocalDateTime.now())
+                .build());
+            applicationRepository.save(application);
+        }
 
         // Add candidate as participant
         Account candidateAccount = findAccountByCandidate(application.getCandidate());
@@ -180,10 +257,14 @@ public class InterviewServiceImpl implements InterviewService {
         if (StringUtils.hasText(statusFilter)) {
             List<InterviewStatus> statuses = resolveStatusFilter(statusFilter);
             return interviewRepository.findByCandidateIdAndInterviewStatusInAndHiddenFromCandidateFalse(candidateId,
-                    statuses);
+                    statuses).stream()
+                    .sorted(Comparator.comparing(Interview::getScheduledAt, Comparator.nullsLast(Comparator.reverseOrder())))
+                    .toList();
         }
         return interviewRepository.findByCandidateIdAndInterviewStatusInAndHiddenFromCandidateFalse(
-                candidateId, List.of(InterviewStatus.values()));
+                candidateId, List.of(InterviewStatus.values())).stream()
+                .sorted(Comparator.comparing(Interview::getScheduledAt, Comparator.nullsLast(Comparator.reverseOrder())))
+                .toList();
     }
 
     @Override
@@ -196,7 +277,12 @@ public class InterviewServiceImpl implements InterviewService {
     @Override
     @Transactional(readOnly = true)
     public List<Interview> getCalendarEvents(String companyId, LocalDateTime start, LocalDateTime end) {
-        return interviewRepository.findByCompanyIdAndScheduledAtBetween(companyId, start, end);
+        return interviewRepository.findByCompanyIdAndScheduledAtBetween(companyId, start, end).stream()
+            .sorted(Comparator
+                .comparing((Interview i) -> i.getScheduledAt() != null ? i.getScheduledAt().toLocalDate() : LocalDate.MIN)
+                .thenComparing(i -> CALENDAR_STATUS_PRIORITY.getOrDefault(i.getInterviewStatus(), 999))
+                .thenComparing(Interview::getScheduledAt, Comparator.nullsLast(Comparator.naturalOrder())))
+            .toList();
     }
 
     @Override
@@ -237,10 +323,9 @@ public class InterviewServiceImpl implements InterviewService {
                 || interview.getInterviewStatus() == InterviewStatus.CANCELLED) {
             throw new AppException(ErrorType.BAD_REQUEST, "Interview cannot be cancelled in current status");
         }
-        boolean cancelledBeforeCandidateConfirmed = interview.getInterviewStatus() == InterviewStatus.SCHEDULED;
         interview.setInterviewStatus(InterviewStatus.CANCELLED);
         interview.setCancellationReason(reason);
-        interview.setHiddenFromCandidate(cancelledBeforeCandidateConfirmed);
+        interview.setHiddenFromCandidate(false);
         return interviewRepository.save(interview);
     }
 
@@ -248,27 +333,35 @@ public class InterviewServiceImpl implements InterviewService {
     public Interview rescheduleInterview(String id, InterviewRescheduleRequest request, String companyId) {
         Interview original = getInterviewById(id);
         if (!original.getCompany().getId().equals(companyId)) {
-            throw new AppException(ErrorType.BAD_REQUEST, "Interview does not belong to your company");
+            throw new AppException(ErrorType.BAD_REQUEST, "Lịch phỏng vấn không thuộc công ty của bạn");
         }
 
         // Cancel the original
-        boolean cancelledBeforeCandidateConfirmed = original.getInterviewStatus() == InterviewStatus.SCHEDULED;
         original.setInterviewStatus(InterviewStatus.CANCELLED);
         original.setCancellationReason("Rescheduled");
-        original.setHiddenFromCandidate(cancelledBeforeCandidateConfirmed);
+        original.setHiddenFromCandidate(false);
         interviewRepository.save(original);
 
         // Create new interview
         LocalDate date = LocalDate.parse(request.getNewDate(), DateTimeFormatter.ISO_LOCAL_DATE);
         LocalTime startTime = LocalTime.parse(request.getNewStartTime(), DateTimeFormatter.ofPattern("HH:mm"));
         LocalDateTime scheduledAt = LocalDateTime.of(date, startTime);
+        if (scheduledAt.isBefore(LocalDateTime.now())) {
+            throw new AppException(ErrorType.BAD_REQUEST, "Không thể dời lịch phỏng vấn vào thời điểm trong quá khứ");
+        }
         LocalDateTime endAt = scheduledAt.plusMinutes(request.getDurationMinutes());
 
-        if (scheduledAt.isBefore(LocalDateTime.now())) {
-            throw new AppException(ErrorType.BAD_REQUEST, "Cannot schedule interview in the past");
+        String meetingLink = null;
+        if (original.getType() == InterviewType.ONLINE) {
+            InterviewRoom room = roomService.findOrCreateRoom(original.getJob().getId(), date, null);
+            meetingLink = room.getRoomCode();
+            roomService.addParticipantSlot(
+                    room.getId(),
+                    original.getApplication().getId(),
+                    original.getCandidate().getId(),
+                    scheduledAt,
+                    endAt);
         }
-
-        String meetingLink = original.getType() == InterviewType.ONLINE ? generateMeetingLink() : null;
 
         Interview rescheduled = Interview.builder()
                 .application(original.getApplication())
@@ -319,6 +412,65 @@ public class InterviewServiceImpl implements InterviewService {
                 "Cannot complete interview because candidate has not joined this interview room yet");
 
         interview.setInterviewStatus(InterviewStatus.COMPLETED);
+        return interviewRepository.save(interview);
+    }
+
+    @Override
+    public Interview updateInterview(String id, InterviewUpdateRequest request, String companyId) {
+        Interview interview = getInterviewById(id);
+        if (!interview.getCompany().getId().equals(companyId)) {
+            throw new AppException(ErrorType.BAD_REQUEST, "Interview does not belong to your company");
+        }
+
+        if (interview.getInterviewStatus() == InterviewStatus.CANCELLED || interview.getInterviewStatus() == InterviewStatus.NO_SHOW) {
+            throw new AppException(ErrorType.BAD_REQUEST, "Không thể chỉnh sửa lịch đã hủy hoặc vắng mặt");
+        }
+
+        if (StringUtils.hasText(request.getLocation())) {
+            interview.setLocation(request.getLocation());
+        }
+        if (request.getNotes() != null) {
+            interview.setNotes(request.getNotes());
+        }
+
+        if (request.getDurationMinutes() != null && request.getDurationMinutes() >= 15) {
+            LocalDateTime newEnd = interview.getScheduledAt().plusMinutes(request.getDurationMinutes());
+            interview.setDurationMinutes(request.getDurationMinutes());
+            interview.setEndAt(newEnd);
+        }
+
+        return interviewRepository.save(interview);
+    }
+
+    @Override
+    public Interview updateInterviewStatus(String id, InterviewStatusUpdateRequest request, String companyId) {
+        Interview interview = getInterviewById(id);
+        if (!interview.getCompany().getId().equals(companyId)) {
+            throw new AppException(ErrorType.BAD_REQUEST, "Interview does not belong to your company");
+        }
+
+        InterviewStatus nextStatus;
+        try {
+            nextStatus = InterviewStatus.valueOf(request.getStatus().toUpperCase());
+        } catch (IllegalArgumentException ex) {
+            throw new AppException(ErrorType.BAD_REQUEST, "Interview status không hợp lệ");
+        }
+
+        InterviewStatus current = interview.getInterviewStatus();
+        if (current == nextStatus) {
+            return interview;
+        }
+
+        if (current == InterviewStatus.COMPLETED) {
+            throw new AppException(ErrorType.BAD_REQUEST, "Không thể đổi trạng thái khi phỏng vấn đã hoàn thành");
+        }
+
+        if (nextStatus == InterviewStatus.CANCELLED) {
+            interview.setCancellationReason(StringUtils.hasText(request.getReason()) ? request.getReason() : "Cancelled by HR");
+            interview.setHiddenFromCandidate(false);
+        }
+
+        interview.setInterviewStatus(nextStatus);
         return interviewRepository.save(interview);
     }
 
@@ -387,6 +539,7 @@ public class InterviewServiceImpl implements InterviewService {
         List<Application> allApps = applicationRepository.findByCompanyIdAndJobId(companyId, jobId);
         List<String> scheduledAppIds = interviewRepository.findScheduledApplicationIdsByJobId(jobId, ACTIVE_STATUSES);
         return allApps.stream()
+                .filter(app -> app.getCurrentStage() != null && SCHEDULABLE_STAGES.contains(app.getCurrentStage()))
                 .filter(app -> !scheduledAppIds.contains(app.getId()))
                 .toList();
     }
@@ -466,6 +619,7 @@ public class InterviewServiceImpl implements InterviewService {
         // Cancel the original interview
         interview.setInterviewStatus(InterviewStatus.CANCELLED);
         interview.setCancellationReason("Rescheduled per candidate proposal");
+        interview.setHiddenFromCandidate(false);
         interviewRepository.save(interview);
 
         // Create new interview with proposed times
@@ -547,15 +701,6 @@ public class InterviewServiceImpl implements InterviewService {
         log.info("HR rejected proposal {} for interview {}", proposalId, interviewId);
     }
 
-    private String generateMeetingLink() {
-        String chars = "abcdefghijklmnopqrstuvwxyz0123456789";
-        StringBuilder sb = new StringBuilder(12);
-        for (int i = 0; i < 12; i++) {
-            sb.append(chars.charAt(RANDOM.nextInt(chars.length())));
-        }
-        return sb.toString();
-    }
-
     private Account findAccountByCandidate(Candidate candidate) {
         if (candidate == null)
             return null;
@@ -568,6 +713,7 @@ public class InterviewServiceImpl implements InterviewService {
                 List.of(InterviewStatus.SCHEDULED, InterviewStatus.CONFIRMED, InterviewStatus.PENDING_RESCHEDULE);
             case "PAST" -> List.of(InterviewStatus.COMPLETED, InterviewStatus.NO_SHOW);
             case "CANCELLED" -> List.of(InterviewStatus.CANCELLED);
+            case "HISTORY" -> List.of(InterviewStatus.CANCELLED, InterviewStatus.COMPLETED, InterviewStatus.NO_SHOW);
             default -> {
                 try {
                     yield List.of(InterviewStatus.valueOf(filter.toUpperCase()));
@@ -583,12 +729,9 @@ public class InterviewServiceImpl implements InterviewService {
         List<Interview> interviews = getInterviewsByRoomCode(roomCode);
 
         return interviews.stream()
-                .filter(i -> i.getInterviewStatus() == InterviewStatus.IN_PROGRESS)
-                .findFirst()
-                .or(() -> interviews.stream().filter(i -> i.getInterviewStatus() == InterviewStatus.CONFIRMED)
-                        .findFirst())
-                .or(() -> interviews.stream().filter(i -> i.getInterviewStatus() == InterviewStatus.SCHEDULED)
-                        .findFirst())
+            .filter(i -> ACTIVE_STATUSES.contains(i.getInterviewStatus()))
+            .min(Comparator.comparing(Interview::getScheduledAt,
+                Comparator.nullsLast(Comparator.naturalOrder())))
                 .orElse(interviews.get(0));
     }
 
@@ -598,7 +741,39 @@ public class InterviewServiceImpl implements InterviewService {
         if (interviews.isEmpty()) {
             throw new AppException(ErrorType.BAD_REQUEST, "Interview room not found");
         }
+
+        validateRoomAccessWindow(interviews);
         return interviews;
+    }
+
+    private void validateRoomAccessWindow(List<Interview> interviews) {
+        LocalDateTime now = LocalDateTime.now();
+
+        LocalDate roomDate = interviews.stream()
+                .map(Interview::getScheduledAt)
+                .filter(java.util.Objects::nonNull)
+                .map(LocalDateTime::toLocalDate)
+                .min(LocalDate::compareTo)
+                .orElse(now.toLocalDate());
+
+        if (roomDate.isBefore(now.toLocalDate())) {
+            throw new AppException(ErrorType.BAD_REQUEST,
+                    "Phòng phỏng vấn của ngày trước đã hết hiệu lực truy cập");
+        }
+
+        LocalDateTime latestEnd = interviews.stream()
+                .map(Interview::getEndAt)
+                .filter(java.util.Objects::nonNull)
+                .max(LocalDateTime::compareTo)
+                .orElse(null);
+
+        boolean noActiveSession = interviews.stream()
+                .noneMatch(i -> ACTIVE_STATUSES.contains(i.getInterviewStatus()));
+
+        if (latestEnd != null && now.isAfter(latestEnd) && noActiveSession) {
+            throw new AppException(ErrorType.BAD_REQUEST,
+                    "Phòng phỏng vấn đã kết thúc do quá thời gian cho phép");
+        }
     }
 
     @Override
@@ -670,10 +845,10 @@ public class InterviewServiceImpl implements InterviewService {
                 return;
 
             com.hcmute.careergraph.enums.application.ApplicationStage newStage = switch (recommendation) {
-                case NEXT_ROUND -> com.hcmute.careergraph.enums.application.ApplicationStage.INTERVIEW_COMPLETED;
+                case NEXT_ROUND -> com.hcmute.careergraph.enums.application.ApplicationStage.INTERVIEW;
                 case EXTEND_OFFER -> com.hcmute.careergraph.enums.application.ApplicationStage.OFFER_EXTENDED;
                 case REJECT -> com.hcmute.careergraph.enums.application.ApplicationStage.REJECTED;
-                case HOLD -> null; // Keep current stage
+                case HOLD -> com.hcmute.careergraph.enums.application.ApplicationStage.INTERVIEW;
             };
 
             if (newStage != null && newStage != application.getCurrentStage()) {
@@ -685,6 +860,19 @@ public class InterviewServiceImpl implements InterviewService {
             }
         } catch (Exception e) {
             log.warn("Failed to auto-update application stage from feedback: {}", e.getMessage());
+        }
+    }
+
+    private void validateApplicationStageForScheduling(Application application) {
+        ApplicationStage currentStage = application.getCurrentStage();
+        if (currentStage == null) {
+            throw new AppException(ErrorType.BAD_REQUEST, "Hồ sơ ứng viên chưa có trạng thái hợp lệ để lên lịch");
+        }
+
+        if (!SCHEDULABLE_STAGES.contains(currentStage)) {
+            throw new AppException(
+                    ErrorType.BAD_REQUEST,
+                    String.format("Không thể lên lịch phỏng vấn khi hồ sơ đang ở trạng thái %s", currentStage));
         }
     }
 }
