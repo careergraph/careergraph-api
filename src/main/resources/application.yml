@@ -145,6 +145,8 @@ management:
       show-details: never
 
 app:
+  messaging:
+    unsend-window-seconds: ${APP_MESSAGING_UNSEND_WINDOW_SECONDS:60}
   seed:
     enabled: ${APP_SEED_ENABLED:false}
     script-path: ${APP_SEED_SCRIPT_PATH:init-scripts/seed-basic.sql}

@@ -47,6 +47,8 @@ public class MessagingResponses {
     private LocalDateTime lastMessageAt;
     private long unreadCount;
     private boolean online;
+    private boolean archived;
+    private boolean blocked;
   }
 
   @Data
@@ -93,5 +95,28 @@ public class MessagingResponses {
     private List<NotificationDto> notifications;
     private long totalUnread;
     private boolean hasMore;
+  }
+
+  @Data
+  @Builder
+  @NoArgsConstructor
+  @AllArgsConstructor
+  public static class BlockStatusDto {
+    private boolean blocked;
+    private LocalDateTime blockedAt;
+    private String reason;
+  }
+
+  @Data
+  @Builder
+  @NoArgsConstructor
+  @AllArgsConstructor
+  public static class BlockedUserDto {
+    private String userId;
+    private String fullName;
+    private String email;
+    private String avatarUrl;
+    private LocalDateTime blockedAt;
+    private String reason;
   }
 }

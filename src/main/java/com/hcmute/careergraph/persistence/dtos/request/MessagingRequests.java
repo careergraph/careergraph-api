@@ -24,4 +24,9 @@ public class MessagingRequests {
     private String fileName;
     private Long fileSize;
   }
+
+  @Data
+  public static class BlockUserRequest {
+    private String reason;
+  }
 }

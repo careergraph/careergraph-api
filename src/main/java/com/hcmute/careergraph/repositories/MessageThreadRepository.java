@@ -25,4 +25,68 @@ public interface MessageThreadRepository extends JpaRepository<MessageThread, St
 
   @Query("SELECT t.id FROM MessageThread t WHERE t.candidate.id = :candidateId")
   List<String> findIdsByCandidateId(@Param("candidateId") String candidateId);
+
+  @Query("""
+      SELECT t
+      FROM MessageThread t
+      WHERE t.company.id = :companyId
+        AND t.archivedByCompany = :archived
+        AND NOT EXISTS (
+          SELECT 1
+          FROM ThreadDeletion td
+          WHERE td.thread.id = t.id
+            AND td.account.id = :accountId
+        )
+      """)
+  Page<MessageThread> findVisibleByCompanyAndArchived(@Param("companyId") String companyId,
+      @Param("accountId") String accountId,
+      @Param("archived") boolean archived,
+      Pageable pageable);
+
+  @Query("""
+      SELECT t
+      FROM MessageThread t
+      WHERE t.candidate.id = :candidateId
+        AND t.archivedByCandidate = :archived
+        AND NOT EXISTS (
+          SELECT 1
+          FROM ThreadDeletion td
+          WHERE td.thread.id = t.id
+            AND td.account.id = :accountId
+        )
+      """)
+  Page<MessageThread> findVisibleByCandidateAndArchived(@Param("candidateId") String candidateId,
+      @Param("accountId") String accountId,
+      @Param("archived") boolean archived,
+      Pageable pageable);
+
+  @Query("""
+      SELECT t.id
+      FROM MessageThread t
+      WHERE t.company.id = :companyId
+        AND t.archivedByCompany = false
+        AND NOT EXISTS (
+          SELECT 1
+          FROM ThreadDeletion td
+          WHERE td.thread.id = t.id
+            AND td.account.id = :accountId
+        )
+      """)
+  List<String> findVisibleIdsByCompanyId(@Param("companyId") String companyId,
+      @Param("accountId") String accountId);
+
+  @Query("""
+      SELECT t.id
+      FROM MessageThread t
+      WHERE t.candidate.id = :candidateId
+        AND t.archivedByCandidate = false
+        AND NOT EXISTS (
+          SELECT 1
+          FROM ThreadDeletion td
+          WHERE td.thread.id = t.id
+            AND td.account.id = :accountId
+        )
+      """)
+  List<String> findVisibleIdsByCandidateId(@Param("candidateId") String candidateId,
+      @Param("accountId") String accountId);
 }

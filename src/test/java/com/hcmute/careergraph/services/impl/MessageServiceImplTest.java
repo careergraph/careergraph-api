@@ -29,6 +29,7 @@ import org.springframework.transaction.support.SimpleTransactionStatus;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
@@ -52,6 +53,10 @@ class MessageServiceImplTest {
   private ApplicationRepository applicationRepository;
   @Mock
   private AccountRepository accountRepository;
+  @Mock
+  private ThreadDeletionRepository threadDeletionRepository;
+  @Mock
+  private UserBlockRepository userBlockRepository;
   @Mock
   private NotificationService notificationService;
   @Mock
@@ -105,6 +110,10 @@ class MessageServiceImplTest {
       .thenReturn(new SimpleTransactionStatus());
     doNothing().when(transactionManager).commit(any(TransactionStatus.class));
     doNothing().when(transactionManager).rollback(any(TransactionStatus.class));
+
+    when(accountRepository.findByCompanyId(anyString())).thenReturn(Optional.of(hrAccount));
+    when(accountRepository.findByCandidateId(anyString())).thenReturn(Optional.of(candidateAccount));
+    when(userBlockRepository.existsByBlockerIdAndBlockedId(anyString(), anyString())).thenReturn(false);
   }
 
   @Test
@@ -149,10 +158,11 @@ class MessageServiceImplTest {
   void getOrCreateThread_shouldRecoverWhenConcurrentInsertOccurs() {
     MessagingRequests.CreateThreadRequest request = new MessagingRequests.CreateThreadRequest();
     request.setCandidateId(candidate.getId());
+    AtomicInteger lookupCounter = new AtomicInteger(0);
 
     when(candidateRepository.findById(candidate.getId())).thenReturn(Optional.of(candidate));
     when(messageThreadRepository.findByCompanyIdAndCandidateId(company.getId(), candidate.getId()))
-        .thenReturn(Optional.empty(), Optional.of(thread));
+      .thenAnswer(invocation -> lookupCounter.getAndIncrement() == 0 ? Optional.empty() : Optional.of(thread));
     when(messageThreadRepository.saveAndFlush(any(MessageThread.class)))
         .thenThrow(new DataIntegrityViolationException("duplicate"));
     when(messageRepository.countUnreadInThread(anyString(), anyString(), any(LocalDateTime.class))).thenReturn(0L);
@@ -270,7 +280,7 @@ class MessageServiceImplTest {
 
   @Test
   void getThreads_shouldReturnUnreadCountInSummary() {
-    when(messageThreadRepository.findByCompanyId(eq(company.getId()), any(PageRequest.class)))
+    when(messageThreadRepository.findVisibleByCompanyAndArchived(eq(company.getId()), eq(hrAccount.getId()), eq(false), any(PageRequest.class)))
         .thenReturn(new PageImpl<>(List.of(thread)));
     when(messageRepository.countUnreadInThread(eq(thread.getId()), eq(hrAccount.getId()), any(LocalDateTime.class)))
         .thenReturn(2L);
@@ -324,7 +334,7 @@ class MessageServiceImplTest {
 
   @Test
   void getTotalUnread_shouldUseCurrentUsersThreads() {
-    when(messageThreadRepository.findIdsByCompanyId(company.getId())).thenReturn(List.of("thread-1", "thread-2"));
+    when(messageThreadRepository.findVisibleIdsByCompanyId(company.getId(), hrAccount.getId())).thenReturn(List.of("thread-1", "thread-2"));
     when(messageRepository.countTotalUnreadByThreadIds(eq(hrAccount.getId()), anyList(), any(LocalDateTime.class)))
         .thenReturn(4L);
 

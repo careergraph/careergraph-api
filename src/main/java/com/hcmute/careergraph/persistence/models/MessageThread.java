@@ -45,4 +45,16 @@ public class MessageThread extends BaseEntity {
 
   @Column(name = "last_message_preview", length = 255)
   private String lastMessagePreview;
+
+  @Column(name = "archived_by_company", nullable = false)
+  private boolean archivedByCompany;
+
+  @Column(name = "archived_by_company_at")
+  private LocalDateTime archivedByCompanyAt;
+
+  @Column(name = "archived_by_candidate", nullable = false)
+  private boolean archivedByCandidate;
+
+  @Column(name = "archived_by_candidate_at")
+  private LocalDateTime archivedByCandidateAt;
 }

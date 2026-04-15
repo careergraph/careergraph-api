@@ -27,9 +27,11 @@ public class MessageController {
   @GetMapping("/threads")
   public RestResponse<Page<MessagingResponses.ThreadSummaryDto>> getThreads(
       @RequestParam(defaultValue = "0") int page,
-      @RequestParam(defaultValue = "20") int size) {
+      @RequestParam(defaultValue = "20") int size,
+      @RequestParam(defaultValue = "false") boolean archived) {
     Page<MessagingResponses.ThreadSummaryDto> result = messageService.getThreads(
         getCurrentAccount(),
+        archived,
         PageRequest.of(page, size));
 
     return RestResponse.<Page<MessagingResponses.ThreadSummaryDto>>builder()
@@ -104,11 +106,51 @@ public class MessageController {
 
   @DeleteMapping("/{messageId}")
   public RestResponse<Void> deleteMessage(@PathVariable String messageId) {
-    messageService.deleteMessage(getCurrentAccount(), messageId);
+    messageService.unsendMessage(getCurrentAccount(), messageId);
 
     return RestResponse.<Void>builder()
         .status(HttpStatus.OK)
         .message("Message deleted successfully")
+        .build();
+  }
+
+  @DeleteMapping("/{messageId}/unsend")
+  public RestResponse<Void> unsendMessage(@PathVariable String messageId) {
+    messageService.unsendMessage(getCurrentAccount(), messageId);
+
+    return RestResponse.<Void>builder()
+        .status(HttpStatus.OK)
+        .message("Message unsent successfully")
+        .build();
+  }
+
+  @DeleteMapping("/threads/{threadId}")
+  public RestResponse<Void> deleteThread(@PathVariable String threadId) {
+    messageService.deleteThreadForMe(getCurrentAccount(), threadId);
+
+    return RestResponse.<Void>builder()
+        .status(HttpStatus.OK)
+        .message("Thread deleted successfully")
+        .build();
+  }
+
+  @PostMapping("/threads/{threadId}/archive")
+  public RestResponse<Void> archiveThread(@PathVariable String threadId) {
+    messageService.archiveThread(getCurrentAccount(), threadId, true);
+
+    return RestResponse.<Void>builder()
+        .status(HttpStatus.OK)
+        .message("Thread archived successfully")
+        .build();
+  }
+
+  @PostMapping("/threads/{threadId}/unarchive")
+  public RestResponse<Void> unarchiveThread(@PathVariable String threadId) {
+    messageService.archiveThread(getCurrentAccount(), threadId, false);
+
+    return RestResponse.<Void>builder()
+        .status(HttpStatus.OK)
+        .message("Thread unarchived successfully")
         .build();
   }
 

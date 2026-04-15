@@ -2,6 +2,7 @@ package com.hcmute.careergraph.persistence.models;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.hcmute.careergraph.enums.message.MessageContentType;
+import com.hcmute.careergraph.enums.message.MessageDeleteType;
 import jakarta.persistence.*;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
@@ -55,6 +56,10 @@ public class Message extends BaseEntity {
 
   @Column(name = "deleted_at")
   private LocalDateTime deletedAt;
+
+  @Enumerated(EnumType.STRING)
+  @Column(name = "delete_type", length = 20)
+  private MessageDeleteType deleteType;
 
   @Override
   public void prePersist() {

@@ -2,6 +2,7 @@ package com.hcmute.careergraph.services.impl;
 
 import com.hcmute.careergraph.enums.common.Role;
 import com.hcmute.careergraph.enums.message.MessageContentType;
+import com.hcmute.careergraph.enums.message.MessageDeleteType;
 import com.hcmute.careergraph.exception.BadRequestException;
 import com.hcmute.careergraph.exception.ForbiddenException;
 import com.hcmute.careergraph.exception.NotFoundException;
@@ -13,6 +14,7 @@ import com.hcmute.careergraph.services.MessageService;
 import com.hcmute.careergraph.services.NotificationService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.*;
 import org.springframework.stereotype.Service;
@@ -20,7 +22,9 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.util.StringUtils;
 
+import java.time.Duration;
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Optional;
 
 @Service
@@ -33,6 +37,8 @@ public class MessageServiceImpl implements MessageService {
   private static final int DEFAULT_MESSAGE_PAGE_SIZE = 30;
   private static final int PREVIEW_MAX_LENGTH = 100;
   private static final LocalDateTime EPOCH = LocalDateTime.of(1970, 1, 1, 0, 0);
+  private static final String CONTENT_UNSENT = "[Tin nhắn đã được gỡ]";
+  private static final String CONTENT_DELETED = "Tin nhắn đã được thu hồi";
 
   private final MessageThreadRepository messageThreadRepository;
   private final MessageRepository messageRepository;
@@ -41,8 +47,13 @@ public class MessageServiceImpl implements MessageService {
   private final CompanyRepository companyRepository;
   private final ApplicationRepository applicationRepository;
   private final AccountRepository accountRepository;
+  private final ThreadDeletionRepository threadDeletionRepository;
+  private final UserBlockRepository userBlockRepository;
   private final NotificationService notificationService;
   private final org.springframework.transaction.PlatformTransactionManager transactionManager;
+
+  @Value("${app.messaging.unsend-window-seconds:60}")
+  private long unsendWindowSeconds;
 
   @Override
   public MessagingResponses.ThreadSummaryDto getOrCreateThread(Account currentAccount,
@@ -102,12 +113,28 @@ public class MessageServiceImpl implements MessageService {
   @Override
   @Transactional(readOnly = true)
   public Page<MessagingResponses.ThreadSummaryDto> getThreads(Account currentAccount, Pageable pageable) {
+    return getThreads(currentAccount, false, pageable);
+  }
+
+  @Override
+  @Transactional(readOnly = true)
+  public Page<MessagingResponses.ThreadSummaryDto> getThreads(Account currentAccount,
+      boolean archived,
+      Pageable pageable) {
     Role role = resolveRole(currentAccount);
     Pageable normalized = normalizeThreadPageable(pageable);
 
     Page<MessageThread> page = role == Role.HR
-        ? messageThreadRepository.findByCompanyId(currentAccount.getCompany().getId(), normalized)
-        : messageThreadRepository.findByCandidateId(currentAccount.getCandidate().getId(), normalized);
+        ? messageThreadRepository.findVisibleByCompanyAndArchived(
+            currentAccount.getCompany().getId(),
+            currentAccount.getId(),
+            archived,
+            normalized)
+        : messageThreadRepository.findVisibleByCandidateAndArchived(
+            currentAccount.getCandidate().getId(),
+            currentAccount.getId(),
+            archived,
+            normalized);
 
     return page.map(thread -> toThreadSummary(currentAccount, thread));
   }
@@ -148,6 +175,7 @@ public class MessageServiceImpl implements MessageService {
       MessagingRequests.SendMessageRequest request) {
     MessageThread thread = findThreadOrThrow(threadId);
     validateThreadAccess(thread, currentAccount);
+    ensureThreadNotBlocked(thread);
 
     MessageContentType contentType = request.getContentType() != null
         ? request.getContentType()
@@ -155,12 +183,12 @@ public class MessageServiceImpl implements MessageService {
 
     String content = request.getContent() != null ? request.getContent().trim() : "";
     if (contentType == MessageContentType.TEXT && !StringUtils.hasText(content)) {
-      throw new BadRequestException("Message content is required");
+      throw new BadRequestException("Nội dung tin nhắn không được để trống");
     }
     if (contentType != MessageContentType.TEXT
         && !StringUtils.hasText(request.getFileUrl())
         && !StringUtils.hasText(content)) {
-      throw new BadRequestException("fileUrl or content is required for non-text messages");
+      throw new BadRequestException("Tin nhắn tệp cần có nội dung hoặc đường dẫn tệp");
     }
     if (!StringUtils.hasText(content)) {
       content = StringUtils.hasText(request.getFileName()) ? request.getFileName().trim() : "[Attachment]";
@@ -176,6 +204,13 @@ public class MessageServiceImpl implements MessageService {
         .fileSize(request.getFileSize())
         .deleted(false)
         .build();
+
+      // New message should bring the thread back to both participants' inbox.
+      threadDeletionRepository.deleteByThreadId(threadId);
+      thread.setArchivedByCompany(false);
+      thread.setArchivedByCompanyAt(null);
+      thread.setArchivedByCandidate(false);
+      thread.setArchivedByCandidateAt(null);
 
     Message savedMessage = messageRepository.save(message);
 
@@ -232,19 +267,31 @@ public class MessageServiceImpl implements MessageService {
 
   @Override
   public void deleteMessage(Account currentAccount, String messageId) {
+    unsendMessage(currentAccount, messageId);
+  }
+
+  @Override
+  public void unsendMessage(Account currentAccount, String messageId) {
     Message message = messageRepository.findById(messageId)
-        .orElseThrow(() -> new NotFoundException("Message not found"));
+        .orElseThrow(() -> new NotFoundException("Không tìm thấy tin nhắn"));
 
     if (!message.getSender().getId().equals(currentAccount.getId())) {
-      throw new ForbiddenException("Only sender can delete this message");
+      throw new ForbiddenException("Bạn chỉ có thể gỡ tin nhắn do mình gửi");
     }
     if (message.isDeleted()) {
       return;
     }
 
+    LocalDateTime createdAt = message.getCreatedDate() != null ? message.getCreatedDate() : LocalDateTime.now();
+    long elapsedSeconds = Math.max(0, Duration.between(createdAt, LocalDateTime.now()).getSeconds());
+    if (elapsedSeconds > unsendWindowSeconds) {
+      throw new BadRequestException("Chỉ có thể gỡ tin nhắn trong vòng " + unsendWindowSeconds + " giây sau khi gửi");
+    }
+
     message.setDeleted(true);
     message.setDeletedAt(LocalDateTime.now());
-    message.setContent("Message was deleted");
+    message.setDeleteType(MessageDeleteType.UNSEND);
+    message.setContent(CONTENT_UNSENT);
     messageRepository.save(message);
 
     MessageThread thread = message.getThread();
@@ -263,13 +310,126 @@ public class MessageServiceImpl implements MessageService {
   }
 
   @Override
+  public void deleteThreadForMe(Account currentAccount, String threadId) {
+    MessageThread thread = findThreadOrThrow(threadId);
+    validateThreadAccess(thread, currentAccount);
+
+    if (threadDeletionRepository.existsByThreadIdAndAccountId(threadId, currentAccount.getId())) {
+      return;
+    }
+
+    ThreadDeletion threadDeletion = ThreadDeletion.builder()
+        .thread(thread)
+        .account(currentAccount)
+        .deletedAt(LocalDateTime.now())
+        .build();
+    threadDeletionRepository.save(threadDeletion);
+  }
+
+  @Override
+  public void archiveThread(Account currentAccount, String threadId, boolean archive) {
+    MessageThread thread = findThreadOrThrow(threadId);
+    validateThreadAccess(thread, currentAccount);
+
+    Role role = resolveRole(currentAccount);
+    LocalDateTime now = LocalDateTime.now();
+
+    if (role == Role.HR) {
+      thread.setArchivedByCompany(archive);
+      thread.setArchivedByCompanyAt(archive ? now : null);
+    } else {
+      thread.setArchivedByCandidate(archive);
+      thread.setArchivedByCandidateAt(archive ? now : null);
+    }
+
+    messageThreadRepository.save(thread);
+  }
+
+  @Override
+  public void blockCandidate(Account currentAccount, String candidateId, String reason) {
+    if (resolveRole(currentAccount) != Role.HR) {
+      throw new ForbiddenException("Chỉ HR mới có quyền chặn ứng viên");
+    }
+    if (!StringUtils.hasText(candidateId)) {
+      throw new BadRequestException("Thiếu candidateId");
+    }
+
+    Account candidateAccount = accountRepository.findByCandidateId(candidateId)
+        .orElseThrow(() -> new NotFoundException("Không tìm thấy tài khoản ứng viên"));
+
+    if (userBlockRepository.existsByBlockerIdAndBlockedId(currentAccount.getId(), candidateAccount.getId())) {
+      return;
+    }
+
+    UserBlock userBlock = UserBlock.builder()
+        .blocker(currentAccount)
+        .blocked(candidateAccount)
+        .reason(StringUtils.hasText(reason) ? reason.trim() : null)
+        .blockedAt(LocalDateTime.now())
+        .build();
+    userBlockRepository.save(userBlock);
+  }
+
+  @Override
+  public void unblockCandidate(Account currentAccount, String candidateId) {
+    if (resolveRole(currentAccount) != Role.HR) {
+      throw new ForbiddenException("Chỉ HR mới có quyền bỏ chặn ứng viên");
+    }
+    if (!StringUtils.hasText(candidateId)) {
+      throw new BadRequestException("Thiếu candidateId");
+    }
+
+    Account candidateAccount = accountRepository.findByCandidateId(candidateId)
+        .orElseThrow(() -> new NotFoundException("Không tìm thấy tài khoản ứng viên"));
+
+    userBlockRepository.findByBlockerIdAndBlockedId(currentAccount.getId(), candidateAccount.getId())
+        .ifPresent(userBlockRepository::delete);
+  }
+
+  @Override
+  @Transactional(readOnly = true)
+  public MessagingResponses.BlockStatusDto getBlockStatus(Account currentAccount, String candidateId) {
+    if (resolveRole(currentAccount) != Role.HR) {
+      throw new ForbiddenException("Chỉ HR mới có quyền xem danh sách chặn");
+    }
+
+    if (!StringUtils.hasText(candidateId)) {
+      throw new BadRequestException("Thiếu candidateId");
+    }
+
+    Account candidateAccount = accountRepository.findByCandidateId(candidateId)
+        .orElseThrow(() -> new NotFoundException("Không tìm thấy tài khoản ứng viên"));
+
+    Optional<UserBlock> block = userBlockRepository.findByBlockerIdAndBlockedId(currentAccount.getId(), candidateAccount.getId());
+
+    return MessagingResponses.BlockStatusDto.builder()
+        .blocked(block.isPresent())
+        .blockedAt(block.map(UserBlock::getBlockedAt).orElse(null))
+        .reason(block.map(UserBlock::getReason).orElse(null))
+        .build();
+  }
+
+  @Override
+  @Transactional(readOnly = true)
+  public List<MessagingResponses.BlockedUserDto> getBlockedCandidates(Account currentAccount) {
+    if (resolveRole(currentAccount) != Role.HR) {
+      throw new ForbiddenException("Chỉ HR mới có quyền xem danh sách chặn");
+    }
+
+    return userBlockRepository.findByBlockerIdOrderByBlockedAtDesc(currentAccount.getId())
+        .stream()
+        .map(this::toBlockedUserDto)
+        .toList();
+  }
+
+  @Override
   @Transactional(readOnly = true)
   public long getTotalUnread(Account currentAccount) {
     Role role = resolveRole(currentAccount);
 
     var threadIds = role == Role.HR
-        ? messageThreadRepository.findIdsByCompanyId(currentAccount.getCompany().getId())
-        : messageThreadRepository.findIdsByCandidateId(currentAccount.getCandidate().getId());
+        ? messageThreadRepository.findVisibleIdsByCompanyId(currentAccount.getCompany().getId(), currentAccount.getId())
+        : messageThreadRepository.findVisibleIdsByCandidateId(currentAccount.getCandidate().getId(), currentAccount.getId());
 
     if (threadIds == null || threadIds.isEmpty()) {
       return 0L;
@@ -392,6 +552,13 @@ public class MessageServiceImpl implements MessageService {
     }
 
     long unreadCount = messageRepository.countUnreadInThread(thread.getId(), currentAccount.getId(), EPOCH);
+    boolean isHr = resolveRole(currentAccount) == Role.HR;
+    boolean archived = isHr ? thread.isArchivedByCompany() : thread.isArchivedByCandidate();
+    String hrAccountId = resolveHrAccountId(thread);
+    String candidateAccountId = resolveCandidateAccountId(thread);
+    boolean blocked = StringUtils.hasText(hrAccountId)
+      && StringUtils.hasText(candidateAccountId)
+      && userBlockRepository.existsByBlockerIdAndBlockedId(hrAccountId, candidateAccountId);
 
     return MessagingResponses.ThreadSummaryDto.builder()
         .threadId(thread.getId())
@@ -401,6 +568,8 @@ public class MessageServiceImpl implements MessageService {
         .lastMessageAt(thread.getLastMessageAt())
         .unreadCount(unreadCount)
         .online(false)
+      .archived(archived)
+      .blocked(blocked)
         .build();
   }
 
@@ -441,7 +610,7 @@ public class MessageServiceImpl implements MessageService {
         .senderId(message.getSender().getId())
         .senderName(resolveAccountName(message.getSender()))
         .senderAvatar(resolveAccountAvatar(message.getSender()))
-        .content(message.isDeleted() ? "Message was deleted" : message.getContent())
+        .content(message.isDeleted() ? CONTENT_DELETED : message.getContent())
         .contentType(message.getContentType())
         .fileUrl(message.getFileUrl())
         .fileName(message.getFileName())
@@ -532,6 +701,54 @@ public class MessageServiceImpl implements MessageService {
       return account.getCompany().getAvatar();
     }
     return null;
+  }
+
+  private void ensureThreadNotBlocked(MessageThread thread) {
+    String hrAccountId = resolveHrAccountId(thread);
+    String candidateAccountId = resolveCandidateAccountId(thread);
+    if (!StringUtils.hasText(hrAccountId) || !StringUtils.hasText(candidateAccountId)) {
+      return;
+    }
+
+    if (userBlockRepository.existsByBlockerIdAndBlockedId(hrAccountId, candidateAccountId)) {
+      throw new ForbiddenException("Không thể gửi tin nhắn: cuộc trò chuyện đã bị HR chặn");
+    }
+  }
+
+  private String resolveHrAccountId(MessageThread thread) {
+    if (thread.getCompany() == null) {
+      return null;
+    }
+    Optional<Account> account = accountRepository.findByCompanyId(thread.getCompany().getId());
+    if (account == null) {
+      return null;
+    }
+    return account.map(Account::getId).orElse(null);
+  }
+
+  private String resolveCandidateAccountId(MessageThread thread) {
+    if (thread.getCandidate() == null) {
+      return null;
+    }
+    Optional<Account> account = accountRepository.findByCandidateId(thread.getCandidate().getId());
+    if (account == null) {
+      return null;
+    }
+    return account.map(Account::getId).orElse(null);
+  }
+
+  private MessagingResponses.BlockedUserDto toBlockedUserDto(UserBlock userBlock) {
+    Account blocked = userBlock.getBlocked();
+    Candidate candidate = blocked != null ? blocked.getCandidate() : null;
+
+    return MessagingResponses.BlockedUserDto.builder()
+        .userId(candidate != null ? candidate.getId() : (blocked != null ? blocked.getId() : null))
+        .fullName(candidate != null ? resolveCandidateName(candidate) : resolveAccountName(blocked))
+        .email(blocked != null ? blocked.getEmail() : null)
+        .avatarUrl(blocked != null ? resolveAccountAvatar(blocked) : null)
+        .blockedAt(userBlock.getBlockedAt())
+        .reason(userBlock.getReason())
+        .build();
   }
 
   private record ThreadParticipants(Company company, Candidate candidate, Application application) {
