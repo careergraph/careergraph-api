@@ -548,3 +548,24 @@ const CandidateMessageTab: React.FC<{ candidateId: string; applicationId?: strin
 - [ ] Skeleton loading đẹp
 - [ ] Empty states có illustration/icon
 - [ ] Animation mượt mà
+
+---
+
+## 🔧 Addendum — UI Consistency Rules (2026-04-15)
+
+### Chat Bubble Alignment (bắt buộc)
+- Tin nhắn của current user luôn hiển thị bên phải.
+- Tin nhắn của đối phương luôn hiển thị bên trái.
+- Logic xác định `isOwn` cần có fallback bằng email khi senderId không cùng định danh.
+
+### Display Name + Avatar Fallback (bắt buộc)
+- Ưu tiên `fullName` (firstName + lastName).
+- Nếu thiếu `fullName`, fallback `email local-part`.
+- Tránh hiển thị text chung cho nhiều thread (ví dụ cùng là "Ứng viên").
+- Avatar fallback dùng 1 ký tự đầu của `displayName`.
+
+### HR ↔ Candidate Parity
+- Candidate FE phải reuse layout spec của HR:
+  - outgoing bên phải, incoming bên trái
+  - cùng rules fallback tên/avatar
+  - cùng behavior typing/read receipt/unread

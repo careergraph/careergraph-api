@@ -433,6 +433,23 @@ export const useMessaging = () => {
 
 ---
 
+## 🔧 Addendum — Layout Parity With HR (2026-04-15)
+
+### Bắt buộc đồng nhất với HR
+- Outgoing message luôn bên phải.
+- Incoming message luôn bên trái.
+- Không tách riêng behavior bubble/read/unread/typing nếu không có lý do nghiệp vụ.
+
+### Name/Avatar fallback rules
+- Display name ưu tiên full name.
+- Nếu thiếu full name, fallback email local-part.
+- Nếu vẫn thiếu dữ liệu:
+  - HR side: hiển thị "HR".
+  - Candidate side: hiển thị label phân biệt theo user, không dùng text chung cho nhiều thread.
+- Avatar fallback dùng 1 ký tự đầu của display name (hoặc "HR" khi profile HR trống).
+
+---
+
 ## 📤 Output của Phase 4
 
 1. `/messages` route hoạt động cho candidate

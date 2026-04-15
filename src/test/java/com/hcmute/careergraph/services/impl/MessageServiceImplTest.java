@@ -16,9 +16,15 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.mockito.junit.jupiter.MockitoSettings;
+import org.mockito.quality.Strictness;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionDefinition;
+import org.springframework.transaction.TransactionStatus;
+import org.springframework.transaction.support.SimpleTransactionStatus;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -29,6 +35,7 @@ import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
+@MockitoSettings(strictness = Strictness.LENIENT)
 class MessageServiceImplTest {
 
   @Mock
@@ -47,6 +54,8 @@ class MessageServiceImplTest {
   private AccountRepository accountRepository;
   @Mock
   private NotificationService notificationService;
+  @Mock
+  private PlatformTransactionManager transactionManager;
 
   @InjectMocks
   private MessageServiceImpl messageService;
@@ -91,6 +100,11 @@ class MessageServiceImplTest {
         .lastMessageAt(LocalDateTime.now())
         .lastMessagePreview("Hi")
         .build();
+
+    when(transactionManager.getTransaction(any(TransactionDefinition.class)))
+      .thenReturn(new SimpleTransactionStatus());
+    doNothing().when(transactionManager).commit(any(TransactionStatus.class));
+    doNothing().when(transactionManager).rollback(any(TransactionStatus.class));
   }
 
   @Test
@@ -101,7 +115,7 @@ class MessageServiceImplTest {
     when(candidateRepository.findById(candidate.getId())).thenReturn(Optional.of(candidate));
     when(messageThreadRepository.findByCompanyIdAndCandidateId(company.getId(), candidate.getId()))
         .thenReturn(Optional.empty());
-    when(messageThreadRepository.save(any(MessageThread.class))).thenAnswer(inv -> {
+    when(messageThreadRepository.saveAndFlush(any(MessageThread.class))).thenAnswer(inv -> {
       MessageThread saved = inv.getArgument(0, MessageThread.class);
       saved.setId("thread-new");
       return saved;
@@ -112,7 +126,7 @@ class MessageServiceImplTest {
 
     assertEquals("thread-new", result.getThreadId());
     assertEquals("candidate-1", result.getOtherParty().getId());
-    verify(messageThreadRepository).save(any(MessageThread.class));
+    verify(messageThreadRepository).saveAndFlush(any(MessageThread.class));
   }
 
   @Test
@@ -139,14 +153,14 @@ class MessageServiceImplTest {
     when(candidateRepository.findById(candidate.getId())).thenReturn(Optional.of(candidate));
     when(messageThreadRepository.findByCompanyIdAndCandidateId(company.getId(), candidate.getId()))
         .thenReturn(Optional.empty(), Optional.of(thread));
-    when(messageThreadRepository.save(any(MessageThread.class)))
+    when(messageThreadRepository.saveAndFlush(any(MessageThread.class)))
         .thenThrow(new DataIntegrityViolationException("duplicate"));
     when(messageRepository.countUnreadInThread(anyString(), anyString(), any(LocalDateTime.class))).thenReturn(0L);
 
     MessagingResponses.ThreadSummaryDto result = messageService.getOrCreateThread(hrAccount, request);
 
     assertEquals(thread.getId(), result.getThreadId());
-    verify(messageThreadRepository).save(any(MessageThread.class));
+    verify(messageThreadRepository).saveAndFlush(any(MessageThread.class));
   }
 
   @Test

@@ -17,6 +17,7 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.*;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.util.StringUtils;
 
 import java.time.LocalDateTime;
@@ -41,6 +42,7 @@ public class MessageServiceImpl implements MessageService {
   private final ApplicationRepository applicationRepository;
   private final AccountRepository accountRepository;
   private final NotificationService notificationService;
+  private final org.springframework.transaction.PlatformTransactionManager transactionManager;
 
   @Override
   public MessagingResponses.ThreadSummaryDto getOrCreateThread(Account currentAccount,
@@ -48,13 +50,13 @@ public class MessageServiceImpl implements MessageService {
     ThreadParticipants participants = resolveThreadParticipants(currentAccount, request);
 
     Optional<MessageThread> existing = messageThreadRepository
-        .findByCompanyIdAndCandidateId(participants.company().getId(), participants.candidate().getId());
+      .findByCompanyIdAndCandidateId(participants.company().getId(), participants.candidate().getId());
 
     if (existing.isPresent()) {
       MessageThread thread = existing.get();
       if (thread.getApplication() == null && participants.application() != null) {
         thread.setApplication(participants.application());
-        thread = messageThreadRepository.save(thread);
+        thread = messageThreadRepository.saveAndFlush(thread);
       }
       return toThreadSummary(currentAccount, thread);
     }
@@ -67,15 +69,34 @@ public class MessageServiceImpl implements MessageService {
         .lastMessagePreview(null)
         .build();
 
-    try {
-      MessageThread saved = messageThreadRepository.save(newThread);
+    MessageThread saved = createThreadInNewTransaction(newThread);
+    if (saved != null) {
       return toThreadSummary(currentAccount, saved);
-    } catch (DataIntegrityViolationException ex) {
-      MessageThread recovered = messageThreadRepository
-          .findByCompanyIdAndCandidateId(participants.company().getId(), participants.candidate().getId())
-          .orElseThrow(() -> ex);
-      return toThreadSummary(currentAccount, recovered);
     }
+
+    MessageThread recovered = findThreadInNewTransaction(participants.company().getId(), participants.candidate().getId())
+        .orElseThrow(() -> new DataIntegrityViolationException("duplicate thread insert failed and recovery lookup returned empty"));
+    return toThreadSummary(currentAccount, recovered);
+  }
+
+  private MessageThread createThreadInNewTransaction(MessageThread newThread) {
+    TransactionTemplate template = new TransactionTemplate(transactionManager);
+    template.setPropagationBehavior(org.springframework.transaction.TransactionDefinition.PROPAGATION_REQUIRES_NEW);
+    return template.execute(status -> {
+      try {
+        return messageThreadRepository.saveAndFlush(newThread);
+      } catch (DataIntegrityViolationException ex) {
+        status.setRollbackOnly();
+        return null;
+      }
+    });
+  }
+
+  private Optional<MessageThread> findThreadInNewTransaction(String companyId, String candidateId) {
+    TransactionTemplate template = new TransactionTemplate(transactionManager);
+    template.setPropagationBehavior(org.springframework.transaction.TransactionDefinition.PROPAGATION_REQUIRES_NEW);
+    return Optional.ofNullable(template.execute(status ->
+        messageThreadRepository.findByCompanyIdAndCandidateId(companyId, candidateId).orElse(null)));
   }
 
   @Override
