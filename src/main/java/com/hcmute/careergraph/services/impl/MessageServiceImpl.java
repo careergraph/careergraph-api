@@ -14,6 +14,7 @@ import com.hcmute.careergraph.services.MessageService;
 import com.hcmute.careergraph.services.NotificationService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.hibernate.Hibernate;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.*;
@@ -56,6 +57,7 @@ public class MessageServiceImpl implements MessageService {
   private long unsendWindowSeconds;
 
   @Override
+  @Transactional
   public MessagingResponses.ThreadSummaryDto getOrCreateThread(Account currentAccount,
       MessagingRequests.CreateThreadRequest request) {
     ThreadParticipants participants = resolveThreadParticipants(currentAccount, request);
@@ -87,7 +89,14 @@ public class MessageServiceImpl implements MessageService {
 
     MessageThread recovered = findThreadInNewTransaction(participants.company().getId(), participants.candidate().getId())
         .orElseThrow(() -> new DataIntegrityViolationException("duplicate thread insert failed and recovery lookup returned empty"));
-    return toThreadSummary(currentAccount, recovered);
+    
+    // Re-attach recovered entity to current session
+    MessageThread mergedThread = messageThreadRepository.findWithEagerByCompanyIdAndCandidateId(
+        recovered.getCompany().getId(), 
+        recovered.getCandidate().getId())
+      .orElse(recovered);
+    
+    return toThreadSummary(currentAccount, mergedThread);
   }
 
   private MessageThread createThreadInNewTransaction(MessageThread newThread) {
@@ -107,7 +116,7 @@ public class MessageServiceImpl implements MessageService {
     TransactionTemplate template = new TransactionTemplate(transactionManager);
     template.setPropagationBehavior(org.springframework.transaction.TransactionDefinition.PROPAGATION_REQUIRES_NEW);
     return Optional.ofNullable(template.execute(status ->
-        messageThreadRepository.findByCompanyIdAndCandidateId(companyId, candidateId).orElse(null)));
+        messageThreadRepository.findWithEagerByCompanyIdAndCandidateId(companyId, candidateId).orElse(null)));
   }
 
   @Override
@@ -577,6 +586,8 @@ public class MessageServiceImpl implements MessageService {
     Role role = resolveRole(currentAccount);
     if (role == Role.HR) {
       Candidate candidate = thread.getCandidate();
+      // Ensure candidate is initialized to avoid LazyInitializationException
+      Hibernate.initialize(candidate);
       return MessagingResponses.PartySummaryDto.builder()
           .id(candidate.getId())
           .displayName(resolveCandidateName(candidate))
@@ -586,6 +597,8 @@ public class MessageServiceImpl implements MessageService {
     }
 
     Company company = thread.getCompany();
+    // Ensure company is initialized to avoid LazyInitializationException
+    Hibernate.initialize(company);
     return MessagingResponses.PartySummaryDto.builder()
         .id(company.getId())
         .displayName(resolveCompanyName(company))
@@ -668,14 +681,24 @@ public class MessageServiceImpl implements MessageService {
   }
 
   private String resolveCandidateName(Candidate candidate) {
-    String firstName = StringUtils.hasText(candidate.getFirstName()) ? candidate.getFirstName().trim() : "";
-    String lastName = StringUtils.hasText(candidate.getLastName()) ? candidate.getLastName().trim() : "";
-    String fullName = (firstName + " " + lastName).trim();
-    if (StringUtils.hasText(fullName)) {
-      return fullName;
+    if (candidate == null) {
+      return "Candidate";
     }
-    if (StringUtils.hasText(candidate.getTagname())) {
-      return candidate.getTagname().trim();
+    
+    // Ensure candidate is initialized to access lazy properties
+    try {
+      String firstName = StringUtils.hasText(candidate.getFirstName()) ? candidate.getFirstName().trim() : "";
+      String lastName = StringUtils.hasText(candidate.getLastName()) ? candidate.getLastName().trim() : "";
+      String fullName = (firstName + " " + lastName).trim();
+      if (StringUtils.hasText(fullName)) {
+        return fullName;
+      }
+      if (StringUtils.hasText(candidate.getTagname())) {
+        return candidate.getTagname().trim();
+      }
+    } catch (Exception e) {
+      log.warn("Failed to resolve candidate name for id: {}, fallback to tagname or default", 
+          candidate.getId(), e);
     }
     return "Candidate";
   }
