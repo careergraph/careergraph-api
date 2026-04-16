@@ -152,3 +152,24 @@ app:
     script-path: ${APP_SEED_SCRIPT_PATH:init-scripts/seed-basic.sql}
     check-table: ${APP_SEED_CHECK_TABLE:jobs}
     min-row-count: ${APP_SEED_MIN_ROW_COUNT:1}
+
+socket:
+  # Node.js RTC base URL used by backend to call internal push endpoints.
+  server:
+    url: ${SOCKET_SERVER_URL:http://localhost:4000}
+  # Shared key for backend -> RTC internal API authentication.
+  internal:
+    api-key: ${SOCKET_INTERNAL_API_KEY:dev-secret-change-in-prod}
+
+notification:
+  # Skip creating another NEW_MESSAGE notification in the same thread
+  # if there is already an unread one within this cooldown window.
+  message:
+    cooldown-minutes: ${NOTIFICATION_MESSAGE_COOLDOWN_MINUTES:2}
+  # Aggregate rapid application stage changes into one notification
+  # by updating the latest matching notification in this time window.
+  aggregation:
+    window-minutes: ${NOTIFICATION_AGGREGATION_WINDOW_MINUTES:5}
+  # Scheduled cleanup retention window for old notifications.
+  cleanup:
+    days-to-keep: ${NOTIFICATION_CLEANUP_DAYS_TO_KEEP:90}

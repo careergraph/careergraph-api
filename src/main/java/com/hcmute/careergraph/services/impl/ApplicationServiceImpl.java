@@ -7,6 +7,7 @@ import com.hcmute.careergraph.persistence.dtos.request.ApplicationStageUpdateReq
 import com.hcmute.careergraph.persistence.models.*;
 import com.hcmute.careergraph.repositories.ApplicationRepository;
 import com.hcmute.careergraph.repositories.CandidateRepository;
+import com.hcmute.careergraph.repositories.AccountRepository;
 import com.hcmute.careergraph.repositories.JobRepository;
 import com.hcmute.careergraph.services.ApplicationService;
 import com.hcmute.careergraph.services.MailService;
@@ -37,6 +38,7 @@ public class ApplicationServiceImpl implements ApplicationService {
 
     private final ApplicationRepository applicationRepository;
     private final CandidateRepository candidateRepository;
+    private final AccountRepository accountRepository;
     private final JobRepository jobRepository;
     private final MailService mailService;
     private final NotificationService notificationService;
@@ -236,7 +238,10 @@ public class ApplicationServiceImpl implements ApplicationService {
                 .build());
 
         Application saved = applicationRepository.save(application);
-        notificationService.onApplicationStatusChanged(saved, currentStage, targetStage, null);
+        Account changedByAccount = StringUtils.hasText(request.getChangeBy())
+            ? accountRepository.findByCompanyId(request.getChangeBy()).orElse(null)
+            : null;
+        notificationService.onApplicationStatusChanged(saved, currentStage, targetStage, changedByAccount);
         dispatchStageEmail(saved, targetStage, note, actor);
         log.info("Application {} moved from {} to {}", id, currentStage, targetStage);
         return saved;
