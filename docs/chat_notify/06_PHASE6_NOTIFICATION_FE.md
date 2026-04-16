@@ -12,7 +12,7 @@
 3. Realtime badge update
 4. Full integration test end-to-end
 5. Performance & polish
-
+6. Kiểm tra lại việc hiện logic  có tin nhắn mới ở message page, chat window ở HR và Candidate là đúng chưa (Hiện tại đang gặp vấn đề realtime về có số tin nhắn mới từ người này, và click vào xem thì không mất con số phải reload lại)
 ---
 
 ## 📋 BƯỚC 1 — Notify Socket Hook (dùng cho cả 2 FE)
