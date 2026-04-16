@@ -19,12 +19,15 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.util.StringUtils;
 
 import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
@@ -32,9 +35,18 @@ import java.util.Optional;
 @Transactional
 public class NotificationServiceImpl implements NotificationService {
 
+  private static final int SEARCH_PAGE_SIZE = 10;
+
   private final NotificationRepository notificationRepository;
   private final AccountRepository accountRepository;
   private final MessageRepository messageRepository;
+  private final SocketNotificationPusher socketNotificationPusher;
+
+  @org.springframework.beans.factory.annotation.Value("${notification.message.cooldown-minutes:2}")
+  private long messageCooldownMinutes;
+
+  @org.springframework.beans.factory.annotation.Value("${notification.aggregation.window-minutes:5}")
+  private long aggregationWindowMinutes;
 
   @Override
   public Notification createNotification(String recipientAccountId,
@@ -54,7 +66,10 @@ public class NotificationServiceImpl implements NotificationService {
         .read(false)
         .build();
 
-    return notificationRepository.save(notification);
+      Notification saved = notificationRepository.save(notification);
+      log.info("Created notification {} for recipient {}", type, recipientAccountId);
+      dispatchSocketPush(saved);
+      return saved;
   }
 
   @Override
@@ -156,28 +171,16 @@ public class NotificationServiceImpl implements NotificationService {
     data.put("newStage", newStage != null ? newStage.name() : null);
     data.put("navigateTo", "/applications/" + application.getId());
 
-    String title = "Application stage updated";
-    String body = String.format("Your application for %s at %s is now %s",
-        jobTitle,
-        companyName,
-        newStage != null ? newStage.name() : "UPDATED");
+    NotificationType notificationType = resolveApplicationNotificationType(newStage);
+    NotificationContent content = resolveApplicationNotificationContent(companyName, jobTitle, newStage);
 
-    if (newStage == ApplicationStage.INTERVIEW_SCHEDULED) {
-      title = "Interview scheduled";
-      body = String.format("%s scheduled an interview for %s", companyName, jobTitle);
-    } else if (newStage == ApplicationStage.REJECTED) {
-      title = "Application update";
-      body = String.format("Your application for %s at %s was marked as %s",
-          jobTitle,
-          companyName,
-          newStage.name());
-    }
-
-    createNotification(candidateAccountOpt.get().getId(),
-        NotificationType.APPLICATION_STATUS_CHANGED,
-        title,
-        body,
-        data);
+    createOrUpdateApplicationNotification(
+      candidateAccountOpt.get().getId(),
+      notificationType,
+      content.title(),
+      content.body(),
+      data,
+      application.getId());
   }
 
   @Override
@@ -244,6 +247,18 @@ public class NotificationServiceImpl implements NotificationService {
     data.put("senderId", sender.getId());
     data.put("navigateTo", "/messages?thread=" + thread.getId());
 
+    LocalDateTime cooldownCutoff = LocalDateTime.now().minusMinutes(Math.max(1, messageCooldownMinutes));
+    Optional<Notification> recentUnreadNotification = findRecentUnreadMessageNotification(
+        recipient.getId(),
+        thread.getId(),
+        cooldownCutoff);
+
+    if (recentUnreadNotification.isPresent()) {
+      log.info("Skipped NEW_MESSAGE notification for recipient {} due to cooldown", recipient.getId());
+      dispatchUnreadCountsPush(recipient.getId());
+      return;
+    }
+
     createNotification(
         recipient.getId(),
         NotificationType.NEW_MESSAGE,
@@ -263,6 +278,166 @@ public class NotificationServiceImpl implements NotificationService {
         .createdAt(notification.getCreatedDate())
         .readAt(notification.getReadAt())
         .build();
+  }
+
+  private Notification createOrUpdateApplicationNotification(String recipientId,
+      NotificationType type,
+      String title,
+      String body,
+      HashMap<String, Object> data,
+      String applicationId) {
+    LocalDateTime cutoff = LocalDateTime.now().minusMinutes(Math.max(1, aggregationWindowMinutes));
+    Optional<Notification> recent = findRecentSameApplicationNotification(recipientId, type, applicationId, cutoff);
+
+    if (recent.isPresent()) {
+      Notification existing = recent.get();
+      existing.setType(type);
+      existing.setTitle(title);
+      existing.setBody(body);
+      existing.setData(data != null ? new HashMap<>(data) : new HashMap<>());
+      existing.setRead(false);
+      existing.setReadAt(null);
+
+      Notification saved = notificationRepository.save(existing);
+      log.info("Updated notification {} for application {} (type={})", saved.getId(), applicationId, type);
+      dispatchSocketPush(saved);
+      return saved;
+    }
+
+    return createNotification(recipientId, type, title, body, data);
+  }
+
+  private Optional<Notification> findRecentSameApplicationNotification(String recipientId,
+      NotificationType type,
+      String applicationId,
+      LocalDateTime since) {
+    if (!StringUtils.hasText(recipientId) || !StringUtils.hasText(applicationId)) {
+      return Optional.empty();
+    }
+
+    return notificationRepository
+        .findByRecipientIdAndTypeAndCreatedDateGreaterThanEqualOrderByCreatedDateDesc(
+            recipientId,
+            type,
+            since,
+            PageRequest.of(0, SEARCH_PAGE_SIZE))
+        .stream()
+        .filter(notification -> applicationId.equals(extractDataValue(notification, "applicationId")))
+        .findFirst();
+  }
+
+  private Optional<Notification> findRecentUnreadMessageNotification(String recipientId,
+      String threadId,
+      LocalDateTime since) {
+    if (!StringUtils.hasText(recipientId) || !StringUtils.hasText(threadId)) {
+      return Optional.empty();
+    }
+
+    return notificationRepository
+        .findByRecipientIdAndTypeAndReadFalseAndCreatedDateGreaterThanEqualOrderByCreatedDateDesc(
+            recipientId,
+            NotificationType.NEW_MESSAGE,
+            since,
+            PageRequest.of(0, SEARCH_PAGE_SIZE))
+        .stream()
+        .filter(notification -> threadId.equals(extractDataValue(notification, "threadId")))
+        .findFirst();
+  }
+
+  private String extractDataValue(Notification notification, String key) {
+    if (notification == null || notification.getData() == null || !StringUtils.hasText(key)) {
+      return null;
+    }
+
+    Object value = notification.getData().get(key);
+    return value != null ? value.toString() : null;
+  }
+
+  private void dispatchSocketPush(Notification saved) {
+    if (saved == null || saved.getRecipient() == null) {
+      return;
+    }
+
+    Runnable task = () -> {
+      try {
+        MessagingResponses.NotificationDto dto = toDto(saved);
+        socketNotificationPusher.pushToUser(UUID.fromString(saved.getRecipient().getId()), dto);
+        dispatchUnreadCountsPush(saved.getRecipient().getId());
+      } catch (Exception ex) {
+        log.warn("Failed to dispatch socket push for notification {}: {}", saved.getId(), ex.getMessage());
+      }
+    };
+
+    if (TransactionSynchronizationManager.isSynchronizationActive()) {
+      TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+        @Override
+        public void afterCommit() {
+          task.run();
+        }
+      });
+      return;
+    }
+
+    task.run();
+  }
+
+  private void dispatchUnreadCountsPush(String recipientId) {
+    if (!StringUtils.hasText(recipientId)) {
+      return;
+    }
+
+    long unreadNotifications = notificationRepository.countByRecipientIdAndReadFalse(recipientId);
+    long unreadMessages = messageRepository.countTotalUnread(recipientId, LocalDateTime.of(1970, 1, 1, 0, 0));
+    socketNotificationPusher.pushUnreadCounts(UUID.fromString(recipientId), unreadMessages, unreadNotifications);
+  }
+
+  private NotificationType resolveApplicationNotificationType(ApplicationStage newStage) {
+    if (newStage == null) {
+      return NotificationType.APPLICATION_STATUS_CHANGED;
+    }
+
+    return switch (newStage) {
+      case SCREENING -> NotificationType.APPLICATION_VIEWED;
+      case HR_CONTACTED -> NotificationType.APPLICATION_SHORTLISTED;
+      case INTERVIEW_SCHEDULED -> NotificationType.APPLICATION_INTERVIEW_SCHEDULED;
+      case REJECTED -> NotificationType.APPLICATION_REJECTED;
+      default -> NotificationType.APPLICATION_STATUS_CHANGED;
+    };
+  }
+
+  private NotificationContent resolveApplicationNotificationContent(String companyName,
+      String jobTitle,
+      ApplicationStage newStage) {
+    if (newStage == null) {
+      return new NotificationContent(
+          "Cập nhật hồ sơ ứng tuyển",
+          String.format("Hồ sơ của bạn tại %s đã được cập nhật.", companyName));
+    }
+
+    return switch (newStage) {
+      case SCREENING -> new NotificationContent(
+          "Hồ sơ của bạn đã được xem",
+          String.format("%s đã xem hồ sơ của bạn cho vị trí %s.", companyName, jobTitle));
+      case HR_CONTACTED -> new NotificationContent(
+          "Hồ sơ của bạn đang được xem xét",
+          String.format("Hồ sơ của bạn đang được xem xét tại %s.", companyName));
+      case INTERVIEW_SCHEDULED -> new NotificationContent(
+          "🎉 Chúc mừng! Bạn đã được mời phỏng vấn",
+          String.format("Bạn đã được mời phỏng vấn tại %s cho vị trí %s.", companyName, jobTitle));
+      case REJECTED -> new NotificationContent(
+          "Thông báo về hồ sơ ứng tuyển",
+          String.format("Hồ sơ của bạn chưa phù hợp với vị trí %s tại %s. Cảm ơn bạn đã quan tâm.",
+              jobTitle,
+              companyName));
+      default -> new NotificationContent(
+          "Cập nhật hồ sơ ứng tuyển",
+          String.format("Hồ sơ của bạn tại %s đã được cập nhật sang trạng thái %s.",
+              companyName,
+              newStage.getLabel()));
+    };
+  }
+
+  private record NotificationContent(String title, String body) {
   }
 
   private String resolveAccountDisplayName(Account account) {

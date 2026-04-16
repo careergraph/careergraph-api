@@ -86,4 +86,17 @@ public interface MessageRepository extends JpaRepository<Message, String> {
   long countTotalUnreadByThreadIds(@Param("accountId") String accountId,
       @Param("threadIds") List<String> threadIds,
       @Param("epoch") LocalDateTime epoch);
+
+  @Query("""
+      SELECT COUNT(m)
+      FROM Message m
+      WHERE m.sender.id <> :accountId
+        AND m.deleted = false
+        AND m.createdDate > COALESCE(
+            (SELECT mr.lastReadAt FROM MessageRead mr WHERE mr.account.id = :accountId AND mr.thread.id = m.thread.id),
+            :epoch
+        )
+      """)
+  long countTotalUnread(@Param("accountId") String accountId,
+      @Param("epoch") LocalDateTime epoch);
 }
