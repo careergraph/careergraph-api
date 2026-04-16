@@ -35,6 +35,10 @@ public class Message extends BaseEntity {
   @JoinColumn(name = "sender_id", nullable = false)
   private Account sender;
 
+  @ManyToOne(fetch = FetchType.LAZY)
+  @JoinColumn(name = "job_context_id")
+  private Job jobContext;
+
   @Column(name = "content", nullable = false, columnDefinition = "TEXT")
   private String content;
 

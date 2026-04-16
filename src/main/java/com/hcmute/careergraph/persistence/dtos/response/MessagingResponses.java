@@ -39,10 +39,35 @@ public class MessagingResponses {
   @Builder
   @NoArgsConstructor
   @AllArgsConstructor
+  public static class JobContextDto {
+    private String jobId;
+    private String jobTitle;
+    private String jobStatus;
+  }
+
+  @Data
+  @Builder
+  @NoArgsConstructor
+  @AllArgsConstructor
+  public static class ThreadJobDto {
+    private String jobId;
+    private String jobTitle;
+    private String jobStatus;
+    private long unreadCount;
+    private LocalDateTime lastMessageAt;
+    private boolean hasMessages;
+  }
+
+  @Data
+  @Builder
+  @NoArgsConstructor
+  @AllArgsConstructor
   public static class ThreadSummaryDto {
     private String threadId;
     private PartySummaryDto otherParty;
     private ApplicationSummaryDto application;
+    private List<ThreadJobDto> jobs;
+    private ThreadJobDto primaryJob;
     private String lastMessagePreview;
     private LocalDateTime lastMessageAt;
     private long unreadCount;
@@ -67,6 +92,7 @@ public class MessagingResponses {
     private String fileName;
     private Long fileSize;
     private boolean deleted;
+    private JobContextDto jobContext;
     private LocalDateTime createdAt;
     private boolean read;
     private LocalDateTime readAt;

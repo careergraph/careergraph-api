@@ -1,4 +1,4 @@
-# Phase 5 Messaging Production Hotfix Spec
+# Phase 4 Messaging Production Hotfix Spec
 
 Date: 2026-04-16
 Owner: Copilot (GPT-5.3-Codex)

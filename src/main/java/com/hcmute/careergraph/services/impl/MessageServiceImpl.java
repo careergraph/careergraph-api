@@ -25,7 +25,10 @@ import org.springframework.util.StringUtils;
 
 import java.time.Duration;
 import java.time.LocalDateTime;
+import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 @Service
@@ -47,6 +50,7 @@ public class MessageServiceImpl implements MessageService {
   private final CandidateRepository candidateRepository;
   private final CompanyRepository companyRepository;
   private final ApplicationRepository applicationRepository;
+  private final JobRepository jobRepository;
   private final AccountRepository accountRepository;
   private final ThreadDeletionRepository threadDeletionRepository;
   private final UserBlockRepository userBlockRepository;
@@ -158,12 +162,32 @@ public class MessageServiceImpl implements MessageService {
 
   @Override
   @Transactional(readOnly = true)
-  public Page<MessagingResponses.MessageDto> getMessages(Account currentAccount, String threadId, Pageable pageable) {
+  public List<MessagingResponses.ThreadJobDto> getThreadJobs(Account currentAccount, String threadId) {
+    MessageThread thread = findThreadOrThrow(threadId);
+    validateThreadAccess(thread, currentAccount);
+    return resolveThreadJobs(currentAccount, thread);
+  }
+
+  @Override
+  @Transactional(readOnly = true)
+  public Page<MessagingResponses.MessageDto> getMessages(Account currentAccount,
+      String threadId,
+      String jobId,
+      Pageable pageable) {
     MessageThread thread = findThreadOrThrow(threadId);
     validateThreadAccess(thread, currentAccount);
 
+    String normalizedJobId = normalizeJobContextId(jobId);
+    if (normalizedJobId != null
+        && !applicationRepository.existsByCandidateIdAndJobIdAndJobCompanyId(
+            thread.getCandidate().getId(),
+            normalizedJobId,
+            thread.getCompany().getId())) {
+      throw new BadRequestException("Job không thuộc cuộc trò chuyện này");
+    }
+
     Pageable normalized = normalizeMessagePageable(pageable);
-    Page<Message> messages = messageRepository.findByThreadId(threadId, normalized);
+    Page<Message> messages = messageRepository.findByThreadIdAndOptionalJobId(threadId, normalizedJobId, normalized);
 
     LocalDateTime currentReadAt = messageReadRepository
         .findByThreadIdAndAccountId(threadId, currentAccount.getId())
@@ -203,9 +227,24 @@ public class MessageServiceImpl implements MessageService {
       content = StringUtils.hasText(request.getFileName()) ? request.getFileName().trim() : "[Attachment]";
     }
 
+    Job jobContext = null;
+    String jobContextId = normalizeJobContextId(request.getJobContextId());
+    if (jobContextId != null) {
+      boolean belongsToThread = applicationRepository.existsByCandidateIdAndJobIdAndJobCompanyId(
+          thread.getCandidate().getId(),
+          jobContextId,
+          thread.getCompany().getId());
+      if (!belongsToThread) {
+        throw new BadRequestException("Job không thuộc cuộc trò chuyện này");
+      }
+      jobContext = jobRepository.findById(jobContextId)
+          .orElseThrow(() -> new NotFoundException("Không tìm thấy job context"));
+    }
+
     Message message = Message.builder()
         .thread(thread)
         .sender(currentAccount)
+        .jobContext(jobContext)
         .content(content)
         .contentType(contentType)
         .fileUrl(request.getFileUrl())
@@ -560,6 +599,9 @@ public class MessageServiceImpl implements MessageService {
           .build();
     }
 
+            List<MessagingResponses.ThreadJobDto> jobs = resolveThreadJobs(currentAccount, thread);
+            MessagingResponses.ThreadJobDto primaryJob = resolvePrimaryJob(jobs);
+
     long unreadCount = messageRepository.countUnreadInThread(thread.getId(), currentAccount.getId(), EPOCH);
     boolean isHr = resolveRole(currentAccount) == Role.HR;
     boolean archived = isHr ? thread.isArchivedByCompany() : thread.isArchivedByCandidate();
@@ -573,6 +615,8 @@ public class MessageServiceImpl implements MessageService {
         .threadId(thread.getId())
         .otherParty(otherParty)
         .application(applicationSummary)
+        .jobs(jobs)
+        .primaryJob(primaryJob)
         .lastMessagePreview(thread.getLastMessagePreview())
         .lastMessageAt(thread.getLastMessageAt())
         .unreadCount(unreadCount)
@@ -629,9 +673,88 @@ public class MessageServiceImpl implements MessageService {
         .fileName(message.getFileName())
         .fileSize(message.getFileSize())
         .deleted(message.isDeleted())
+        .jobContext(toJobContextDto(message.getThread(), message.getJobContext()))
         .createdAt(message.getCreatedDate())
         .read(isRead)
         .readAt(isRead ? readAt : null)
+        .build();
+  }
+
+  private String normalizeJobContextId(String jobContextId) {
+    if (!StringUtils.hasText(jobContextId)) {
+      return null;
+    }
+    return jobContextId.trim();
+  }
+
+  private List<MessagingResponses.ThreadJobDto> resolveThreadJobs(Account currentAccount, MessageThread thread) {
+    List<Application> applications = applicationRepository.findThreadContextApplications(
+        thread.getCandidate().getId(),
+        thread.getCompany().getId());
+
+    Map<String, MessagingResponses.ThreadJobDto> groupedJobs = new LinkedHashMap<>();
+
+    for (Application application : applications) {
+      Job job = application.getJob();
+      if (job == null || !StringUtils.hasText(job.getId())) {
+        continue;
+      }
+
+      String jobId = job.getId();
+      if (groupedJobs.containsKey(jobId)) {
+        continue;
+      }
+
+      LocalDateTime lastMessageAt = messageRepository
+          .findLastMessageTimeByThreadAndJob(thread.getId(), jobId)
+          .orElse(null);
+      long unreadCount = messageRepository.countUnreadInThreadByJob(thread.getId(), jobId, currentAccount.getId(), EPOCH);
+
+      groupedJobs.put(jobId, MessagingResponses.ThreadJobDto.builder()
+          .jobId(jobId)
+          .jobTitle(job.getTitle())
+          .jobStatus(application.getCurrentStage() != null ? application.getCurrentStage().name() : null)
+          .unreadCount(unreadCount)
+          .lastMessageAt(lastMessageAt)
+          .hasMessages(lastMessageAt != null)
+          .build());
+    }
+
+    return groupedJobs.values().stream()
+        .sorted(Comparator.comparing(MessagingResponses.ThreadJobDto::getLastMessageAt,
+            Comparator.nullsLast(Comparator.reverseOrder())))
+        .toList();
+  }
+
+  private MessagingResponses.ThreadJobDto resolvePrimaryJob(List<MessagingResponses.ThreadJobDto> jobs) {
+    if (jobs == null || jobs.isEmpty()) {
+      return null;
+    }
+
+    for (MessagingResponses.ThreadJobDto job : jobs) {
+      if (job.isHasMessages()) {
+        return job;
+      }
+    }
+
+    return jobs.get(0);
+  }
+
+  private MessagingResponses.JobContextDto toJobContextDto(MessageThread thread, Job jobContext) {
+    if (jobContext == null) {
+      return null;
+    }
+
+    String jobStatus = applicationRepository
+        .findFirstByCandidateIdAndJobIdOrderByCreatedDateDesc(thread.getCandidate().getId(), jobContext.getId())
+        .map(Application::getCurrentStage)
+        .map(Enum::name)
+        .orElse(null);
+
+    return MessagingResponses.JobContextDto.builder()
+        .jobId(jobContext.getId())
+        .jobTitle(jobContext.getTitle())
+        .jobStatus(jobStatus)
         .build();
   }
 

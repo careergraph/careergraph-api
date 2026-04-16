@@ -67,11 +67,13 @@ public class MessageController {
   @GetMapping("/threads/{threadId}/messages")
   public RestResponse<Page<MessagingResponses.MessageDto>> getMessages(
       @PathVariable String threadId,
+      @RequestParam(required = false) String jobId,
       @RequestParam(defaultValue = "0") int page,
       @RequestParam(defaultValue = "30") int size) {
     Page<MessagingResponses.MessageDto> result = messageService.getMessages(
         getCurrentAccount(),
         threadId,
+        jobId,
         PageRequest.of(page, size));
 
     return RestResponse.<Page<MessagingResponses.MessageDto>>builder()
@@ -80,6 +82,17 @@ public class MessageController {
         .data(result)
         .build();
   }
+
+        @GetMapping("/threads/{threadId}/jobs")
+        public RestResponse<java.util.List<MessagingResponses.ThreadJobDto>> getThreadJobs(@PathVariable String threadId) {
+          java.util.List<MessagingResponses.ThreadJobDto> result = messageService.getThreadJobs(getCurrentAccount(), threadId);
+
+          return RestResponse.<java.util.List<MessagingResponses.ThreadJobDto>>builder()
+          .status(HttpStatus.OK)
+          .message("Thread jobs retrieved successfully")
+          .data(result)
+          .build();
+        }
 
   @PostMapping("/threads/{threadId}/messages")
   public RestResponse<MessagingResponses.MessageDto> sendMessage(

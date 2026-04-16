@@ -23,6 +23,7 @@ public class MessagingRequests {
     private String fileUrl;
     private String fileName;
     private Long fileSize;
+    private String jobContextId;
   }
 
   @Data

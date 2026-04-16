@@ -11,6 +11,7 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
+import java.util.Optional;
 
 @Repository
 public interface ApplicationRepository extends JpaRepository<Application, String> {
@@ -104,4 +105,19 @@ public interface ApplicationRepository extends JpaRepository<Application, String
 
 
     boolean existsApplicationsByJobIdAndCandidateId(String jobId, String candidateId);
+
+        boolean existsByCandidateIdAndJobIdAndJobCompanyId(String candidateId, String jobId, String companyId);
+
+        @Query("""
+                SELECT a
+                FROM Application a
+                JOIN FETCH a.job j
+                WHERE a.candidate.id = :candidateId
+                    AND j.company.id = :companyId
+                ORDER BY a.createdDate DESC
+        """)
+        List<Application> findThreadContextApplications(@Param("candidateId") String candidateId,
+                        @Param("companyId") String companyId);
+
+        Optional<Application> findFirstByCandidateIdAndJobIdOrderByCreatedDateDesc(String candidateId, String jobId);
 }

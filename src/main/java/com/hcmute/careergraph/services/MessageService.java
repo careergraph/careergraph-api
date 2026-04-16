@@ -19,7 +19,12 @@ public interface MessageService {
 
   MessagingResponses.ThreadSummaryDto getThread(Account currentAccount, String threadId);
 
-  Page<MessagingResponses.MessageDto> getMessages(Account currentAccount, String threadId, Pageable pageable);
+  List<MessagingResponses.ThreadJobDto> getThreadJobs(Account currentAccount, String threadId);
+
+  Page<MessagingResponses.MessageDto> getMessages(Account currentAccount,
+      String threadId,
+      String jobId,
+      Pageable pageable);
 
   MessagingResponses.MessageDto sendMessage(Account currentAccount,
       String threadId,
