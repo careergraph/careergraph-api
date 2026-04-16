@@ -10,6 +10,7 @@ import com.hcmute.careergraph.repositories.CandidateRepository;
 import com.hcmute.careergraph.repositories.JobRepository;
 import com.hcmute.careergraph.services.ApplicationService;
 import com.hcmute.careergraph.services.MailService;
+import com.hcmute.careergraph.services.NotificationService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -38,21 +39,20 @@ public class ApplicationServiceImpl implements ApplicationService {
     private final CandidateRepository candidateRepository;
     private final JobRepository jobRepository;
     private final MailService mailService;
-
-
+    private final NotificationService notificationService;
 
     private static final String SUBMISSION_NOTE = "Ứng viên đã nộp hồ sơ.";
     private static final Map<ApplicationStage, Set<ApplicationStage>> BASE_TRANSITIONS = buildBaseTransitions();
 
     @Override
     public Application createApplication(ApplicationRequest request) {
-        log.info("Creating new application for candidate: {} to job: {}", 
+        log.info("Creating new application for candidate: {} to job: {}",
                 request.getCandidateId(), request.getJobId());
-        
+
         // Find candidate and job
         Candidate candidate = candidateRepository.findById(request.getCandidateId())
                 .orElseThrow(() -> new RuntimeException("Candidate not found with id: " + request.getCandidateId()));
-        
+
         Job job = jobRepository.findById(request.getJobId())
                 .orElseThrow(() -> new RuntimeException("Job not found with id: " + request.getJobId()));
 
@@ -83,6 +83,7 @@ public class ApplicationServiceImpl implements ApplicationService {
                 .build());
 
         Application savedApplication = applicationRepository.save(application);
+        notificationService.onNewApplication(savedApplication);
         dispatchStageEmail(savedApplication, ApplicationStage.APPLIED, SUBMISSION_NOTE, null);
         log.info("Application created successfully with id: {}", savedApplication.getId());
 
@@ -116,18 +117,25 @@ public class ApplicationServiceImpl implements ApplicationService {
         log.info("Getting applications by candidate id: {}", candidateId);
         return applicationRepository.findByCandidateId(candidateId, pageable);
     }
+
     @Override
     @Transactional(readOnly = true)
     public Page<Application> getApplicationsByCandidateWithJob(String candidateId, Pageable pageable) {
-//        return applicationRepository.getApplicationsByCandidateWithJob(candidateId, pageable);
+        // return applicationRepository.getApplicationsByCandidateWithJob(candidateId,
+        // pageable);
         return applicationRepository.findByJobId("00000000-0000-0000-0000-000000001007", pageable);
     }
+
     @Override
     @Transactional(readOnly = true)
-    public Page<Application> getApplicationsByCandidateWithJobWithStatus(String candidateId, Pageable pageable, ApplicationStage status) {
-//        return applicationRepository.getApplicationsByCandidateWithJob(candidateId, pageable);
-//        return applicationRepository.getApplicationsByCandidateWithJobWithStatus("00000000-0000-0000-0000-000000001007", pageable,status);
-        return applicationRepository.getAllApplicationsWithStatus(pageable,status);
+    public Page<Application> getApplicationsByCandidateWithJobWithStatus(String candidateId, Pageable pageable,
+            ApplicationStage status) {
+        // return applicationRepository.getApplicationsByCandidateWithJob(candidateId,
+        // pageable);
+        // return
+        // applicationRepository.getApplicationsByCandidateWithJobWithStatus("00000000-0000-0000-0000-000000001007",
+        // pageable,status);
+        return applicationRepository.getAllApplicationsWithStatus(pageable, status);
     }
 
     @Override
@@ -145,7 +153,7 @@ public class ApplicationServiceImpl implements ApplicationService {
     @Override
     public Application updateApplication(String id, ApplicationRequest request) {
         log.info("Updating application with id: {}", id);
-        
+
         Application application = applicationRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Application not found with id: " + id));
 
@@ -157,7 +165,8 @@ public class ApplicationServiceImpl implements ApplicationService {
         // Update candidate if changed
         if (!application.getCandidate().getId().equals(request.getCandidateId())) {
             Candidate candidate = candidateRepository.findById(request.getCandidateId())
-                    .orElseThrow(() -> new RuntimeException("Candidate not found with id: " + request.getCandidateId()));
+                    .orElseThrow(
+                            () -> new RuntimeException("Candidate not found with id: " + request.getCandidateId()));
             application.setCandidate(candidate);
         }
 
@@ -227,6 +236,7 @@ public class ApplicationServiceImpl implements ApplicationService {
                 .build());
 
         Application saved = applicationRepository.save(application);
+        notificationService.onApplicationStatusChanged(saved, currentStage, targetStage, null);
         dispatchStageEmail(saved, targetStage, note, actor);
         log.info("Application {} moved from {} to {}", id, currentStage, targetStage);
         return saved;
@@ -252,27 +262,27 @@ public class ApplicationServiceImpl implements ApplicationService {
         Set<ApplicationStage> allowedTargets = BASE_TRANSITIONS.getOrDefault(currentStage, Set.of());
         if (!allowedTargets.contains(targetStage)) {
             throw new RuntimeException(String.format(
-                "Stage transition from %s to %s is not allowed for application %s",
-                currentStage, targetStage, applicationId));
+                    "Stage transition from %s to %s is not allowed for application %s",
+                    currentStage, targetStage, applicationId));
         }
 
         Company company = Optional.ofNullable(application)
-            .map(Application::getJob)
-            .map(Job::getCompany)
-            .orElse(null);
+                .map(Application::getJob)
+                .map(Job::getCompany)
+                .orElse(null);
 
         boolean offerBeforeTrial = company == null || !Boolean.FALSE.equals(company.getOfferBeforeTrial());
         boolean enableOffboardedStage = company != null && Boolean.TRUE.equals(company.getEnableOffboardedStage());
 
         if (offerBeforeTrial
-            && currentStage == ApplicationStage.INTERVIEW_COMPLETED
-            && targetStage == ApplicationStage.TRIAL) {
+                && currentStage == ApplicationStage.INTERVIEW_COMPLETED
+                && targetStage == ApplicationStage.TRIAL) {
             throw new RuntimeException("Company pipeline yêu cầu gửi Offer trước khi chuyển sang Thử việc");
         }
 
         if (!offerBeforeTrial
-            && currentStage == ApplicationStage.INTERVIEW_COMPLETED
-            && targetStage == ApplicationStage.OFFER_EXTENDED) {
+                && currentStage == ApplicationStage.INTERVIEW_COMPLETED
+                && targetStage == ApplicationStage.OFFER_EXTENDED) {
             throw new RuntimeException("Company pipeline yêu cầu qua Thử việc trước khi gửi Offer");
         }
 
@@ -293,53 +303,53 @@ public class ApplicationServiceImpl implements ApplicationService {
         }
     }
 
-        private static Map<ApplicationStage, Set<ApplicationStage>> buildBaseTransitions() {
+    private static Map<ApplicationStage, Set<ApplicationStage>> buildBaseTransitions() {
         Map<ApplicationStage, Set<ApplicationStage>> transitions = new EnumMap<>(ApplicationStage.class);
 
         transitions.put(ApplicationStage.APPLIED,
-            EnumSet.of(ApplicationStage.SCREENING, ApplicationStage.HR_CONTACTED, ApplicationStage.SCHEDULED,
-                ApplicationStage.INTERVIEW, ApplicationStage.REJECTED, ApplicationStage.WITHDRAWN));
+                EnumSet.of(ApplicationStage.SCREENING, ApplicationStage.HR_CONTACTED, ApplicationStage.SCHEDULED,
+                        ApplicationStage.INTERVIEW, ApplicationStage.REJECTED, ApplicationStage.WITHDRAWN));
         transitions.put(ApplicationStage.SCREENING,
-            EnumSet.of(ApplicationStage.HR_CONTACTED, ApplicationStage.SCHEDULED,
-                ApplicationStage.INTERVIEW, ApplicationStage.REJECTED, ApplicationStage.WITHDRAWN));
+                EnumSet.of(ApplicationStage.HR_CONTACTED, ApplicationStage.SCHEDULED,
+                        ApplicationStage.INTERVIEW, ApplicationStage.REJECTED, ApplicationStage.WITHDRAWN));
         transitions.put(ApplicationStage.HR_CONTACTED,
-            EnumSet.of(ApplicationStage.SCHEDULED, ApplicationStage.INTERVIEW,
-                ApplicationStage.INTERVIEW_SCHEDULED, ApplicationStage.REJECTED, ApplicationStage.WITHDRAWN));
+                EnumSet.of(ApplicationStage.SCHEDULED, ApplicationStage.INTERVIEW,
+                        ApplicationStage.INTERVIEW_SCHEDULED, ApplicationStage.REJECTED, ApplicationStage.WITHDRAWN));
         transitions.put(ApplicationStage.SCHEDULED,
-            EnumSet.of(ApplicationStage.INTERVIEW, ApplicationStage.INTERVIEW_SCHEDULED,
-                ApplicationStage.REJECTED, ApplicationStage.WITHDRAWN));
+                EnumSet.of(ApplicationStage.INTERVIEW, ApplicationStage.INTERVIEW_SCHEDULED,
+                        ApplicationStage.REJECTED, ApplicationStage.WITHDRAWN));
         transitions.put(ApplicationStage.INTERVIEW,
-            EnumSet.of(ApplicationStage.INTERVIEW_SCHEDULED, ApplicationStage.INTERVIEW_COMPLETED,
-                ApplicationStage.REJECTED, ApplicationStage.WITHDRAWN));
+                EnumSet.of(ApplicationStage.INTERVIEW_SCHEDULED, ApplicationStage.INTERVIEW_COMPLETED,
+                        ApplicationStage.REJECTED, ApplicationStage.WITHDRAWN));
         transitions.put(ApplicationStage.INTERVIEW_SCHEDULED,
-            EnumSet.of(ApplicationStage.INTERVIEW, ApplicationStage.INTERVIEW_COMPLETED,
-                ApplicationStage.REJECTED, ApplicationStage.WITHDRAWN));
+                EnumSet.of(ApplicationStage.INTERVIEW, ApplicationStage.INTERVIEW_COMPLETED,
+                        ApplicationStage.REJECTED, ApplicationStage.WITHDRAWN));
         transitions.put(ApplicationStage.INTERVIEW_COMPLETED,
-            EnumSet.of(ApplicationStage.TRIAL, ApplicationStage.OFFER_EXTENDED,
-                ApplicationStage.REJECTED, ApplicationStage.WITHDRAWN));
+                EnumSet.of(ApplicationStage.TRIAL, ApplicationStage.OFFER_EXTENDED,
+                        ApplicationStage.REJECTED, ApplicationStage.WITHDRAWN));
         transitions.put(ApplicationStage.TRIAL,
-            EnumSet.of(ApplicationStage.HIRED, ApplicationStage.REJECTED,
-                ApplicationStage.WITHDRAWN, ApplicationStage.OFFER_EXTENDED,
-                ApplicationStage.OFFBOARDED));
+                EnumSet.of(ApplicationStage.HIRED, ApplicationStage.REJECTED,
+                        ApplicationStage.WITHDRAWN, ApplicationStage.OFFER_EXTENDED,
+                        ApplicationStage.OFFBOARDED));
         transitions.put(ApplicationStage.OFFER_EXTENDED,
-            EnumSet.of(ApplicationStage.OFFER_ACCEPTED, ApplicationStage.OFFER_DECLINED,
-                ApplicationStage.HIRED, ApplicationStage.REJECTED, ApplicationStage.WITHDRAWN,
-                ApplicationStage.TRIAL));
+                EnumSet.of(ApplicationStage.OFFER_ACCEPTED, ApplicationStage.OFFER_DECLINED,
+                        ApplicationStage.HIRED, ApplicationStage.REJECTED, ApplicationStage.WITHDRAWN,
+                        ApplicationStage.TRIAL));
         transitions.put(ApplicationStage.OFFER_ACCEPTED,
-            EnumSet.of(ApplicationStage.HIRED, ApplicationStage.TRIAL));
+                EnumSet.of(ApplicationStage.HIRED, ApplicationStage.TRIAL));
         transitions.put(ApplicationStage.OFFER_DECLINED,
-            EnumSet.noneOf(ApplicationStage.class));
+                EnumSet.noneOf(ApplicationStage.class));
         transitions.put(ApplicationStage.HIRED,
-            EnumSet.of(ApplicationStage.OFFBOARDED));
+                EnumSet.of(ApplicationStage.OFFBOARDED));
         transitions.put(ApplicationStage.OFFBOARDED,
-            EnumSet.noneOf(ApplicationStage.class));
+                EnumSet.noneOf(ApplicationStage.class));
         transitions.put(ApplicationStage.REJECTED,
-            EnumSet.noneOf(ApplicationStage.class));
+                EnumSet.noneOf(ApplicationStage.class));
         transitions.put(ApplicationStage.WITHDRAWN,
-            EnumSet.noneOf(ApplicationStage.class));
+                EnumSet.noneOf(ApplicationStage.class));
 
         return transitions;
-        }
+    }
 
     private String resolveStageNote(ApplicationStage stage, String providedNote) {
         if (StringUtils.hasText(providedNote)) {
@@ -391,7 +401,8 @@ public class ApplicationServiceImpl implements ApplicationService {
 
         try {
             // Each state change triggers a tailored candidate notification.
-            mailService.sendApplicationStageUpdateEmail(recipientEmail, candidateName, jobTitle, companyName, stage, note);
+            mailService.sendApplicationStageUpdateEmail(recipientEmail, candidateName, jobTitle, companyName, stage,
+                    note);
         } catch (Exception ex) {
             log.error("Failed to send stage update email for application {}", application.getId(), ex);
         }
