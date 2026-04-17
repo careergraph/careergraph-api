@@ -78,6 +78,39 @@ public class AuthRequests {
     }
 
     @Data
+    public static class RequestEmailChangeOtp {
+        @Email
+        @NotBlank
+        private String newEmail;
+    }
+
+    @Data
+    public static class ConfirmEmailChangeRequest {
+        @Email
+        @NotBlank
+        private String newEmail;
+
+        @NotBlank
+        private String otp;
+    }
+
+    @Data
+    public static class RequestPasswordChangeOtp {
+        @NotBlank
+        private String currentPassword;
+
+        @NotBlank
+        @Size(min = 8, max = 100)
+        private String newPassword;
+    }
+
+    @Data
+    public static class ConfirmPasswordChangeRequest {
+        @NotBlank
+        private String otp;
+    }
+
+    @Data
     public static class GoogleLoginRequest {
         @NotBlank
         private String idToken;

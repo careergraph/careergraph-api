@@ -18,7 +18,6 @@ import com.hcmute.careergraph.services.RedisService;
 import com.hcmute.careergraph.services.JwtTokenService;
 import com.hcmute.careergraph.services.MailService;
 import com.hcmute.careergraph.services.UserCacheService;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
@@ -319,6 +318,96 @@ public class AuthServiceImpl implements AuthService {
     }
 
     @Override
+    public Integer requestEmailChangeOtp(String accountId, AuthRequests.RequestEmailChangeOtp request) {
+        Account account = accountRepository.findById(accountId)
+                .orElseThrow(() -> new AppException(ErrorType.NOT_FOUND, "Account not found"));
+
+        String normalizedNewEmail = normalizeEmail(request.getNewEmail());
+        if (Objects.equals(account.getEmail(), normalizedNewEmail)) {
+            throw new AppException(ErrorType.BAD_REQUEST, "New email must be different from current email");
+        }
+        if (accountRepository.existsByEmail(normalizedNewEmail)) {
+            throw new AppException(ErrorType.CONFLICT, "Email already in use");
+        }
+
+        String otp = generateOtp();
+        redisService.setObject(accountOtpKey(accountId, "email_change"), otp, TIME_OTP_EXPIRED);
+        redisService.setObject(accountPendingKey(accountId, "email_change"), normalizedNewEmail, TIME_OTP_EXPIRED);
+
+        mailService.sendOtp(normalizedNewEmail, otp);
+        return TIME_OTP_EXPIRED;
+    }
+
+    @Override
+    public void confirmEmailChange(String accountId, AuthRequests.ConfirmEmailChangeRequest request) {
+        Account account = accountRepository.findById(accountId)
+                .orElseThrow(() -> new AppException(ErrorType.NOT_FOUND, "Account not found"));
+
+        String pendingEmail = redisService.getObject(accountPendingKey(accountId, "email_change"), String.class);
+        if (pendingEmail == null) {
+            throw new AppException(ErrorType.BAD_REQUEST, "No pending email change request");
+        }
+
+        String normalizedNewEmail = normalizeEmail(request.getNewEmail());
+        if (!pendingEmail.equals(normalizedNewEmail)) {
+            throw new AppException(ErrorType.BAD_REQUEST, "Email does not match pending request");
+        }
+
+        validateAccountOtpOrThrow(accountId, "email_change", request.getOtp());
+
+        if (accountRepository.existsByEmail(normalizedNewEmail)) {
+            throw new AppException(ErrorType.CONFLICT, "Email already in use");
+        }
+
+        account.setEmail(normalizedNewEmail);
+        account.setEmailVerified(true);
+        accountRepository.save(account);
+
+        redisService.deleteObject(accountOtpKey(accountId, "email_change"));
+        redisService.deleteObject(accountPendingKey(accountId, "email_change"));
+    }
+
+    @Override
+    public Integer requestPasswordChangeOtp(String accountId, AuthRequests.RequestPasswordChangeOtp request) {
+        Account account = accountRepository.findById(accountId)
+                .orElseThrow(() -> new AppException(ErrorType.NOT_FOUND, "Account not found"));
+
+        if (!passwordEncoder.matches(request.getCurrentPassword(), account.getPasswordHash())) {
+            throw new AppException(ErrorType.UNAUTHORIZED, "Current password is invalid");
+        }
+        if (passwordEncoder.matches(request.getNewPassword(), account.getPasswordHash())) {
+            throw new AppException(ErrorType.BAD_REQUEST, "New password must be different from current password");
+        }
+
+        String otp = generateOtp();
+        String nextPasswordHash = passwordEncoder.encode(request.getNewPassword());
+
+        redisService.setObject(accountOtpKey(accountId, "password_change"), otp, TIME_OTP_EXPIRED);
+        redisService.setObject(accountPendingKey(accountId, "password_change"), nextPasswordHash, TIME_OTP_EXPIRED);
+        mailService.sendOtp(account.getEmail(), otp);
+        return TIME_OTP_EXPIRED;
+    }
+
+    @Override
+    public void confirmPasswordChange(String accountId, AuthRequests.ConfirmPasswordChangeRequest request) {
+        Account account = accountRepository.findById(accountId)
+                .orElseThrow(() -> new AppException(ErrorType.NOT_FOUND, "Account not found"));
+
+        String nextPasswordHash = redisService.getObject(accountPendingKey(accountId, "password_change"), String.class);
+        if (nextPasswordHash == null || nextPasswordHash.isBlank()) {
+            throw new AppException(ErrorType.BAD_REQUEST, "No pending password change request");
+        }
+
+        validateAccountOtpOrThrow(accountId, "password_change", request.getOtp());
+
+        account.setPasswordHash(nextPasswordHash);
+        accountRepository.save(account);
+
+        redisService.deleteObject(accountOtpKey(accountId, "password_change"));
+        redisService.deleteObject(accountPendingKey(accountId, "password_change"));
+    }
+
+    @Override
     public AuthResponses.TokenResponse googleLogin(AuthRequests.GoogleLoginRequest request) {
         try {
             // Verify Google ID token using GoogleAuthService
@@ -473,6 +562,24 @@ public class AuthServiceImpl implements AuthService {
 
     private void validateOtpOrThrow(String email, String otp) {
         String cachedOtp = redisService.getObject(otpKey(email), String.class);
+        if (cachedOtp == null) {
+            throw new AppException(ErrorType.BAD_REQUEST, "OTP expired or not found");
+        }
+        if (otp == null || !cachedOtp.equals(otp.trim())) {
+            throw new AppException(ErrorType.BAD_REQUEST, "Invalid OTP");
+        }
+    }
+
+    private String accountOtpKey(String accountId, String purpose) {
+        return "otp:account:" + accountId + ":" + purpose;
+    }
+
+    private String accountPendingKey(String accountId, String purpose) {
+        return "otp:account:pending:" + accountId + ":" + purpose;
+    }
+
+    private void validateAccountOtpOrThrow(String accountId, String purpose, String otp) {
+        String cachedOtp = redisService.getObject(accountOtpKey(accountId, purpose), String.class);
         if (cachedOtp == null) {
             throw new AppException(ErrorType.BAD_REQUEST, "OTP expired or not found");
         }
