@@ -15,13 +15,15 @@ import lombok.RequiredArgsConstructor;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
-import com.cloudinary.AuthToken;
 
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
+import java.text.Normalizer;
 import java.util.*;
+import java.util.Locale;
 
 /**
  * Cloudinary service implementation
@@ -80,36 +82,60 @@ public class CloudinaryServiceImpl implements CloudinaryService {
         }
 
         String folder = ownerType + "/" + idd + "/" + fileType.name();
-        String original = Objects.requireNonNull(multipart.getOriginalFilename());
-        String safeName = original.replaceAll("[^a-zA-Z0-9.\\-_]", "_");
-        String publicId = UUID.randomUUID() + "_" + safeName;
+        String original = normalizeUtf8Filename(Objects.requireNonNull(multipart.getOriginalFilename()));
+        String displayName = buildDisplayName(original);
+        String publicId = UUID.randomUUID().toString();
 
-        Path tmp = Files.createTempFile("upload_", "_" + safeName);
-        multipart.transferTo(tmp);
+        Path inputTmp = Files.createTempFile("upload_", "_" + publicId);
+        try (InputStream is = multipart.getInputStream()) {
+            Files.copy(is, inputTmp, StandardCopyOption.REPLACE_EXISTING);
+        }
+
+        boolean convertToPdf = isWordDocument(original, multipart.getContentType());
+        Path uploadPath = convertToPdf
+                ? convertWordToPdf(inputTmp)
+                : inputTmp;
+        String uploadDisplayName = convertToPdf ? replaceExtension(displayName, "pdf") : displayName;
 
         try {
-            Map<String, Object> options = ObjectUtils.asMap(
+            @SuppressWarnings("unchecked")
+            Map<String, Object> options = (Map<String, Object>) ObjectUtils.asMap(
                     "resource_type", resourceType,   // image | video | raw
                     "folder", folder,
                     "public_id", publicId,
                     "overwrite", false,
-                    "access_mode", "public"          // 🔥 BẮT BUỘC → KHÔNG 401
+                    "access_mode", "public",         // 🔥 BẮT BUỘC → KHÔNG 401
+                    "display_name", uploadDisplayName,
+                    "filename_override", uploadDisplayName,
+                    "use_filename", true,
+                    "unique_filename", false
             );
 
             @SuppressWarnings("unchecked")
             Map<String, Object> result =
-                    cloudinary.uploader().upload(tmp.toFile(), options);
+                    cloudinary.uploader().upload(uploadPath.toFile(), options);
 
             File entity = fileMapper.toFile(result);
             entity.setOwnerId(idd);
             entity.setOwnerType(PartyType.fromLabel(ownerType));
             entity.setFileType(fileType);
+            entity.setFileName(uploadDisplayName);
+            entity.setOriginalFileName(original);
+            if (convertToPdf) {
+                entity.setMimeType("application/pdf");
+            }
 
             fileRepository.save(entity);
             return fileMapper.toFileResponse(entity);
 
         } finally {
-            Files.deleteIfExists(tmp);
+            Files.deleteIfExists(uploadPath);
+            if (convertToPdf) {
+                Files.deleteIfExists(uploadPath.getParent());
+            }
+            if (!Objects.equals(uploadPath, inputTmp)) {
+                Files.deleteIfExists(inputTmp);
+            }
         }
     }
 
@@ -151,7 +177,8 @@ public class CloudinaryServiceImpl implements CloudinaryService {
                 ? ownerType + "/" + idd + "/"
                 : ownerType + "/" + idd + "/" + fileType.name() + "/";
 
-        Map<String, Object> params = ObjectUtils.asMap(
+        @SuppressWarnings("unchecked")
+        Map<String, Object> params = (Map<String, Object>) ObjectUtils.asMap(
                 "type", "upload",
                 "prefix", prefix,
                 "max_results", 500
@@ -173,38 +200,90 @@ public class CloudinaryServiceImpl implements CloudinaryService {
     }
     /* ======================= HELPERS ======================= */
 
-    private java.io.File convertToTempFile(MultipartFile file, String extension)
-            throws IOException {
+    private Path convertWordToPdf(Path inputFile) throws IOException {
+        Path outDir = Files.createTempDirectory("cv_pdf_");
+        List<String> commands = List.of("soffice", "libreoffice");
 
-        String suffix = (extension == null || extension.isBlank())
-                ? ""
-                : "." + extension;
+        IOException lastError = null;
+        for (String command : commands) {
+            try {
+                Process process = new ProcessBuilder(
+                        command,
+                        "--headless",
+                        "--nologo",
+                        "--nofirststartwizard",
+                        "--convert-to",
+                        "pdf",
+                        "--outdir",
+                        outDir.toString(),
+                        inputFile.toString()
+                ).redirectErrorStream(true).start();
 
-        Path tmp = Files.createTempFile("upload_", suffix);
-        try (InputStream is = file.getInputStream()) {
-            Files.copy(is, tmp, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+                String output = new String(process.getInputStream().readAllBytes());
+                int exitCode = process.waitFor();
+                if (exitCode != 0) {
+                    lastError = new IOException("LibreOffice conversion failed: " + output.trim());
+                    continue;
+                }
+
+                String inputBase = getBaseName(inputFile.getFileName().toString());
+                Path converted = outDir.resolve(inputBase + ".pdf");
+                if (Files.exists(converted)) {
+                    return converted;
+                }
+
+                try (var stream = Files.list(outDir)) {
+                    Optional<Path> firstPdf = stream
+                            .filter(path -> path.getFileName().toString().toLowerCase(Locale.ROOT).endsWith(".pdf"))
+                            .findFirst();
+                    if (firstPdf.isPresent()) {
+                        return firstPdf.get();
+                    }
+                }
+
+                lastError = new IOException("LibreOffice did not produce a PDF file.");
+            } catch (IOException e) {
+                lastError = e;
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                throw new IOException("LibreOffice conversion interrupted", e);
+            }
         }
-        return tmp.toFile();
+
+        throw new IOException("DOC/DOCX to PDF conversion requires LibreOffice (soffice/libreoffice) installed.", lastError);
     }
 
-    private void cleanDisk(java.io.File file) {
-        if (file == null) return;
-        try {
-            Files.deleteIfExists(file.toPath());
-        } catch (IOException ignored) {
+    private String normalizeUtf8Filename(String filename) {
+        if (filename == null) {
+            return "file";
         }
+
+        return Normalizer.normalize(filename, Normalizer.Form.NFC)
+                .replaceAll("[\\\\/:\u0000-\u001F]", " ")
+                .replaceAll("\\s+", " ")
+                .trim();
     }
 
-    private List<String> buildTags(String ownerType, String idd, FileType fileType) {
-        return List.of(
-                "owner:" + idd,
-                "ownerType:" + ownerType,
-                "type:" + fileType.name()
-        );
+    private boolean isWordDocument(String filename, String contentType) {
+        String lower = filename == null ? "" : filename.toLowerCase(Locale.ROOT);
+        String mime = contentType == null ? "" : contentType.toLowerCase(Locale.ROOT);
+        return lower.endsWith(".doc") || lower.endsWith(".docx")
+                || "application/msword".equals(mime)
+                || "application/vnd.openxmlformats-officedocument.wordprocessingml.document".equals(mime);
     }
 
-    private String sanitizeFilename(String s) {
-        return (s == null) ? "file" : s.replaceAll("[^a-zA-Z0-9\\-_]", "_");
+    private String buildDisplayName(String originalFilename) {
+        String baseName = getBaseName(originalFilename);
+        String extension = getExtension(originalFilename);
+        if (StringUtils.isBlank(extension)) {
+            return originalFilename;
+        }
+        return baseName + "." + extension.toLowerCase(Locale.ROOT);
+    }
+
+    private String replaceExtension(String filename, String newExtension) {
+        String baseName = getBaseName(filename);
+        return baseName + "." + newExtension.toLowerCase(Locale.ROOT);
     }
 
     private String getBaseName(String originalName) {
