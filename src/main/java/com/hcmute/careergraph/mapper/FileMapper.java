@@ -90,6 +90,8 @@ public class FileMapper {
                 .id(file.getId())
                 .url(file.getFilePath())
                 .publicId(file.getPublicId())
+            .fileName(file.getFileName())
+            .originalFileName(file.getOriginalFileName())
                 .createdAt(file.getCreatedDate() != null
                         ? file.getCreatedDate().toString()
                         : null)

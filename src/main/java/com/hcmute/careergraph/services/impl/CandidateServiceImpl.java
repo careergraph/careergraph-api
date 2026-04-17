@@ -1,6 +1,5 @@
 package com.hcmute.careergraph.services.impl;
 
-import com.cloudinary.utils.ObjectUtils;
 import com.hcmute.careergraph.enums.application.ApplicationStage;
 import com.hcmute.careergraph.enums.candidate.AddressType;
 import com.hcmute.careergraph.enums.candidate.ContactType;
@@ -13,7 +12,6 @@ import com.hcmute.careergraph.persistence.event.CandidateUpdatedEvent;
 import org.springframework.context.ApplicationEventPublisher;
 import com.hcmute.careergraph.mapper.CandidateEducationMapper;
 import com.hcmute.careergraph.mapper.CandidateExperienceMapper;
-import com.hcmute.careergraph.mapper.CloudFileMapper;
 import com.hcmute.careergraph.mapper.FileMapper;
 import com.hcmute.careergraph.persistence.dtos.projection.AppliedJobsProjection;
 import com.hcmute.careergraph.persistence.dtos.request.CandidateRequest;
@@ -37,6 +35,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
+import java.text.Normalizer;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -58,13 +57,10 @@ public class CandidateServiceImpl implements CandidateService {
     private final EducationRepository educationRepository;
     private final CandidateEducationRepository candidateEducationRepository;
 
-    private static final int MAX = 20;
     private final SkillRepository skillRepository;
-    private final CandidateSkillRepository candidateSkillRepository;
 
     private final ApplicationServiceImpl applicationServiceImpl;
     private final ApplicationRepository applicationRepository;
-    private final JobRepository jobRepository;
     private final FileRepository fileRepository;
     private final FileMapper fileMapper;
     private final SavedJobRepository savedJobRepository;
@@ -75,8 +71,8 @@ public class CandidateServiceImpl implements CandidateService {
     public String getResource(String candidateId, FileType fileType)
             throws ChangeSetPersister.NotFoundException {
 
-        Candidate candidate = candidateRepository.findById(candidateId)
-                .orElseThrow(() -> new ChangeSetPersister.NotFoundException());
+        candidateRepository.findById(candidateId)
+            .orElseThrow(() -> new ChangeSetPersister.NotFoundException());
 
         // Check permission
         if (!securityUtils.getCandidateId().get().equals(candidateId)) {
@@ -465,6 +461,29 @@ public class CandidateServiceImpl implements CandidateService {
     }
 
     @Override
+    public FileResponse renameFile(String candidateId, String fileId, String newName) throws ChangeSetPersister.NotFoundException {
+        if (StringUtils.isBlank(candidateId) || StringUtils.isBlank(fileId)) {
+            throw new InternalException("Invalid file rename request");
+        }
+
+        String normalizedName = normalizeFileDisplayName(newName);
+        if (StringUtils.isBlank(normalizedName)) {
+            throw new InternalException("Tên CV không được để trống");
+        }
+
+        File file = fileRepository.findById(fileId)
+                .orElseThrow(ChangeSetPersister.NotFoundException::new);
+
+        if (!Objects.equals(file.getOwnerId(), candidateId)) {
+            throw new InternalException("You do not have permission to update this resource");
+        }
+
+        file.setFileName(normalizedName);
+        fileRepository.save(file);
+        return fileMapper.toFileResponse(file);
+    }
+
+    @Override
     public CandidateClientResponse.CandidateProfileResponse getOverview(String candidateId)
             throws ChangeSetPersister.NotFoundException {
         // return candidateRepository.findById(candidateId)
@@ -501,6 +520,23 @@ public class CandidateServiceImpl implements CandidateService {
         candidate.setIsOpenToNotifyNewJob(!candidate.getIsOpenToNotifyNewJob());
         candidateRepository.save(candidate);
         return candidate.getIsOpenToNotifyNewJob();
+    }
+
+    private String normalizeFileDisplayName(String input) {
+        if (input == null) {
+            return null;
+        }
+
+        String normalized = Normalizer.normalize(input, Normalizer.Form.NFC)
+                .replaceAll("[\\\\/:\u0000-\u001F]", " ")
+                .replaceAll("\\s+", " ")
+                .trim();
+
+        if (normalized.length() > 255) {
+            normalized = normalized.substring(0, 255).trim();
+        }
+
+        return normalized;
     }
 
     @Override

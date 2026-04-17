@@ -47,6 +47,8 @@ public interface CandidateService {
 
     void deleteByFileId(String candidateId, String fileId) throws ChangeSetPersister.NotFoundException;
 
+    FileResponse renameFile(String candidateId, String fileId, String newName) throws ChangeSetPersister.NotFoundException;
+
     CandidateClientResponse.CandidateProfileResponse getOverview(String candidateId) throws ChangeSetPersister.NotFoundException;
 
     List<Job> getSavedJobs(String candidateId);

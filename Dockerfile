@@ -21,6 +21,9 @@ FROM amazoncorretto:21-alpine
 
 WORKDIR /app
 
+# LibreOffice headless is required for DOC/DOCX -> PDF conversion.
+RUN apk add --no-cache libreoffice ttf-dejavu
+
 # Copy jar từ build stage
 COPY --from=build /app/target/*.jar app.jar
 COPY --from=build /app/init-scripts ./init-scripts
