@@ -5,6 +5,7 @@ import com.hcmute.careergraph.helper.RestResponse;
 import com.hcmute.careergraph.helper.SecurityUtils;
 import com.hcmute.careergraph.mapper.CompanyMapper;
 import com.hcmute.careergraph.mapper.JobMapper;
+import com.hcmute.careergraph.persistence.dtos.request.CompanyRequests;
 import com.hcmute.careergraph.persistence.dtos.response.CompanyResponse;
 import com.hcmute.careergraph.persistence.dtos.response.JobResponse;
 import com.hcmute.careergraph.persistence.models.Company;
@@ -19,6 +20,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
+import jakarta.validation.Valid;
 
 import java.util.HashMap;
 import java.util.List;
@@ -41,6 +43,24 @@ public class CompanyController {
         return RestResponse.<CompanyResponse>builder()
                 .status(HttpStatus.OK)
                 .data(companyMapper.toResponse(company, false))
+                .build();
+    }
+
+    @PutMapping("/me/profile")
+    public RestResponse<CompanyResponse> updateCompanyProfile(
+            Authentication authentication,
+            @Valid @RequestBody CompanyRequests.UpdateMyProfileRequest request
+    ) {
+        String companyId = securityUtils.extractCompanyId(authentication);
+        if (companyId == null || companyId.isBlank()) {
+            throw new BadRequestException("Company ID invalid");
+        }
+
+        Company company = companyService.updateMyProfile(companyId, request);
+        return RestResponse.<CompanyResponse>builder()
+                .status(HttpStatus.OK)
+                .message("Company profile updated successfully")
+                .data(companyMapper.toResponse(company, true))
                 .build();
     }
 

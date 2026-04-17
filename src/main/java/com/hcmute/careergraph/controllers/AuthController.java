@@ -1,11 +1,11 @@
 package com.hcmute.careergraph.controllers;
 
 import com.hcmute.careergraph.helper.RestResponse;
+import com.hcmute.careergraph.helper.SecurityUtils;
 import com.hcmute.careergraph.persistence.dtos.request.AuthRequests;
 import com.hcmute.careergraph.persistence.dtos.response.AuthResponses;
 import com.hcmute.careergraph.schedule.DailyDigestScheduler;
 import com.hcmute.careergraph.services.AuthService;
-import com.hcmute.careergraph.services.RedisService;
 import com.hcmute.careergraph.services.impl.AuthServiceImpl;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -28,11 +28,10 @@ import java.time.Duration;
 public class AuthController {
 
         private final AuthService authService;
-        private final RedisService redisService;
-        private final JwtDecoder jwtDecoder;
         private final JwtDecoder rawJwtDecoder;
         private final AuthServiceImpl authServiceImpl;
         private final DailyDigestScheduler dailyDigestScheduler;
+        private final SecurityUtils securityUtils;
 
         @Value("${cookie.secure:false}")
         private boolean cookieSecure;
@@ -45,17 +44,15 @@ public class AuthController {
         private static final String RESET_PASSWORD_COOKIE = "ttl_t";
 
         public AuthController(AuthService authService,
-                        RedisService redisService,
-                        JwtDecoder jwtDecoder,
                         @Qualifier("rawJwtDecoder") JwtDecoder rawJwtDecoder,
                         AuthServiceImpl authServiceImpl,
-                        DailyDigestScheduler dailyDigestScheduler) {
+                        DailyDigestScheduler dailyDigestScheduler,
+                        SecurityUtils securityUtils) {
                 this.authService = authService;
-                this.redisService = redisService;
-                this.jwtDecoder = jwtDecoder;
                 this.rawJwtDecoder = rawJwtDecoder;
                 this.authServiceImpl = authServiceImpl;
                 this.dailyDigestScheduler = dailyDigestScheduler;
+                this.securityUtils = securityUtils;
         }
 
         @PostMapping("/register/candidate")
@@ -217,6 +214,44 @@ public class AuthController {
                                 .build();
         }
 
+        @PostMapping("/email-change/request-otp")
+        public RestResponse<Integer> requestEmailChangeOtp(@Valid @RequestBody AuthRequests.RequestEmailChangeOtp request) {
+                Integer ttl = authService.requestEmailChangeOtp(getCurrentAccountId(), request);
+                return RestResponse.<Integer>builder()
+                                .status(HttpStatus.OK)
+                                .message("OTP sent successfully")
+                                .data(ttl)
+                                .build();
+        }
+
+        @PostMapping("/email-change/confirm")
+        public RestResponse<Void> confirmEmailChange(@Valid @RequestBody AuthRequests.ConfirmEmailChangeRequest request) {
+                authService.confirmEmailChange(getCurrentAccountId(), request);
+                return RestResponse.<Void>builder()
+                                .status(HttpStatus.OK)
+                                .message("Email updated successfully")
+                                .build();
+        }
+
+        @PostMapping("/password-change/request-otp")
+        public RestResponse<Integer> requestPasswordChangeOtp(@Valid @RequestBody AuthRequests.RequestPasswordChangeOtp request) {
+                Integer ttl = authService.requestPasswordChangeOtp(getCurrentAccountId(), request);
+                return RestResponse.<Integer>builder()
+                                .status(HttpStatus.OK)
+                                .message("OTP sent successfully")
+                                .data(ttl)
+                                .build();
+        }
+
+        @PostMapping("/password-change/confirm")
+        public RestResponse<Void> confirmPasswordChange(@Valid @RequestBody AuthRequests.ConfirmPasswordChangeRequest request) {
+                authService.confirmPasswordChange(getCurrentAccountId(), request);
+                return RestResponse.<Void>builder()
+                                .status(HttpStatus.OK)
+                                .message("Password updated successfully")
+                                .build();
+        }
+
         @PostMapping("/google-login")
         public RestResponse<AuthResponses.OnlyTokenResponse> googleLogin(
                         @Valid @RequestBody AuthRequests.GoogleLoginRequest request, HttpServletResponse resp) {
@@ -267,6 +302,12 @@ public class AuthController {
                                 .data(AuthResponses.OnlyTokenResponse.builder().accessToken(token.getAccessToken())
                                                 .build())
                                 .build();
+        }
+
+        private String getCurrentAccountId() {
+                return securityUtils.getCurrentAccount()
+                                .orElseThrow(() -> new RuntimeException("Không tìm thấy tài khoản"))
+                                .getId();
         }
 
 }
