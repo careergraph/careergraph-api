@@ -169,6 +169,51 @@ jobs:
               echo "[deploy-api][$(date -u +'%Y-%m-%dT%H:%M:%SZ')] $1"
             }
 
+            wait_for_service_ready() {
+              service_name="$1"
+              timeout_seconds="$2"
+              interval_seconds=5
+              attempts=$((timeout_seconds / interval_seconds))
+
+              if [ "$attempts" -le 0 ]; then
+                attempts=1
+              fi
+
+              log_step "Waiting for service '$service_name' to be ready"
+
+              for i in $(seq 1 "$attempts"); do
+                container_id=$(docker compose -f "$COMPOSE_FILE_TMP" ps -q "$service_name" | head -n 1)
+
+                if [ -n "$container_id" ]; then
+                  container_state=$(docker inspect -f '{{.State.Status}}' "$container_id" 2>/dev/null || echo "unknown")
+                  health_state=$(docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' "$container_id" 2>/dev/null || echo "unknown")
+
+                  if [ "$container_state" = "running" ] && { [ "$health_state" = "healthy" ] || [ "$health_state" = "none" ]; }; then
+                    log_step "Service '$service_name' is ready (state=$container_state, health=$health_state)"
+                    return 0
+                  fi
+
+                  if [ "$container_state" = "exited" ] || [ "$container_state" = "dead" ]; then
+                    log_step "Service '$service_name' container stopped unexpectedly (state=$container_state)"
+                    docker compose -f "$COMPOSE_FILE_TMP" logs --tail=120 "$service_name" || true
+                    return 1
+                  fi
+                fi
+
+                if [ $((i % 6)) -eq 0 ]; then
+                  elapsed=$((i * interval_seconds))
+                  log_step "Service '$service_name' not ready after ${elapsed}s"
+                fi
+
+                sleep "$interval_seconds"
+              done
+
+              log_step "Timed out waiting for service '$service_name'"
+              docker compose -f "$COMPOSE_FILE_TMP" ps "$service_name" || true
+              docker compose -f "$COMPOSE_FILE_TMP" logs --tail=120 "$service_name" || true
+              return 1
+            }
+
             prune_repo_images() {
               repo="$1"
               keep_tag_a="$2"
@@ -262,6 +307,13 @@ jobs:
             log_step "Pulling API image"
             docker compose -f "$COMPOSE_FILE_TMP" pull careergraph-api
             log_step "Pull completed"
+
+            log_step "Ensuring infrastructure dependencies are running"
+            docker compose -f "$COMPOSE_FILE_TMP" up -d careergraph-db careergraph-redis careergraph-elasticsearch
+
+            wait_for_service_ready careergraph-db 180
+            wait_for_service_ready careergraph-redis 180
+            wait_for_service_ready careergraph-elasticsearch 240
 
             log_step "Starting API container"
             docker compose -f "$COMPOSE_FILE_TMP" up -d --no-deps careergraph-api
