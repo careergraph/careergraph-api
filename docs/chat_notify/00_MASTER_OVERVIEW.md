@@ -59,8 +59,9 @@
 | 4 | Candidate FE — Inbox & Chat UI | React JS | 2–3 ngày |
 | 5 | Notification System — BE + Socket | Spring Boot + Node.js | 2 ngày |
 | 6 | Notification FE + Integration Test | React TS + React JS | 2 ngày |
+| 7 | Realtime Lifecycle Hardening (presence/subscription/reconnect) | React TS + React JS + Node.js RTC | 1–2 ngày |
 
-**Tổng:** ~11–15 ngày
+**Tổng:** ~12–17 ngày
 
 ---
 
@@ -127,5 +128,7 @@ docs/
 - [ ] HR nhận notification khi có ứng viên apply job
 - [ ] Cả 2 nhận notification khi có tin nhắn mới
 - [ ] Reconnect socket tự động khi mất kết nối
+- [ ] Subscription kênh chat/notify hoạt động ổn định ngay cả khi user không đứng ở trang `/messages`
+- [ ] Presence online không bị reset sai khi refresh thread list
 - [ ] Không có memory leak
 - [ ] Performance: FCP < 1.5s, không lag khi scroll chat
