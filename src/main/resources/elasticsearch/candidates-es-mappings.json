@@ -48,6 +48,10 @@
       "type": "text",
       "analyzer": "vi_analyzer"
     },
+    "resumeText": {
+      "type": "text",
+      "analyzer": "vi_analyzer"
+    },
     "isOpenToWork": {
       "type": "boolean"
     },

@@ -26,6 +26,17 @@ public interface JobRepository extends JpaRepository<Job, String> {
     """)
     Page<Job> findByCompanyId(String companyId, Pageable pageable);
 
+    @Query("""
+        SELECT j
+        FROM Job j
+        WHERE j.company.id = :companyId
+            AND j.status = 'ACTIVE'
+            AND (j.expiryDate IS NULL OR j.expiryDate >= :currentDate)
+    """)
+    Page<Job> findActiveJobsByCompanyId(@Param("companyId") String companyId,
+                                        @Param("currentDate") String currentDate,
+                                        Pageable pageable);
+
     Page<Job> findByJobCategory(JobCategory jobCategory, Pageable pageable);
 
     @Query("""

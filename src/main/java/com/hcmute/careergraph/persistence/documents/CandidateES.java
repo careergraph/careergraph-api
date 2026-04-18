@@ -68,6 +68,9 @@ public class CandidateES {
   @Field(type = FieldType.Text, analyzer = "vi_analyzer")
   private String summary;
 
+  @Field(type = FieldType.Text, analyzer = "vi_analyzer")
+  private String resumeText;
+
   /* ========= FILTER KEYWORDS ========= */
   @Field(type = FieldType.Boolean)
   private Boolean isOpenToWork;
@@ -123,6 +126,10 @@ public class CandidateES {
     }
     if (summary != null)
       sb.append(summary);
+    if (resumeText != null && !resumeText.isBlank()) {
+      String snippet = resumeText.length() > 4000 ? resumeText.substring(0, 4000) : resumeText;
+      sb.append(" ").append(snippet);
+    }
     return sb.toString().trim();
   }
 }

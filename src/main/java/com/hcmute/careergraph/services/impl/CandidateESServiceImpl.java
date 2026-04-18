@@ -9,10 +9,13 @@ import com.hcmute.careergraph.persistence.documents.CandidateES;
 import com.hcmute.careergraph.persistence.dtos.request.CandidateFilterRequest;
 import com.hcmute.careergraph.persistence.dtos.response.CandidateSuggestionResponse;
 import com.hcmute.careergraph.persistence.models.Candidate;
-import com.hcmute.careergraph.persistence.models.CandidateSkill;
+import com.hcmute.careergraph.persistence.models.File;
 import com.hcmute.careergraph.persistence.models.Job;
+import com.hcmute.careergraph.enums.common.FileType;
+import com.hcmute.careergraph.enums.common.Status;
 import com.hcmute.careergraph.repositories.CandidateESRepository;
 import com.hcmute.careergraph.repositories.CandidateRepository;
+import com.hcmute.careergraph.repositories.FileRepository;
 import com.hcmute.careergraph.repositories.JobRepository;
 import com.hcmute.careergraph.services.CandidateESService;
 import com.hcmute.careergraph.services.EmbedService;
@@ -21,6 +24,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
+import org.springframework.util.StringUtils;
 
 import java.time.LocalDate;
 import java.util.ArrayList;
@@ -35,6 +39,7 @@ public class CandidateESServiceImpl implements CandidateESService {
   private final CandidateESRepository candidateESRepository;
   private final CandidateRepository candidateRepository;
   private final JobRepository jobRepository;
+  private final FileRepository fileRepository;
   private final ElasticsearchClient client;
   private final EmbedService embedService;
 
@@ -79,8 +84,9 @@ public class CandidateESServiceImpl implements CandidateESService {
                         .fields(
                             "desiredPosition^10",
                             "currentJobTitle^5",
-                            "skills^3",
-                            "summary^1")
+                          "skills^3",
+                          "summary^1",
+                          "resumeText^2")
                         .fuzziness("AUTO")
                         .type(TextQueryType.BestFields)
                         .operator(Operator.Or)
@@ -96,7 +102,8 @@ public class CandidateESServiceImpl implements CandidateESService {
                         .query(keyword)
                         .fields(
                             "desiredPosition^10",
-                            "currentJobTitle^5")
+                          "currentJobTitle^5",
+                          "resumeText^2")
                         .type(TextQueryType.PhrasePrefix)
                         .boost(1.5f)));
 
@@ -130,7 +137,7 @@ public class CandidateESServiceImpl implements CandidateESService {
   }
 
   public SearchResponse<CandidateES> hybridSearchCandidatesForCompany(
-      List<String> jobTitles,
+      List<String> jobSearchTexts,
       CandidateFilterRequest filter,
       Pageable pageable) {
     try {
@@ -142,13 +149,15 @@ public class CandidateESServiceImpl implements CandidateESService {
           .query(q -> q.bool(b -> {
 
             /* ========= OR theo từng JOB (BM25) ========= */
-            for (String title : jobTitles) {
+            for (String title : jobSearchTexts) {
               b.should(sh -> sh.multiMatch(mm -> mm
                   .query(title)
                   .fields(
                       "desiredPosition^10",
-                      "currentJobTitle^6",
-                      "skills^3")
+                  "currentJobTitle^6",
+                  "skills^3",
+                  "summary^1",
+                  "resumeText^2")
                   .type(TextQueryType.BestFields)
                   .operator(Operator.Or)
                   .fuzziness("AUTO")
@@ -156,7 +165,7 @@ public class CandidateESServiceImpl implements CandidateESService {
             }
 
             /* ========= OR theo từng JOB (EMBEDDING) ========= */
-            for (String title : jobTitles) {
+            for (String title : jobSearchTexts) {
               float[] vector = embedService.embed(title);
               b.should(sh -> sh.knn(knn -> knn
                   .field("embedding")
@@ -198,7 +207,9 @@ public class CandidateESServiceImpl implements CandidateESService {
       Pageable pageable) {
     try {
       // Get active job titles from company
-      List<Job> companyJobs = jobRepository.findByCompanyId(companyId, PageRequest.of(0, 50)).getContent();
+        List<Job> companyJobs = jobRepository
+          .findActiveJobsByCompanyId(companyId, LocalDate.now().toString(), PageRequest.of(0, 50))
+          .getContent();
 
       if (companyJobs.isEmpty()) {
         log.debug("No active jobs found for company: {}", companyId);
@@ -206,19 +217,19 @@ public class CandidateESServiceImpl implements CandidateESService {
         return searchWithOnlyOpenToWorkFilter(pageable, filter);
       }
 
-      // Build search text from job titles
-      String searchText = companyJobs.stream()
-          .map(Job::getTitle)
-          .distinct()
-          .collect(Collectors.joining(" "));
-
-      log.debug("Searching candidates for company jobs: {}", searchText);
-      List<String> jobTitles = companyJobs.stream()
-          .map(Job::getTitle)
+        List<String> jobSearchTexts = companyJobs.stream()
+          .map(this::buildJobSearchText)
+          .filter(StringUtils::hasText)
           .distinct()
           .toList();
-      // return hybridSearchCandidates(searchText, filter, pageable);
-      return hybridSearchCandidatesForCompany(jobTitles, filter, pageable);
+
+        if (jobSearchTexts.isEmpty()) {
+          log.debug("No usable job search text for company: {}", companyId);
+          return searchWithOnlyOpenToWorkFilter(pageable, filter);
+        }
+
+        log.debug("Searching candidates for active jobs count={}", jobSearchTexts.size());
+        return hybridSearchCandidatesForCompany(jobSearchTexts, filter, pageable);
 
     } catch (Exception e) {
       log.error("Error searching candidates for company {}: {}", companyId, e.getMessage());
@@ -463,6 +474,7 @@ public class CandidateESServiceImpl implements CandidateESService {
         .desiredPosition(candidate.getDesiredPosition())
         .currentJobTitle(candidate.getCurrentJobTitle())
         .summary(candidate.getSummary())
+        .resumeText(resolveResumeText(candidate.getId()))
         .isOpenToWork(candidate.getIsOpenToWork() != null ? candidate.getIsOpenToWork() : false)
         .educationLevel(candidate.getEducationLevel())
         .industries(candidate.getIndustries())
@@ -474,6 +486,45 @@ public class CandidateESServiceImpl implements CandidateESService {
         .createdAt(LocalDate.now())
         .lastActive(LocalDate.now())
         .build();
+  }
+
+  private String resolveResumeText(String candidateId) {
+    return fileRepository
+        .findFirstByOwnerIdAndStatusAndFileTypeInAndShareToFindJobTrueOrderByCreatedDateDesc(
+            candidateId,
+            Status.ACTIVE,
+            List.of(FileType.RESUME, FileType.CV))
+        .map(File::getResumeExtractedText)
+        .filter(StringUtils::hasText)
+        .orElse(null);
+  }
+
+  private String buildJobSearchText(Job job) {
+    if (job == null) {
+      return null;
+    }
+    StringBuilder sb = new StringBuilder();
+    if (StringUtils.hasText(job.getTitle())) {
+      sb.append(job.getTitle()).append(" ");
+    }
+    if (StringUtils.hasText(job.getDescription())) {
+      sb.append(job.getDescription()).append(" ");
+    }
+    appendLines(sb, job.getQualifications());
+    appendLines(sb, job.getMinimumQualifications());
+    appendLines(sb, job.getResponsibilities());
+    return sb.toString().trim();
+  }
+
+  private void appendLines(StringBuilder sb, List<String> lines) {
+    if (lines == null || lines.isEmpty()) {
+      return;
+    }
+    for (String line : lines) {
+      if (StringUtils.hasText(line)) {
+        sb.append(line).append(" ");
+      }
+    }
   }
 
   private List<Float> toFloatList(float[] vector) {

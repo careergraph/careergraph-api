@@ -2,8 +2,12 @@ package com.hcmute.careergraph.config.app;
 
 import com.hcmute.careergraph.persistence.documents.CandidateES;
 import com.hcmute.careergraph.persistence.models.Candidate;
+import com.hcmute.careergraph.persistence.models.File;
+import com.hcmute.careergraph.enums.common.FileType;
+import com.hcmute.careergraph.enums.common.Status;
 import com.hcmute.careergraph.repositories.CandidateESRepository;
 import com.hcmute.careergraph.repositories.CandidateRepository;
+import com.hcmute.careergraph.repositories.FileRepository;
 import com.hcmute.careergraph.services.HuggingFaceEmbeddingService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -14,6 +18,7 @@ import org.springframework.core.annotation.Order;
 import org.springframework.data.elasticsearch.core.ElasticsearchOperations;
 import org.springframework.stereotype.Component;
 import org.springframework.ai.embedding.EmbeddingModel;
+import org.springframework.util.StringUtils;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
@@ -35,6 +40,7 @@ public class CandidateElasticsearchDataInitializer implements CommandLineRunner 
   private final CandidateRepository candidateRepository;
   private final CandidateESRepository candidateESRepository;
   private final ElasticsearchOperations elasticsearchOperations;
+  private final FileRepository fileRepository;
   private final HuggingFaceEmbeddingService huggingFaceEmbeddingService;
   private final EmbeddingModel embeddingModel;
 
@@ -73,9 +79,13 @@ public class CandidateElasticsearchDataInitializer implements CommandLineRunner 
           return;
         }
 
+        List<String> resumeTexts = allCandidates.stream()
+          .map(candidate -> resolveResumeText(candidate.getId()))
+          .toList();
+
         // Build search texts for embedding
-        List<String> searchTexts = allCandidates.stream()
-            .map(this::buildSearchTextFromCandidate)
+        List<String> searchTexts = IntStream.range(0, allCandidates.size())
+          .mapToObj(i -> buildSearchTextFromCandidate(allCandidates.get(i), resumeTexts.get(i)))
             .toList();
 
         // Generate embeddings in batches
@@ -86,7 +96,7 @@ public class CandidateElasticsearchDataInitializer implements CommandLineRunner 
 
         // Convert to CandidateES documents and save
         List<CandidateES> candidatesToSave = IntStream.range(0, allCandidates.size())
-            .mapToObj(i -> convertToCandidateES(allCandidates.get(i), embeddings.get(i)))
+          .mapToObj(i -> convertToCandidateES(allCandidates.get(i), resumeTexts.get(i), embeddings.get(i)))
             .toList();
 
         candidateESRepository.saveAll(candidatesToSave);
@@ -116,7 +126,7 @@ public class CandidateElasticsearchDataInitializer implements CommandLineRunner 
   /**
    * Build search text from Candidate entity for embedding generation
    */
-  private String buildSearchTextFromCandidate(Candidate candidate) {
+  private String buildSearchTextFromCandidate(Candidate candidate, String resumeText) {
     StringBuilder sb = new StringBuilder();
 
     if (candidate.getDesiredPosition() != null) {
@@ -134,6 +144,10 @@ public class CandidateElasticsearchDataInitializer implements CommandLineRunner 
     }
     if (candidate.getSummary() != null) {
       sb.append(candidate.getSummary());
+    }
+    if (StringUtils.hasText(resumeText)) {
+      String snippet = resumeText.length() > 4000 ? resumeText.substring(0, 4000) : resumeText;
+      sb.append(" ").append(snippet);
     }
 
     String result = sb.toString().trim();
@@ -163,7 +177,7 @@ public class CandidateElasticsearchDataInitializer implements CommandLineRunner 
   /**
    * Convert Candidate entity to CandidateES document
    */
-  private CandidateES convertToCandidateES(Candidate candidate, float[] embedding) {
+  private CandidateES convertToCandidateES(Candidate candidate, String resumeText, float[] embedding) {
     // Extract skill names
     List<String> skillNames = new ArrayList<>();
     if (candidate.getSkills() != null) {
@@ -189,6 +203,7 @@ public class CandidateElasticsearchDataInitializer implements CommandLineRunner 
         .desiredPosition(candidate.getDesiredPosition())
         .currentJobTitle(candidate.getCurrentJobTitle())
         .summary(candidate.getSummary())
+        .resumeText(resumeText)
         .isOpenToWork(candidate.getIsOpenToWork() != null ? candidate.getIsOpenToWork() : false)
         .educationLevel(candidate.getEducationLevel())
         .experienceLevel(determineExperienceLevel(candidate.getYearsOfExperience()))
@@ -202,6 +217,17 @@ public class CandidateElasticsearchDataInitializer implements CommandLineRunner 
         .lastActive(LocalDate.now())
         .embedding(embedding)
         .build();
+  }
+
+  private String resolveResumeText(String candidateId) {
+    return fileRepository
+        .findFirstByOwnerIdAndStatusAndFileTypeInAndShareToFindJobTrueOrderByCreatedDateDesc(
+            candidateId,
+            Status.ACTIVE,
+            List.of(FileType.RESUME, FileType.CV))
+        .map(File::getResumeExtractedText)
+        .filter(StringUtils::hasText)
+        .orElse(null);
   }
 
   /**
