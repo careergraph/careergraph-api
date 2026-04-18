@@ -13,6 +13,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.time.LocalDateTime;
 import java.time.LocalDate;
 import java.util.*;
 
@@ -20,10 +21,10 @@ import java.util.*;
 public interface JobRepository extends JpaRepository<Job, String> {
 
     @Query("""
-        SELECT j
-        FROM Job j
-        WHERE j.company.id = :companyId
-    """)
+                SELECT j
+                FROM Job j
+                WHERE j.company.id = :companyId
+            """)
     Page<Job> findByCompanyId(String companyId, Pageable pageable);
 
     @Query("""
@@ -40,54 +41,53 @@ public interface JobRepository extends JpaRepository<Job, String> {
     Page<Job> findByJobCategory(JobCategory jobCategory, Pageable pageable);
 
     @Query("""
-        SELECT j.id, j.title
-        FROM Job j
-        WHERE j.company.id = :companyId
-            AND lower(j.title) LIKE lower(concat('%', :query,'%'))
-    """)
+                SELECT j.id, j.title
+                FROM Job j
+                WHERE j.company.id = :companyId
+                    AND lower(j.title) LIKE lower(concat('%', :query,'%'))
+            """)
     Map<String, String> lookup(@Param("companyId") String companyId, @Param("query") String query);
 
     @Query("""
-        SELECT j FROM Job j WHERE j.id = :jobId AND j.company.id = :companyId
-    """)
+                SELECT j FROM Job j WHERE j.id = :jobId AND j.company.id = :companyId
+            """)
     Optional<Job> findByIdAndCompanyId(@Param("jobId") String jobId, @Param("companyId") String companyId);
 
     @Query("""
-        SELECT j
-        FROM Job j
-        WHERE j.company.id = :companyId
-            AND (:statuses IS NULL OR j.status IN :statuses)
-            AND (:categories IS NULL OR j.jobCategory IN :categories)
-            AND (:types IS NULL OR j.employmentType IN :types)
-            AND (
-                :query IS NULL OR
-                lower(j.title) LIKE lower(concat('%', :query, '%')) OR
-                lower(j.description) LIKE lower(concat('%', :query, '%')))
-    """)
+                SELECT j
+                FROM Job j
+                WHERE j.company.id = :companyId
+                    AND (:statuses IS NULL OR j.status IN :statuses)
+                    AND (:categories IS NULL OR j.jobCategory IN :categories)
+                    AND (:types IS NULL OR j.employmentType IN :types)
+                    AND (
+                        :query IS NULL OR
+                        lower(j.title) LIKE lower(concat('%', :query, '%')) OR
+                        lower(j.description) LIKE lower(concat('%', :query, '%')))
+            """)
     Page<Job> searchJobForCompany(
             @Param("companyId") String companyId,
             @Param("statuses") List<Status> statuses,
             @Param("categories") List<JobCategory> categories,
             @Param("types") List<EmploymentType> types,
             @Param("query") String query,
-            Pageable pageable
-    );
+            Pageable pageable);
 
     @Query("""
-        SELECT j
-        FROM Job j
-        WHERE (NULLIF(TRIM(:city), '') IS NULL
-                OR lower(j.city) LIKE lower(concat('%', :city, '%'))
-                OR lower(j.state) LIKE lower(concat('%', :city, '%')))
-            AND (:jobCategories IS NULL OR j.jobCategory IN :jobCategories)
-            AND (:employmentTypes IS NULL OR j.employmentType IN :employmentTypes)
-            AND (:experienceLevels IS NULL OR j.experienceLevel IN :experienceLevels)
-            AND (:educationTypes IS NULL OR j.education IN :educationTypes)
-            AND (NULLIF(TRIM(:query), '') IS NULL OR
-                lower(j.title) LIKE lower(concat('%', :query, '%')) OR
-                lower(j.description) LIKE lower(concat('%', :query, '%')))
-        ORDER BY function('RANDOM')
-    """)
+                SELECT j
+                FROM Job j
+                WHERE (NULLIF(TRIM(:city), '') IS NULL
+                        OR lower(j.city) LIKE lower(concat('%', :city, '%'))
+                        OR lower(j.state) LIKE lower(concat('%', :city, '%')))
+                    AND (:jobCategories IS NULL OR j.jobCategory IN :jobCategories)
+                    AND (:employmentTypes IS NULL OR j.employmentType IN :employmentTypes)
+                    AND (:experienceLevels IS NULL OR j.experienceLevel IN :experienceLevels)
+                    AND (:educationTypes IS NULL OR j.education IN :educationTypes)
+                    AND (NULLIF(TRIM(:query), '') IS NULL OR
+                        lower(j.title) LIKE lower(concat('%', :query, '%')) OR
+                        lower(j.description) LIKE lower(concat('%', :query, '%')))
+                ORDER BY function('RANDOM')
+            """)
     Page<Job> searchJobForCandidate(
             @Param("candidateId") String candidateId,
             @Param("city") String city,
@@ -96,64 +96,74 @@ public interface JobRepository extends JpaRepository<Job, String> {
             @Param("experienceLevels") List<ExperienceLevel> experienceLevels,
             @Param("educationTypes") List<EducationType> educationTypes,
             @Param("query") String query,
-            Pageable pageable
-    );
+            Pageable pageable);
 
     @Query("""
-        SELECT j FROM Job j
-        WHERE j.status = 'ACTIVE'
-        ORDER BY j.views DESC, j.applicants DESC, j.liked DESC, j.shared DESC
-    """)
+                SELECT j FROM Job j
+                WHERE j.status = 'ACTIVE'
+                ORDER BY j.views DESC, j.applicants DESC, j.liked DESC, j.shared DESC
+            """)
     List<Job> findPopularJob();
 
     @Query(value = """
-        SELECT DISTINCT j.*
-        FROM jobs j
-        WHERE j.status = 'ACTIVE'
-            AND j.expiry_date >= :currentDate
-            AND EXISTS (
-                SELECT 1
-                FROM candidates c
-                WHERE c.id = :userId AND (
-                    (c.industries IS NOT NULL AND jsonb_exists(c.industries::jsonb, j.job_category))
-                    OR (c.locations IS NOT NULL AND jsonb_exists(c.locations::jsonb, j.state))
-                    OR (c.work_types IS NOT NULL AND jsonb_exists(c.work_types::jsonb, j.employment_type))
-                    OR (c.years_of_experience IS NOT NULL
-                        AND (j.min_experience IS NULL OR c.years_of_experience >= j.min_experience)
-                        AND (j.max_experience IS NULL OR c.years_of_experience <= j.max_experience))
-                    OR (c.education_level IS NOT NULL AND c.education_level = j.education)
-                )
-          )
-    """, nativeQuery = true)
+                SELECT DISTINCT j.*
+                FROM jobs j
+                WHERE j.status = 'ACTIVE'
+                    AND j.expiry_date >= :currentDate
+                    AND EXISTS (
+                        SELECT 1
+                        FROM candidates c
+                        WHERE c.id = :userId AND (
+                            (c.industries IS NOT NULL AND jsonb_exists(c.industries::jsonb, j.job_category))
+                            OR (c.locations IS NOT NULL AND jsonb_exists(c.locations::jsonb, j.state))
+                            OR (c.work_types IS NOT NULL AND jsonb_exists(c.work_types::jsonb, j.employment_type))
+                            OR (c.years_of_experience IS NOT NULL
+                                AND (j.min_experience IS NULL OR c.years_of_experience >= j.min_experience)
+                                AND (j.max_experience IS NULL OR c.years_of_experience <= j.max_experience))
+                            OR (c.education_level IS NOT NULL AND c.education_level = j.education)
+                        )
+                  )
+            """, nativeQuery = true)
     List<Job> findJobByPersonalized(@Param("userId") String userId,
-                                    @Param("currentDate") String currentDate);
-
+            @Param("currentDate") String currentDate);
 
     @Query("""
-        SELECT j
-        FROM Job j
-        JOIN Job target ON target.id = :jobId
-        WHERE j.id <> :jobId
-            AND j.status = 'ACTIVE'
-            AND j.jobCategory = target.jobCategory
-            AND (j.experienceLevel = target.experienceLevel
-                OR (j.minExperience <= target.maxExperience AND j.maxExperience >= target.minExperience))
-        ORDER BY function('RANDOM')
-    """)
+                SELECT j
+                FROM Job j
+                JOIN Job target ON target.id = :jobId
+                WHERE j.id <> :jobId
+                    AND j.status = 'ACTIVE'
+                    AND j.jobCategory = target.jobCategory
+                    AND (j.experienceLevel = target.experienceLevel
+                        OR (j.minExperience <= target.maxExperience AND j.maxExperience >= target.minExperience))
+                ORDER BY function('RANDOM')
+            """)
     Page<Job> findSimilarJob(@Param("jobId") String jobId, Pageable pageable);
 
     @Query("""
-        SELECT j
-        FROM Job j
-        WHERE j.status = 'ACTIVE'
-            AND j.expiryDate >= :currentDate
-            AND (:excludeIds IS NULL OR j.id NOT IN :excludeIds)
-        ORDER BY j.createdDate DESC
-    """)
-    List<Job> findLatestJobsExcluding(@Param("currentDate") String currentDate, @Param("excludeIds") Collection<String> excludeIds);
-
+                SELECT j
+                FROM Job j
+                WHERE j.status = 'ACTIVE'
+                    AND j.expiryDate >= :currentDate
+                    AND (:excludeIds IS NULL OR j.id NOT IN :excludeIds)
+                ORDER BY j.createdDate DESC
+            """)
+    List<Job> findLatestJobsExcluding(@Param("currentDate") String currentDate,
+            @Param("excludeIds") Collection<String> excludeIds);
 
     List<Job> findAllByOrderByCreatedDateDesc(Pageable pageable);
 
+    @Query("""
+                SELECT COALESCE(SUM(j.numberOfPositions), 0)
+                FROM Job j
+                WHERE j.company.id = :companyId
+                  AND j.createdDate BETWEEN :from AND :to
+                  AND j.status IN :statuses
+            """)
+    Long sumNumberOfPositionsByCompanyIdAndCreatedDateBetweenAndStatusIn(
+            @Param("companyId") String companyId,
+            @Param("from") LocalDateTime from,
+            @Param("to") LocalDateTime to,
+            @Param("statuses") Collection<Status> statuses);
 
 }
