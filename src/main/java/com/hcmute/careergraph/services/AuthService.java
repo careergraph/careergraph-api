@@ -26,6 +26,14 @@ public interface AuthService {
 
     void resetPassword(String resetPasswordToken, AuthRequests.ResetPasswordRequest request);
 
+    Integer requestEmailChangeOtp(String accountId, AuthRequests.RequestEmailChangeOtp request);
+
+    void confirmEmailChange(String accountId, AuthRequests.ConfirmEmailChangeRequest request);
+
+    Integer requestPasswordChangeOtp(String accountId, AuthRequests.RequestPasswordChangeOtp request);
+
+    void confirmPasswordChange(String accountId, AuthRequests.ConfirmPasswordChangeRequest request);
+
     AuthResponses.TokenResponse googleLogin(AuthRequests.GoogleLoginRequest request);
 
     AuthResponses.TokenResponse refreshWithFamily(Jwt jwt);

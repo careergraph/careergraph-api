@@ -5,8 +5,6 @@ import lombok.Builder;
 import lombok.Getter;
 import lombok.Setter;
 
-import java.time.Instant;
-
 @Builder
 @Getter
 @Setter
@@ -15,6 +13,8 @@ public class FileResponse{
         String id;
         String url;
         String publicId;
+        String fileName;
+        String originalFileName;
         String createdAt;
         String ownerType;
         String idd;
