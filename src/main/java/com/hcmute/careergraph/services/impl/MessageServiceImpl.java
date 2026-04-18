@@ -25,6 +25,8 @@ import org.springframework.util.StringUtils;
 
 import java.time.Duration;
 import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
+import java.time.ZoneId;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -36,6 +38,8 @@ import java.util.Optional;
 @Slf4j
 @Transactional
 public class MessageServiceImpl implements MessageService {
+
+  private static final ZoneId VIETNAM_TIME_ZONE = ZoneId.of("Asia/Ho_Chi_Minh");
 
   private static final int DEFAULT_THREAD_PAGE_SIZE = 20;
   private static final int DEFAULT_MESSAGE_PAGE_SIZE = 30;
@@ -67,7 +71,7 @@ public class MessageServiceImpl implements MessageService {
     ThreadParticipants participants = resolveThreadParticipants(currentAccount, request);
 
     Optional<MessageThread> existing = messageThreadRepository
-      .findByCompanyIdAndCandidateId(participants.company().getId(), participants.candidate().getId());
+        .findByCompanyIdAndCandidateId(participants.company().getId(), participants.candidate().getId());
 
     if (existing.isPresent()) {
       MessageThread thread = existing.get();
@@ -91,15 +95,17 @@ public class MessageServiceImpl implements MessageService {
       return toThreadSummary(currentAccount, saved);
     }
 
-    MessageThread recovered = findThreadInNewTransaction(participants.company().getId(), participants.candidate().getId())
-        .orElseThrow(() -> new DataIntegrityViolationException("duplicate thread insert failed and recovery lookup returned empty"));
-    
+    MessageThread recovered = findThreadInNewTransaction(participants.company().getId(),
+        participants.candidate().getId())
+        .orElseThrow(() -> new DataIntegrityViolationException(
+            "duplicate thread insert failed and recovery lookup returned empty"));
+
     // Re-attach recovered entity to current session
     MessageThread mergedThread = messageThreadRepository.findWithEagerByCompanyIdAndCandidateId(
-        recovered.getCompany().getId(), 
+        recovered.getCompany().getId(),
         recovered.getCandidate().getId())
-      .orElse(recovered);
-    
+        .orElse(recovered);
+
     return toThreadSummary(currentAccount, mergedThread);
   }
 
@@ -119,8 +125,8 @@ public class MessageServiceImpl implements MessageService {
   private Optional<MessageThread> findThreadInNewTransaction(String companyId, String candidateId) {
     TransactionTemplate template = new TransactionTemplate(transactionManager);
     template.setPropagationBehavior(org.springframework.transaction.TransactionDefinition.PROPAGATION_REQUIRES_NEW);
-    return Optional.ofNullable(template.execute(status ->
-        messageThreadRepository.findWithEagerByCompanyIdAndCandidateId(companyId, candidateId).orElse(null)));
+    return Optional.ofNullable(template.execute(
+        status -> messageThreadRepository.findWithEagerByCompanyIdAndCandidateId(companyId, candidateId).orElse(null)));
   }
 
   @Override
@@ -253,12 +259,12 @@ public class MessageServiceImpl implements MessageService {
         .deleted(false)
         .build();
 
-      // New message should bring the thread back to both participants' inbox.
-      threadDeletionRepository.deleteByThreadId(threadId);
-      thread.setArchivedByCompany(false);
-      thread.setArchivedByCompanyAt(null);
-      thread.setArchivedByCandidate(false);
-      thread.setArchivedByCandidateAt(null);
+    // New message should bring the thread back to both participants' inbox.
+    threadDeletionRepository.deleteByThreadId(threadId);
+    thread.setArchivedByCompany(false);
+    thread.setArchivedByCompanyAt(null);
+    thread.setArchivedByCandidate(false);
+    thread.setArchivedByCandidateAt(null);
 
     Message savedMessage = messageRepository.save(message);
 
@@ -448,11 +454,12 @@ public class MessageServiceImpl implements MessageService {
     Account candidateAccount = accountRepository.findByCandidateId(candidateId)
         .orElseThrow(() -> new NotFoundException("Không tìm thấy tài khoản ứng viên"));
 
-    Optional<UserBlock> block = userBlockRepository.findByBlockerIdAndBlockedId(currentAccount.getId(), candidateAccount.getId());
+    Optional<UserBlock> block = userBlockRepository.findByBlockerIdAndBlockedId(currentAccount.getId(),
+        candidateAccount.getId());
 
     return MessagingResponses.BlockStatusDto.builder()
         .blocked(block.isPresent())
-        .blockedAt(block.map(UserBlock::getBlockedAt).orElse(null))
+        .blockedAt(block.map(UserBlock::getBlockedAt).map(this::toVstOffsetDateTime).orElse(null))
         .reason(block.map(UserBlock::getReason).orElse(null))
         .build();
   }
@@ -477,7 +484,8 @@ public class MessageServiceImpl implements MessageService {
 
     var threadIds = role == Role.HR
         ? messageThreadRepository.findVisibleIdsByCompanyId(currentAccount.getCompany().getId(), currentAccount.getId())
-        : messageThreadRepository.findVisibleIdsByCandidateId(currentAccount.getCandidate().getId(), currentAccount.getId());
+        : messageThreadRepository.findVisibleIdsByCandidateId(currentAccount.getCandidate().getId(),
+            currentAccount.getId());
 
     if (threadIds == null || threadIds.isEmpty()) {
       return 0L;
@@ -599,8 +607,8 @@ public class MessageServiceImpl implements MessageService {
           .build();
     }
 
-            List<MessagingResponses.ThreadJobDto> jobs = resolveThreadJobs(currentAccount, thread);
-            MessagingResponses.ThreadJobDto primaryJob = resolvePrimaryJob(jobs);
+    List<MessagingResponses.ThreadJobDto> jobs = resolveThreadJobs(currentAccount, thread);
+    MessagingResponses.ThreadJobDto primaryJob = resolvePrimaryJob(jobs);
 
     long unreadCount = messageRepository.countUnreadInThread(thread.getId(), currentAccount.getId(), EPOCH);
     boolean isHr = resolveRole(currentAccount) == Role.HR;
@@ -608,8 +616,8 @@ public class MessageServiceImpl implements MessageService {
     String hrAccountId = resolveHrAccountId(thread);
     String candidateAccountId = resolveCandidateAccountId(thread);
     boolean blocked = StringUtils.hasText(hrAccountId)
-      && StringUtils.hasText(candidateAccountId)
-      && userBlockRepository.existsByBlockerIdAndBlockedId(hrAccountId, candidateAccountId);
+        && StringUtils.hasText(candidateAccountId)
+        && userBlockRepository.existsByBlockerIdAndBlockedId(hrAccountId, candidateAccountId);
 
     return MessagingResponses.ThreadSummaryDto.builder()
         .threadId(thread.getId())
@@ -618,11 +626,11 @@ public class MessageServiceImpl implements MessageService {
         .jobs(jobs)
         .primaryJob(primaryJob)
         .lastMessagePreview(thread.getLastMessagePreview())
-        .lastMessageAt(thread.getLastMessageAt())
+        .lastMessageAt(toVstOffsetDateTime(thread.getLastMessageAt()))
         .unreadCount(unreadCount)
         .online(false)
-      .archived(archived)
-      .blocked(blocked)
+        .archived(archived)
+        .blocked(blocked)
         .build();
   }
 
@@ -674,9 +682,9 @@ public class MessageServiceImpl implements MessageService {
         .fileSize(message.getFileSize())
         .deleted(message.isDeleted())
         .jobContext(toJobContextDto(message.getThread(), message.getJobContext()))
-        .createdAt(message.getCreatedDate())
+        .createdAt(toVstOffsetDateTime(message.getCreatedDate()))
         .read(isRead)
-        .readAt(isRead ? readAt : null)
+        .readAt(isRead ? toVstOffsetDateTime(readAt) : null)
         .build();
   }
 
@@ -708,14 +716,15 @@ public class MessageServiceImpl implements MessageService {
       LocalDateTime lastMessageAt = messageRepository
           .findLastMessageTimeByThreadAndJob(thread.getId(), jobId)
           .orElse(null);
-      long unreadCount = messageRepository.countUnreadInThreadByJob(thread.getId(), jobId, currentAccount.getId(), EPOCH);
+      long unreadCount = messageRepository.countUnreadInThreadByJob(thread.getId(), jobId, currentAccount.getId(),
+          EPOCH);
 
       groupedJobs.put(jobId, MessagingResponses.ThreadJobDto.builder()
           .jobId(jobId)
           .jobTitle(job.getTitle())
           .jobStatus(application.getCurrentStage() != null ? application.getCurrentStage().name() : null)
           .unreadCount(unreadCount)
-          .lastMessageAt(lastMessageAt)
+          .lastMessageAt(toVstOffsetDateTime(lastMessageAt))
           .hasMessages(lastMessageAt != null)
           .build());
     }
@@ -807,7 +816,7 @@ public class MessageServiceImpl implements MessageService {
     if (candidate == null) {
       return "Candidate";
     }
-    
+
     // Ensure candidate is initialized to access lazy properties
     try {
       String firstName = StringUtils.hasText(candidate.getFirstName()) ? candidate.getFirstName().trim() : "";
@@ -820,7 +829,7 @@ public class MessageServiceImpl implements MessageService {
         return candidate.getTagname().trim();
       }
     } catch (Exception e) {
-      log.warn("Failed to resolve candidate name for id: {}, fallback to tagname or default", 
+      log.warn("Failed to resolve candidate name for id: {}, fallback to tagname or default",
           candidate.getId(), e);
     }
     return "Candidate";
@@ -892,9 +901,13 @@ public class MessageServiceImpl implements MessageService {
         .fullName(candidate != null ? resolveCandidateName(candidate) : resolveAccountName(blocked))
         .email(blocked != null ? blocked.getEmail() : null)
         .avatarUrl(blocked != null ? resolveAccountAvatar(blocked) : null)
-        .blockedAt(userBlock.getBlockedAt())
+        .blockedAt(toVstOffsetDateTime(userBlock.getBlockedAt()))
         .reason(userBlock.getReason())
         .build();
+  }
+
+  private OffsetDateTime toVstOffsetDateTime(LocalDateTime value) {
+    return value == null ? null : value.atZone(VIETNAM_TIME_ZONE).toOffsetDateTime();
   }
 
   private record ThreadParticipants(Company company, Candidate candidate, Application application) {

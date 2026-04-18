@@ -106,6 +106,8 @@ services:
     environment:
       SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-dev}
       SERVER_PORT: ${SERVER_PORT:-8080}
+      TZ: ${TZ:-Asia/Ho_Chi_Minh}
+      JAVA_TIME_ZONE: ${JAVA_TIME_ZONE:-Asia/Ho_Chi_Minh}
       SPRING_DATASOURCE_URL: jdbc:postgresql://careergraph-db:5432/${POSTGRES_DB:-careergraph}
       SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-postgres}
       SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-postgres}

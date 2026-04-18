@@ -15,14 +15,14 @@ spring:
       max-lifetime: ${DATASOURCE_MAX_LIFETIME_MS:1800000}
       auto-commit: true
       data-source-properties:
-        TimeZone: Asia/Ho_Chi_Minh
+        TimeZone: ${DATASOURCE_TIME_ZONE:Asia/Ho_Chi_Minh}
   jpa:
     show-sql: ${JPA_SHOW_SQL:false}
     hibernate:
       ddl-auto: ${JPA_DDL_AUTO:update}
       format_sql: ${JPA_FORMAT_SQL:false}
     properties:
-      "[hibernate.jdbc.time_zone]": UTC
+      "[hibernate.jdbc.time_zone]": ${HIBERNATE_JDBC_TIME_ZONE:Asia/Ho_Chi_Minh}
   data:
     redis:
       host: ${SPRING_REDIS_HOST:localhost}

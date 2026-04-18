@@ -7,7 +7,7 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
 import java.util.HashMap;
 import java.util.List;
 
@@ -54,7 +54,7 @@ public class MessagingResponses {
     private String jobTitle;
     private String jobStatus;
     private long unreadCount;
-    private LocalDateTime lastMessageAt;
+    private OffsetDateTime lastMessageAt;
     private boolean hasMessages;
   }
 
@@ -69,7 +69,7 @@ public class MessagingResponses {
     private List<ThreadJobDto> jobs;
     private ThreadJobDto primaryJob;
     private String lastMessagePreview;
-    private LocalDateTime lastMessageAt;
+    private OffsetDateTime lastMessageAt;
     private long unreadCount;
     private boolean online;
     private boolean archived;
@@ -93,9 +93,9 @@ public class MessagingResponses {
     private Long fileSize;
     private boolean deleted;
     private JobContextDto jobContext;
-    private LocalDateTime createdAt;
+    private OffsetDateTime createdAt;
     private boolean read;
-    private LocalDateTime readAt;
+    private OffsetDateTime readAt;
   }
 
   @Data
@@ -109,8 +109,8 @@ public class MessagingResponses {
     private String body;
     private HashMap<String, Object> data;
     private boolean read;
-    private LocalDateTime createdAt;
-    private LocalDateTime readAt;
+    private OffsetDateTime createdAt;
+    private OffsetDateTime readAt;
   }
 
   @Data
@@ -129,7 +129,7 @@ public class MessagingResponses {
   @AllArgsConstructor
   public static class BlockStatusDto {
     private boolean blocked;
-    private LocalDateTime blockedAt;
+    private OffsetDateTime blockedAt;
     private String reason;
   }
 
@@ -142,7 +142,7 @@ public class MessagingResponses {
     private String fullName;
     private String email;
     private String avatarUrl;
-    private LocalDateTime blockedAt;
+    private OffsetDateTime blockedAt;
     private String reason;
   }
 }

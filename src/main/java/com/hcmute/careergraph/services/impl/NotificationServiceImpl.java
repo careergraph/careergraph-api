@@ -24,6 +24,8 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 import org.springframework.util.StringUtils;
 
 import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
+import java.time.ZoneId;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Optional;
@@ -36,6 +38,7 @@ import java.util.UUID;
 public class NotificationServiceImpl implements NotificationService {
 
   private static final int SEARCH_PAGE_SIZE = 10;
+  private static final ZoneId VIETNAM_TIME_ZONE = ZoneId.of("Asia/Ho_Chi_Minh");
 
   private final NotificationRepository notificationRepository;
   private final AccountRepository accountRepository;
@@ -66,10 +69,10 @@ public class NotificationServiceImpl implements NotificationService {
         .read(false)
         .build();
 
-      Notification saved = notificationRepository.save(notification);
-      log.info("Created notification {} for recipient {}", type, recipientAccountId);
-      dispatchSocketPush(saved);
-      return saved;
+    Notification saved = notificationRepository.save(notification);
+    log.info("Created notification {} for recipient {}", type, recipientAccountId);
+    dispatchSocketPush(saved);
+    return saved;
   }
 
   @Override
@@ -175,12 +178,12 @@ public class NotificationServiceImpl implements NotificationService {
     NotificationContent content = resolveApplicationNotificationContent(companyName, jobTitle, newStage);
 
     createOrUpdateApplicationNotification(
-      candidateAccountOpt.get().getId(),
-      notificationType,
-      content.title(),
-      content.body(),
-      data,
-      application.getId());
+        candidateAccountOpt.get().getId(),
+        notificationType,
+        content.title(),
+        content.body(),
+        data,
+        application.getId());
   }
 
   @Override
@@ -275,9 +278,13 @@ public class NotificationServiceImpl implements NotificationService {
         .body(notification.getBody())
         .data(notification.getData() != null ? new HashMap<>(notification.getData()) : new HashMap<>())
         .read(notification.isRead())
-        .createdAt(notification.getCreatedDate())
-        .readAt(notification.getReadAt())
+        .createdAt(toVstOffsetDateTime(notification.getCreatedDate()))
+        .readAt(toVstOffsetDateTime(notification.getReadAt()))
         .build();
+  }
+
+  private OffsetDateTime toVstOffsetDateTime(LocalDateTime value) {
+    return value == null ? null : value.atZone(VIETNAM_TIME_ZONE).toOffsetDateTime();
   }
 
   private Notification createOrUpdateApplicationNotification(String recipientId,

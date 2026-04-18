@@ -31,6 +31,7 @@ EXPOSE 8080
 
 # Java memory config
 ENV JAVA_OPTS="-Xmx768m -Xms256m -XX:MaxMetaspaceSize=256m"
+ENV JAVA_TIME_ZONE=Asia/Ho_Chi_Minh
 
 # Run application
-ENTRYPOINT ["sh", "-c", "java $JAVA_OPTS -Dserver.port=${PORT} -jar /app/app.jar"]
+ENTRYPOINT ["sh", "-c", "java $JAVA_OPTS -Duser.timezone=${JAVA_TIME_ZONE:-Asia/Ho_Chi_Minh} -Dserver.port=${PORT} -jar /app/app.jar"]
