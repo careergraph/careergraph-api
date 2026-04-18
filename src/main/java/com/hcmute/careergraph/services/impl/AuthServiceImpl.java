@@ -304,12 +304,18 @@ public class AuthServiceImpl implements AuthService {
 
     @Override
     public void resetPassword(String resetPasswordToken, AuthRequests.ResetPasswordRequest request) {
+        Jwt jwt;
+        try {
+            jwt = rawJwtDecoder.decode(resetPasswordToken);
+        } catch (JwtException ex) {
+            throw new AppException(ErrorType.UNAUTHORIZED, "Invalid or expired reset password token");
+        }
 
-        Jwt jwt = jwtDecoder.decode(resetPasswordToken);
-        if (!jwt.getClaim("type").equals("opt_token")) {
+        if (!"opt_token".equals(jwt.getClaimAsString("type"))) {
             throw new AppException(ErrorType.UNAUTHORIZED, "Invalid token type");
         }
-        String email = jwt.getSubject();
+
+        String email = normalizeEmail(jwt.getSubject());
         Account account = accountRepository.findByEmail(email)
                 .orElseThrow(() -> new AppException(ErrorType.NOT_FOUND, "Invalid OTP"));
         account.setPasswordHash(passwordEncoder.encode(request.getNewPassword()));
