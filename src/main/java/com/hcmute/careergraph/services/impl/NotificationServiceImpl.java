@@ -8,6 +8,7 @@ import com.hcmute.careergraph.exception.NotFoundException;
 import com.hcmute.careergraph.persistence.dtos.response.MessagingResponses;
 import com.hcmute.careergraph.persistence.models.*;
 import com.hcmute.careergraph.repositories.AccountRepository;
+import com.hcmute.careergraph.repositories.ApplicationRepository;
 import com.hcmute.careergraph.repositories.MessageRepository;
 import com.hcmute.careergraph.repositories.NotificationRepository;
 import com.hcmute.careergraph.services.NotificationService;
@@ -42,6 +43,7 @@ public class NotificationServiceImpl implements NotificationService {
 
   private final NotificationRepository notificationRepository;
   private final AccountRepository accountRepository;
+  private final ApplicationRepository applicationRepository;
   private final MessageRepository messageRepository;
   private final SocketNotificationPusher socketNotificationPusher;
 
@@ -214,6 +216,56 @@ public class NotificationServiceImpl implements NotificationService {
         NotificationType.NEW_APPLICATION,
         "New application received",
         candidateName + " applied for " + jobTitle,
+        data);
+  }
+
+  @Override
+  public void onApplicationAiScreeningCompleted(String applicationId,
+      int matchScore,
+      boolean autoRejected,
+      String summarySnippet) {
+    if (!StringUtils.hasText(applicationId)) {
+      return;
+    }
+    Application application = applicationRepository.findById(applicationId).orElse(null);
+    if (application == null || application.getJob() == null || application.getJob().getCompany() == null) {
+      return;
+    }
+
+    Optional<Account> companyAccountOpt = accountRepository.findByCompanyId(application.getJob().getCompany().getId());
+    if (companyAccountOpt.isEmpty()) {
+      log.warn("Company account not found for AI screening notification {}", application.getJob().getCompany().getId());
+      return;
+    }
+
+    String candidateName = Optional.ofNullable(application.getCandidate())
+        .map(this::resolveCandidateName)
+        .orElse("Ứng viên");
+    String jobTitle = Optional.ofNullable(application.getJob().getTitle()).orElse("tin tuyển dụng");
+
+    String body = String.format("Điểm phù hợp JD: %d%%. %s",
+        matchScore,
+        autoRejected
+            ? "Hệ thống đã chuyển hồ sơ sang Từ chối (dưới ngưỡng)."
+            : "Hồ sơ đạt ngưỡng, vẫn ở bước đã nộp.");
+    if (StringUtils.hasText(summarySnippet)) {
+      String shortSnip = summarySnippet.length() > 160 ? summarySnippet.substring(0, 157) + "..." : summarySnippet;
+      body = body + " " + shortSnip;
+    }
+
+    HashMap<String, Object> data = new HashMap<>();
+    data.put("applicationId", application.getId());
+    data.put("jobId", application.getJob().getId());
+    data.put("candidateId", application.getCandidate() != null ? application.getCandidate().getId() : null);
+    data.put("matchScore", matchScore);
+    data.put("autoRejected", autoRejected);
+    data.put("navigateTo", "/jobs/" + application.getJob().getId() + "/applications");
+
+    createNotification(
+        companyAccountOpt.get().getId(),
+        NotificationType.APPLICATION_AI_SCREENING,
+        "AI đã sàng lọc hồ sơ",
+        candidateName + " — " + jobTitle + ". " + body,
         data);
   }
 

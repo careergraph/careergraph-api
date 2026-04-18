@@ -79,4 +79,31 @@ public class FastAPIClientServiceImpl implements FastAPIClientService {
             throw new RuntimeException("AI service temporarily unavailable", ex);
         }
     }
+
+    @Override
+    public String reviewCvJobFit(String jsonBody) {
+        try {
+            log.info("Calling FastAPI review-cv endpoint");
+
+            String response = webClient.post()
+                    .uri(FAST_API_URL + "/api/v1/review-cv")
+                    .header("Content-Type", "application/json")
+                    .bodyValue(jsonBody)
+                    .retrieve()
+                    .bodyToMono(String.class)
+                    .timeout(Duration.ofSeconds(45))
+                    .retryWhen(Retry.fixedDelay(1, Duration.ofSeconds(1)))
+                    .block();
+
+            if (response == null) {
+                throw new RuntimeException("FastAPI returned null response");
+            }
+
+            return response;
+
+        } catch (Exception ex) {
+            log.error("ERROR: FastAPI review-cv call failed - {}", ex.getMessage());
+            throw new RuntimeException("AI service temporarily unavailable", ex);
+        }
+    }
 }

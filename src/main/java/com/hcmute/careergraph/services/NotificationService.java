@@ -37,5 +37,11 @@ public interface NotificationService {
 
   void onNewApplication(Application application);
 
+  /**
+   * Thông báo tài khoản công ty sau khi pipeline AI sàng lọc xong (điểm + có auto-reject hay không).
+   */
+  void onApplicationAiScreeningCompleted(String applicationId, int matchScore, boolean autoRejected,
+      String summarySnippet);
+
   void onNewMessage(Message message, MessageThread thread);
 }

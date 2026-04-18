@@ -16,9 +16,12 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
+
+import com.hcmute.careergraph.persistence.event.ApplicationCreatedEvent;
 
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
@@ -42,6 +45,7 @@ public class ApplicationServiceImpl implements ApplicationService {
     private final JobRepository jobRepository;
     private final MailService mailService;
     private final NotificationService notificationService;
+    private final ApplicationEventPublisher applicationEventPublisher;
 
     private static final String SUBMISSION_NOTE = "Ứng viên đã nộp hồ sơ.";
     private static final Map<ApplicationStage, Set<ApplicationStage>> BASE_TRANSITIONS = buildBaseTransitions();
@@ -88,6 +92,8 @@ public class ApplicationServiceImpl implements ApplicationService {
         notificationService.onNewApplication(savedApplication);
         dispatchStageEmail(savedApplication, ApplicationStage.APPLIED, SUBMISSION_NOTE, null);
         log.info("Application created successfully with id: {}", savedApplication.getId());
+
+        applicationEventPublisher.publishEvent(new ApplicationCreatedEvent(savedApplication.getId()));
 
         return savedApplication;
     }

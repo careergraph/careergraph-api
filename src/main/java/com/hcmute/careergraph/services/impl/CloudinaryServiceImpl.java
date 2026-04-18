@@ -11,8 +11,10 @@ import com.hcmute.careergraph.persistence.dtos.response.FileResponse;
 import com.hcmute.careergraph.persistence.models.File;
 import com.hcmute.careergraph.repositories.FileRepository;
 import com.hcmute.careergraph.services.CloudinaryService;
+import com.hcmute.careergraph.persistence.event.ResumeFilePersistedEvent;
 import lombok.RequiredArgsConstructor;
 import org.apache.commons.lang3.StringUtils;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -39,6 +41,7 @@ public class CloudinaryServiceImpl implements CloudinaryService {
     private final Cloudinary cloudinary;
     private final FileRepository fileRepository;
     private final FileMapper fileMapper;
+    private final ApplicationEventPublisher applicationEventPublisher;
 
     /* ================= UPLOAD IMAGE ================= */
 
@@ -126,6 +129,9 @@ public class CloudinaryServiceImpl implements CloudinaryService {
             }
 
             fileRepository.save(entity);
+            if (fileType == FileType.RESUME || fileType == FileType.CV) {
+                applicationEventPublisher.publishEvent(new ResumeFilePersistedEvent(entity.getId()));
+            }
             return fileMapper.toFileResponse(entity);
 
         } finally {

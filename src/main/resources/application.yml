@@ -86,6 +86,18 @@ cache:
 fast-api:
   base-url: ${FAST_API_BASE_URL:http://localhost:8000}
 
+# Sàng lọc AI sau khi ứng viên nộp đơn (async, sau commit). Tắt mặc định để tránh surprise trên môi trường cũ.
+application:
+  ai-screening:
+    enabled: ${APPLICATION_AI_SCREENING_ENABLED:false}
+    # Ứng viên được giữ APPLIED nếu matchScore >= giá trị này; dưới ngưỡng → REJECTED (nếu enabled).
+    min-score-percent: ${APPLICATION_AI_SCREENING_MIN_SCORE_PERCENT:50}
+    max-chars-for-ai-prompt: ${APPLICATION_AI_SCREENING_MAX_PROMPT_CHARS:14000}
+  resume-extraction:
+    max-download-bytes: ${RESUME_EXTRACTION_MAX_DOWNLOAD_BYTES:15728640}
+    max-stored-chars: ${RESUME_EXTRACTION_MAX_STORED_CHARS:50000}
+    allowed-hosts: ${RESUME_EXTRACTION_ALLOWED_HOSTS:res.cloudinary.com}
+
 springdoc:
   api-docs:
     path: /v3/api-docs

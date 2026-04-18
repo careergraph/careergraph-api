@@ -11,6 +11,7 @@ import com.hcmute.careergraph.exception.ForbiddenException;
 import com.hcmute.careergraph.persistence.dtos.response.MessagingResponses;
 import com.hcmute.careergraph.persistence.models.*;
 import com.hcmute.careergraph.repositories.AccountRepository;
+import com.hcmute.careergraph.repositories.ApplicationRepository;
 import com.hcmute.careergraph.repositories.MessageRepository;
 import com.hcmute.careergraph.repositories.NotificationRepository;
 import org.mockito.junit.jupiter.MockitoSettings;
@@ -43,6 +44,8 @@ class NotificationServiceImplTest {
   private NotificationRepository notificationRepository;
   @Mock
   private AccountRepository accountRepository;
+  @Mock
+  private ApplicationRepository applicationRepository;
   @Mock
   private MessageRepository messageRepository;
   @Mock

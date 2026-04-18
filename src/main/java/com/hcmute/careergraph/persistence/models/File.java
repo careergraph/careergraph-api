@@ -55,4 +55,16 @@ public class File extends BaseEntity {
     @Column(name = "original_file_name")
     private String originalFileName;
 
+    /**
+     * Plain text trích từ file CV (PDF/DOCX), đã truncate để lưu DB — dùng cho AI match JD.
+     */
+    @Column(name = "resume_extracted_text", columnDefinition = "TEXT")
+    private String resumeExtractedText;
+
+    /**
+     * Lỗi trích xuất gần nhất (nếu có); null khi thành công hoặc chưa chạy.
+     */
+    @Column(name = "resume_extraction_error", columnDefinition = "TEXT")
+    private String resumeExtractionError;
+
 }
