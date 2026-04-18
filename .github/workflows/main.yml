@@ -169,6 +169,31 @@ jobs:
               echo "[deploy-api][$(date -u +'%Y-%m-%dT%H:%M:%SZ')] $1"
             }
 
+            prune_repo_images() {
+              repo="$1"
+              keep_tag_a="$2"
+              keep_tag_b="$3"
+
+              if [ -z "$repo" ]; then
+                return 0
+              fi
+
+              log_step "Pruning old images for $repo (keeping tags: $keep_tag_a, $keep_tag_b)"
+
+              docker image ls "$repo" --format '{{.Repository}}:{{.Tag}}' \
+                | grep -v '<none>' \
+                | grep -v ":${keep_tag_a}$" \
+                | grep -v ":${keep_tag_b}$" \
+                | sort -u \
+                | while read -r image_ref; do
+                    if [ -n "$image_ref" ]; then
+                      docker image rm -f "$image_ref" || true
+                    fi
+                  done
+
+              docker image prune -f || true
+            }
+
             log_step "Starting API deployment script"
 
             if [ -z "$VPS_APP_DIR" ]; then
@@ -232,12 +257,14 @@ jobs:
             echo "$DOCKER_HUB_ACCESS_TOKEN" | docker login -u "$DOCKER_HUB_USERNAME" --password-stdin
             log_step "Docker login succeeded"
 
+            prune_repo_images "$IMAGE_REPO" "$IMAGE_TAG" "latest"
+
             log_step "Pulling API image"
             docker compose -f "$COMPOSE_FILE_TMP" pull careergraph-api
             log_step "Pull completed"
 
             log_step "Starting API container"
-            docker compose -f "$COMPOSE_FILE_TMP" up -d careergraph-api
+            docker compose -f "$COMPOSE_FILE_TMP" up -d --no-deps careergraph-api
             log_step "Container start command completed"
 
             API_HOST_PORT=$(docker compose -f "$COMPOSE_FILE_TMP" port careergraph-api "${SERVER_PORT_CONTAINER:-8080}" | tail -n 1 | awk -F: '{print $NF}')
@@ -274,9 +301,8 @@ jobs:
               for i in $(seq 1 "$HEALTHCHECK_ATTEMPTS"); do
                 if curl -fsS "$url" > /dev/null; then
                   log_step "Healthcheck succeeded at: $url"
-                  log_step "Removing API image tags from VPS (keeping DB/cache/search images)"
-                  docker image rm "$IMAGE_REPO:$IMAGE_TAG" || true
-                  docker image rm "$IMAGE_REPO:latest" || true
+                  log_step "Pruning old API images from VPS"
+                  prune_repo_images "$IMAGE_REPO" "$IMAGE_TAG" "latest"
                   log_step "Deployment completed successfully"
                   exit 0
                 fi
