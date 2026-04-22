@@ -34,6 +34,9 @@ public class Company extends Party {
     @Column(name = "ceo_name")
     private String ceoName;
 
+    @Column(name = "description", columnDefinition = "TEXT")
+    private String description;
+
     @Column(name = "no_of_members", columnDefinition = "int default 0")
     private Integer noOfMembers;
 

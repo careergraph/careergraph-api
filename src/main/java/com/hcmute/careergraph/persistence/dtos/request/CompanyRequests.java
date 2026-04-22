@@ -13,6 +13,7 @@ public final class CompanyRequests {
     public record UpdateMyProfileRequest(
             String name,
             String ceoName,
+            String description,
             String website,
             String size,
             Integer noOfMembers,

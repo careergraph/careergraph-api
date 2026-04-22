@@ -89,6 +89,66 @@ public class CompanyController {
                 .build();
     }
 
+    @GetMapping("/{companyId}/follow-status")
+    public RestResponse<Boolean> getFollowStatus(
+            @PathVariable("companyId") String companyId,
+            Authentication authentication
+    ) {
+        if (companyId == null || companyId.isBlank()) {
+            throw new BadRequestException("Company ID invalid");
+        }
+
+        String candidateId = securityUtils.extractCandidateId(authentication);
+        if (candidateId == null || candidateId.isBlank()) {
+            throw new BadRequestException("Candidate ID invalid");
+        }
+
+        boolean followed = companyService.isCandidateFollowingCompany(candidateId, companyId);
+
+        return RestResponse.<Boolean>builder()
+                .status(HttpStatus.OK)
+                .data(followed)
+                .build();
+    }
+
+    @PutMapping("/{companyId}/follow")
+    public RestResponse<Boolean> toggleFollowCompany(
+            @PathVariable("companyId") String companyId,
+            Authentication authentication
+    ) {
+        if (companyId == null || companyId.isBlank()) {
+            throw new BadRequestException("Company ID invalid");
+        }
+
+        String candidateId = securityUtils.extractCandidateId(authentication);
+        if (candidateId == null || candidateId.isBlank()) {
+            throw new BadRequestException("Candidate ID invalid");
+        }
+
+        boolean followed = companyService.toggleCandidateFollowCompany(candidateId, companyId);
+
+        return RestResponse.<Boolean>builder()
+                .status(HttpStatus.OK)
+                .message(followed ? "Followed company successfully" : "Unfollowed company successfully")
+                .data(followed)
+                .build();
+    }
+
+    @GetMapping("/following")
+    public RestResponse<List<CompanyResponse>> getFollowedCompanies(Authentication authentication) {
+        String candidateId = securityUtils.extractCandidateId(authentication);
+        if (candidateId == null || candidateId.isBlank()) {
+            throw new BadRequestException("Candidate ID invalid");
+        }
+
+        List<CompanyResponse> companies = companyService.getFollowedCompanies(candidateId);
+
+        return RestResponse.<List<CompanyResponse>>builder()
+                .status(HttpStatus.OK)
+                .data(companies)
+                .build();
+    }
+
     @GetMapping("/{companyId}/jobs")
     public RestResponse<Page<JobResponse>> getJobsByCompanies(@PathVariable("companyId") String companyId,
                                                               @RequestParam(name = "page", defaultValue = "0") Integer page,
@@ -119,13 +179,5 @@ public class CompanyController {
                 .map(job -> jobMapper.toResponse(job))
                 .toList();
         return new PageImpl<>(jobResponses, pageable, jobPage.getTotalElements());
-    }
-
-    // Helper method to map to response page
-    private List<JobResponse> mapToJobResponseList(List<Job> jobs) {
-        List<JobResponse> jobResponses = jobs.stream()
-                .map(job -> jobMapper.toResponse(job))
-                .toList();
-        return jobResponses;
     }
 }

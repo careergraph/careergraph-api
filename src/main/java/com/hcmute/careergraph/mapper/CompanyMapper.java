@@ -72,6 +72,7 @@ public class CompanyMapper {
                 .size(company.getSize())
                 .website(company.getWebsite())
                 .ceoName(company.getCeoName())
+                .description(company.getDescription())
                 .noOfMembers(company.getNoOfMembers())
                 .yearFounded(company.getYearFounded())
                 .offerBeforeTrial(company.getOfferBeforeTrial())

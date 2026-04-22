@@ -23,6 +23,7 @@ public record CompanyResponse(
         String size,
         String website,
         String ceoName,
+        String description,
         Integer noOfMembers,
         Integer yearFounded,
         Boolean offerBeforeTrial,

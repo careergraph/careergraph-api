@@ -2,13 +2,20 @@ package com.hcmute.careergraph.services.impl;
 
 import com.hcmute.careergraph.exception.NotFoundException;
 import com.hcmute.careergraph.enums.candidate.AddressType;
+import com.hcmute.careergraph.enums.candidate.ConnectionType;
 import com.hcmute.careergraph.enums.candidate.ContactType;
 import com.hcmute.careergraph.persistence.dtos.request.CompanyRequests;
+import com.hcmute.careergraph.persistence.dtos.response.CompanyResponse;
 import com.hcmute.careergraph.persistence.models.Address;
+import com.hcmute.careergraph.persistence.models.Candidate;
+import com.hcmute.careergraph.persistence.models.Connection;
 import com.hcmute.careergraph.persistence.models.Contact;
 import com.hcmute.careergraph.persistence.models.Company;
+import com.hcmute.careergraph.repositories.CandidateRepository;
 import com.hcmute.careergraph.repositories.CompanyRepository;
+import com.hcmute.careergraph.repositories.ConnectionRepository;
 import com.hcmute.careergraph.services.CompanyService;
+import com.hcmute.careergraph.mapper.CompanyMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -17,6 +24,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -24,6 +32,9 @@ import java.util.List;
 public class CompanyServiceImpl implements CompanyService {
 
     private final CompanyRepository companyRepository;
+    private final CandidateRepository candidateRepository;
+    private final ConnectionRepository connectionRepository;
+    private final CompanyMapper companyMapper;
 
     @Override
     @Transactional(readOnly = true)
@@ -43,6 +54,9 @@ public class CompanyServiceImpl implements CompanyService {
         }
         if (request.ceoName() != null) {
             company.setCeoName(request.ceoName().trim());
+        }
+        if (request.description() != null) {
+            company.setDescription(request.description().trim());
         }
         if (request.website() != null) {
             company.setWebsite(request.website().trim());
@@ -109,6 +123,78 @@ public class CompanyServiceImpl implements CompanyService {
         }
 
         return companyRepository.save(company);
+    }
+
+        @Override
+        @Transactional(readOnly = true)
+        public boolean isCandidateFollowingCompany(String candidateId, String companyId) {
+        return connectionRepository.existsByCandidateIdAndConnectedCompanyIdAndConnectionType(
+            candidateId,
+            companyId,
+            ConnectionType.FOLLOWED
+        );
+        }
+
+        @Override
+        @Transactional
+        public boolean toggleCandidateFollowCompany(String candidateId, String companyId) {
+        Candidate candidate = candidateRepository.findById(candidateId)
+            .orElseThrow(() -> new NotFoundException("Candidate not found"));
+        Company company = companyRepository.findById(companyId)
+            .orElseThrow(() -> new NotFoundException("Company not found"));
+
+        Connection existing = connectionRepository
+            .findByCandidateIdAndConnectedCompanyIdAndConnectionType(
+                candidateId,
+                companyId,
+                ConnectionType.FOLLOWED
+            )
+            .orElse(null);
+
+        if (existing != null) {
+            connectionRepository.delete(existing);
+            candidate.setNoOfFollowing(Math.max(0, candidate.getNoOfFollowing() - 1));
+            company.setNoOfFollowers(Math.max(0, company.getNoOfFollowers() - 1));
+            candidateRepository.save(candidate);
+            companyRepository.save(company);
+            return false;
+        }
+
+        Connection followConnection = Connection.builder()
+            .candidate(candidate)
+            .connectedCompanyId(companyId)
+            .connectionType(ConnectionType.FOLLOWED)
+            .hasSeen(true)
+            .disableNotification(false)
+            .build();
+        connectionRepository.save(followConnection);
+
+        candidate.setNoOfFollowing(candidate.getNoOfFollowing() + 1);
+        company.setNoOfFollowers(company.getNoOfFollowers() + 1);
+        candidateRepository.save(candidate);
+        companyRepository.save(company);
+
+        return true;
+        }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<CompanyResponse> getFollowedCompanies(String candidateId) {
+        List<String> companyIds = connectionRepository
+                .findAllByCandidateIdAndConnectionType(candidateId, ConnectionType.FOLLOWED)
+                .stream()
+                .map(Connection::getConnectedCompanyId)
+                .filter(id -> id != null && !id.isBlank())
+                .distinct()
+                .toList();
+
+        if (companyIds.isEmpty()) {
+            return List.of();
+        }
+
+        return companyRepository.findAllById(companyIds).stream()
+                .map(company -> companyMapper.toResponse(company, true))
+                .collect(Collectors.toList());
     }
 
     @Override
