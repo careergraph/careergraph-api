@@ -34,15 +34,11 @@ public class CompanyMapper {
             return null;
         }
 
-        Set<ContactResponse> contacts = new HashSet<>();
-        Set<AddressResponse> addresses = new HashSet<>();
-        Set<JobResponse> jobs = new HashSet<>();
-
-        if (isDetail) {
-            jobs = toJobResponseSet(company.getJobs());
-            addresses = toAddressResponseSet(company.getAddresses());
-            contacts = toContactResponseSet(company.getContacts());
-        }
+        // Contacts and addresses are lightweight and needed by HR profile screens.
+        // Jobs are only attached in detail mode to avoid oversized payloads.
+        Set<ContactResponse> contacts = toContactResponseSet(company.getContacts());
+        Set<AddressResponse> addresses = toAddressResponseSet(company.getAddresses());
+        Set<JobResponse> jobs = isDetail ? toJobResponseSet(company.getJobs()) : Collections.emptySet();
 
         // Extract account info (role, email) if available
         String role = null;

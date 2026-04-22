@@ -12,7 +12,6 @@ import com.hcmute.careergraph.repositories.InterviewRepository;
 import com.hcmute.careergraph.repositories.JobRepository;
 import com.hcmute.careergraph.services.AnalyticsService;
 import lombok.RequiredArgsConstructor;
-import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -63,7 +62,6 @@ public class AnalyticsServiceImpl implements AnalyticsService {
   private final JobRepository jobRepository;
 
   @Override
-  @Cacheable(value = "dashboardSummary", key = "#companyId + ':' + #from + ':' + #to")
   public DashboardSummaryResponse getDashboardSummary(LocalDate from, LocalDate to, String companyId) {
     DateWindow window = DateWindow.of(from, to);
     DateWindow previousWindow = window.previousWindow();
