@@ -401,6 +401,7 @@ public class CandidateServiceImpl implements CandidateService {
         Page<Application> page = applicationServiceImpl.getApplicationsByCandidateWithJob(candidateId, pageable);
         page.getContent().forEach(application -> {
             list.add(CandidateClientResponse.AppliedJobs.builder()
+                    .applicationId(application.getId())
                     .jobName(application.getJob().getTitle())
                     .companyName(application.getJob().getCompany().getName())
                     .jobId(application.getJob().getId())
@@ -432,6 +433,7 @@ public class CandidateServiceImpl implements CandidateService {
                 pageable);
         return page.getContent().stream()
                 .map(p -> CandidateClientResponse.AppliedJobs.builder()
+                        .applicationId(p.getApplicationId())
                         .jobName(p.getJobName())
                         .companyName(p.getCompanyName())
                         .jobId(p.getJobId())

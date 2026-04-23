@@ -119,6 +119,7 @@ public final class CandidateClientResponse {
 
     @Builder
     public record AppliedJobs(
+            String applicationId,
             String jobName,
             String jobId,
             String companyName,

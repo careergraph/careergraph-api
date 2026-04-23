@@ -55,6 +55,7 @@ public interface ApplicationRepository extends JpaRepository<Application, String
 
     @Query("""
                 SELECT
+                    a.id             AS applicationId,
                     j.title          AS jobName,
                     c.name           AS companyName,
                     j.id             AS jobId,
@@ -75,6 +76,7 @@ public interface ApplicationRepository extends JpaRepository<Application, String
 
     @Query("""
                 SELECT
+                    a.id             AS applicationId,
                     j.title          AS jobName,
                     c.name           AS companyName,
                     j.id             AS jobId,
@@ -93,6 +95,7 @@ public interface ApplicationRepository extends JpaRepository<Application, String
 
     @Query("""
                 SELECT
+                    a.id             AS applicationId,
                     j.title          AS jobName,
                     c.name           AS companyName,
                     j.id             AS jobId,
