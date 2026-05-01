@@ -61,4 +61,7 @@ public class Company extends Party {
     @OneToMany(cascade = CascadeType.ALL, orphanRemoval = true)
     @JoinColumn(name = "connected_company_id")
     private Set<Connection> companyConnections;
+
+    @OneToMany(mappedBy = "company", cascade = CascadeType.ALL, orphanRemoval = true)
+    private Set<CompanyRecruitmentStage> recruitmentStages;
 }

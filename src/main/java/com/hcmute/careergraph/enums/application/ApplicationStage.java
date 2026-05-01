@@ -1,8 +1,10 @@
 package com.hcmute.careergraph.enums.application;
 
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.EnumMap;
 import java.util.EnumSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
@@ -26,6 +28,21 @@ public enum ApplicationStage {
     OFFBOARDED("Employee has left company"),
     REJECTED("Application rejected"),
     WITHDRAWN("Application withdrawn");
+
+        private static final List<ApplicationStage> CONFIGURABLE_STAGES = List.of(
+            APPLIED,
+            SCREENING,
+            HR_CONTACTED,
+            INTERVIEW,
+            INTERVIEW_COMPLETED,
+            TRIAL,
+            OFFER_EXTENDED,
+            HIRED,
+            OFFBOARDED,
+            REJECTED
+        );
+
+        private static final Set<ApplicationStage> REQUIRED_STAGES = EnumSet.of(APPLIED, REJECTED);
 
     private static final Map<ApplicationStage, Set<ApplicationStage>> TRANSITIONS;
 
@@ -67,5 +84,37 @@ public enum ApplicationStage {
 
     public boolean isTerminal() {
         return getAllowedNextStages().isEmpty();
+    }
+
+    public static List<ApplicationStage> getConfigurableStages() {
+        return CONFIGURABLE_STAGES;
+    }
+
+    public static boolean isConfigurableStage(ApplicationStage stage) {
+        return stage != null && CONFIGURABLE_STAGES.contains(stage);
+    }
+
+    public static boolean isRequiredStage(ApplicationStage stage) {
+        return stage != null && REQUIRED_STAGES.contains(stage);
+    }
+
+    public static List<ApplicationStage> getDefaultPipelineOrder(boolean offerBeforeTrial) {
+        List<ApplicationStage> order = new ArrayList<>();
+        order.add(APPLIED);
+        order.add(SCREENING);
+        order.add(HR_CONTACTED);
+        order.add(INTERVIEW);
+        order.add(INTERVIEW_COMPLETED);
+        if (offerBeforeTrial) {
+            order.add(OFFER_EXTENDED);
+            order.add(TRIAL);
+        } else {
+            order.add(TRIAL);
+            order.add(OFFER_EXTENDED);
+        }
+        order.add(HIRED);
+        order.add(OFFBOARDED);
+        order.add(REJECTED);
+        return Collections.unmodifiableList(order);
     }
 }

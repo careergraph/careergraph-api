@@ -11,6 +11,7 @@ import com.hcmute.careergraph.repositories.AccountRepository;
 import com.hcmute.careergraph.repositories.JobRepository;
 import com.hcmute.careergraph.services.ApplicationService;
 import com.hcmute.careergraph.services.MailService;
+import com.hcmute.careergraph.services.CompanyRecruitmentStageService;
 import com.hcmute.careergraph.services.NotificationService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -46,6 +47,7 @@ public class ApplicationServiceImpl implements ApplicationService {
     private final MailService mailService;
     private final NotificationService notificationService;
     private final ApplicationEventPublisher applicationEventPublisher;
+    private final CompanyRecruitmentStageService companyRecruitmentStageService;
 
     private static final String SUBMISSION_NOTE = "Ứng viên đã nộp hồ sơ.";
     private static final Map<ApplicationStage, Set<ApplicationStage>> BASE_TRANSITIONS = buildBaseTransitions();
@@ -283,7 +285,14 @@ public class ApplicationServiceImpl implements ApplicationService {
                 .orElse(null);
 
         boolean offerBeforeTrial = company == null || !Boolean.FALSE.equals(company.getOfferBeforeTrial());
-        boolean enableOffboardedStage = company != null && Boolean.TRUE.equals(company.getEnableOffboardedStage());
+
+        if (company != null && ApplicationStage.isConfigurableStage(targetStage)) {
+            boolean activeStage = companyRecruitmentStageService
+                    .isStageActiveForCompany(company.getId(), targetStage);
+            if (!activeStage) {
+                throw new RuntimeException("Stage hiện đã bị tắt trong pipeline của công ty");
+            }
+        }
 
         if (offerBeforeTrial
                 && currentStage == ApplicationStage.INTERVIEW_COMPLETED
@@ -295,10 +304,6 @@ public class ApplicationServiceImpl implements ApplicationService {
                 && currentStage == ApplicationStage.INTERVIEW_COMPLETED
                 && targetStage == ApplicationStage.OFFER_EXTENDED) {
             throw new RuntimeException("Company pipeline yêu cầu qua Thử việc trước khi gửi Offer");
-        }
-
-        if (targetStage == ApplicationStage.OFFBOARDED && !enableOffboardedStage) {
-            throw new RuntimeException("Company chưa bật cột Nghỉ việc trong pipeline");
         }
 
         if (currentStage == ApplicationStage.OFFBOARDED && targetStage != ApplicationStage.OFFBOARDED) {

@@ -13,6 +13,7 @@ import com.hcmute.careergraph.repositories.CandidateRepository;
 import com.hcmute.careergraph.repositories.CompanyRepository;
 import com.hcmute.careergraph.persistence.dtos.response.GoogleUserInfo;
 import com.hcmute.careergraph.services.AuthService;
+import com.hcmute.careergraph.services.CompanyRecruitmentStageService;
 import com.hcmute.careergraph.services.GoogleAuthService;
 import com.hcmute.careergraph.services.RedisService;
 import com.hcmute.careergraph.services.JwtTokenService;
@@ -49,6 +50,7 @@ public class AuthServiceImpl implements AuthService {
     private final JwtDecoder rawJwtDecoder; // Raw decoder for internal operations
     private final GoogleAuthService googleAuthService;
     private final UserCacheService userCacheService;
+    private final CompanyRecruitmentStageService companyRecruitmentStageService;
 
     // Constructor for dependency injection with Qualifier
     public AuthServiceImpl(
@@ -62,7 +64,8 @@ public class AuthServiceImpl implements AuthService {
             JwtDecoder jwtDecoder,
             @Qualifier("rawJwtDecoder") JwtDecoder rawJwtDecoder,
             GoogleAuthService googleAuthService,
-            UserCacheService userCacheService) {
+            UserCacheService userCacheService,
+            CompanyRecruitmentStageService companyRecruitmentStageService) {
         this.accountRepository = accountRepository;
         this.candidateRepository = candidateRepository;
         this.companyRepository = companyRepository;
@@ -74,6 +77,7 @@ public class AuthServiceImpl implements AuthService {
         this.rawJwtDecoder = rawJwtDecoder;
         this.googleAuthService = googleAuthService;
         this.userCacheService = userCacheService;
+        this.companyRecruitmentStageService = companyRecruitmentStageService;
     }
 
     private Integer TIME_OTP_EXPIRED = 300;
@@ -116,7 +120,8 @@ public class AuthServiceImpl implements AuthService {
                     .build();
             account.setCompany(company);
 
-            companyRepository.save(company);
+            Company savedCompany = companyRepository.save(company);
+            companyRecruitmentStageService.initializeDefaultStages(savedCompany);
         }
         sendOtp(normalizedEmail);
     }
