@@ -13,6 +13,7 @@ import com.hcmute.careergraph.persistence.dtos.request.InterviewTimeProposalRequ
 import com.hcmute.careergraph.persistence.dtos.request.InterviewUpdateRequest;
 import com.hcmute.careergraph.persistence.models.*;
 import com.hcmute.careergraph.repositories.*;
+import com.hcmute.careergraph.services.CompanyRecruitmentStageService;
 import com.hcmute.careergraph.services.InterviewRoomService;
 import com.hcmute.careergraph.services.InterviewService;
 import lombok.RequiredArgsConstructor;
@@ -48,12 +49,13 @@ public class InterviewServiceImpl implements InterviewService {
     private final ApplicationRepository applicationRepository;
     private final AccountRepository accountRepository;
     private final InterviewRoomService roomService;
+    private final CompanyRecruitmentStageService companyRecruitmentStageService;
 
     private static final List<InterviewStatus> ACTIVE_STATUSES = List.of(InterviewStatus.SCHEDULED,
             InterviewStatus.CONFIRMED,
             InterviewStatus.PENDING_RESCHEDULE,
             InterviewStatus.IN_PROGRESS);
-        private static final Map<InterviewStatus, Integer> CALENDAR_STATUS_PRIORITY = Map.of(
+    private static final Map<InterviewStatus, Integer> CALENDAR_STATUS_PRIORITY = Map.of(
             InterviewStatus.IN_PROGRESS, 1,
             InterviewStatus.PENDING_RESCHEDULE, 1,
             InterviewStatus.CONFIRMED, 2,
@@ -61,12 +63,12 @@ public class InterviewServiceImpl implements InterviewService {
             InterviewStatus.CANCELLED, 4,
             InterviewStatus.NO_SHOW, 4,
             InterviewStatus.COMPLETED, 5);
-        private static final Set<ApplicationStage> SCHEDULABLE_STAGES = Set.of(
+    private static final Set<ApplicationStage> SCHEDULABLE_STAGES = Set.of(
+            ApplicationStage.SCREENING,
             ApplicationStage.HR_CONTACTED,
             ApplicationStage.SCHEDULED,
             ApplicationStage.INTERVIEW,
-            ApplicationStage.INTERVIEW_SCHEDULED,
-            ApplicationStage.INTERVIEW_COMPLETED);
+            ApplicationStage.INTERVIEW_SCHEDULED);
 
     @Override
     public Interview createInterview(InterviewRequest request, String companyId) {
@@ -97,20 +99,56 @@ public class InterviewServiceImpl implements InterviewService {
 
         InterviewType type = InterviewType.valueOf(request.getType().toUpperCase());
 
-        List<Interview> existingActiveInterviews = interviewRepository.findActiveByApplicationAndJob(
-                application.getId(), application.getJob().getId(), ACTIVE_STATUSES);
+        List<Interview> allInterviews = interviewRepository.findByApplicationId(application.getId());
+        int maxCompletedRound = allInterviews.stream()
+                .filter(i -> i.getInterviewStatus() == InterviewStatus.COMPLETED)
+                .mapToInt(this::resolveRoundNumber)
+                .max()
+                .orElse(0);
 
+        int requestedRound = request.getRoundNumber() != null ? request.getRoundNumber() : (maxCompletedRound + 1);
+        if (requestedRound < 1) {
+            throw new AppException(ErrorType.BAD_REQUEST, "Vòng phỏng vấn phải lớn hơn hoặc bằng 1");
+        }
+        if (requestedRound > maxCompletedRound + 1) {
+            throw new AppException(
+                    ErrorType.BAD_REQUEST,
+                    String.format("Chỉ có thể tạo đến vòng %d cho ứng viên này", maxCompletedRound + 1));
+        }
+
+        if (requestedRound <= maxCompletedRound) {
+            throw new AppException(
+                    ErrorType.BAD_REQUEST,
+                    String.format("Không thể tạo lại lịch cho vòng %d đã hoàn thành", requestedRound));
+        }
+
+        List<Interview> existingActiveInterviews = interviewRepository.findActiveByApplicationAndJob(
+                application.getId(), application.getJob().getId(), ACTIVE_STATUSES).stream()
+                .toList();
+
+        existingActiveInterviews = normalizeActiveInterviews(existingActiveInterviews, LocalDateTime.now());
         if (!existingActiveInterviews.isEmpty()) {
             Interview currentActive = existingActiveInterviews.get(0);
+            int activeRound = resolveRoundNumber(currentActive);
+
+            if (requestedRound != activeRound) {
+                throw new AppException(
+                        ErrorType.BAD_REQUEST,
+                        String.format(
+                                "Ứng viên đang có lịch phỏng vấn vòng %d đang hoạt động. Vui lòng hoàn tất hoặc hủy trước khi tạo vòng %d.",
+                                activeRound,
+                                requestedRound));
+            }
+
             boolean sameDay = currentActive.getScheduledAt() != null
                     && currentActive.getScheduledAt().toLocalDate().isEqual(date);
 
             boolean hasInProgressInterview = existingActiveInterviews.stream()
-                .anyMatch(i -> i.getInterviewStatus() == InterviewStatus.IN_PROGRESS);
+                    .anyMatch(i -> i.getInterviewStatus() == InterviewStatus.IN_PROGRESS);
             if (hasInProgressInterview) {
-            throw new AppException(
-                ErrorType.BAD_REQUEST,
-                "Không thể tạo lịch mới khi ứng viên đang có buổi phỏng vấn diễn ra");
+                throw new AppException(
+                        ErrorType.BAD_REQUEST,
+                        "Không thể tạo lịch mới khi ứng viên đang có buổi phỏng vấn diễn ra");
             }
 
             if (!request.isConfirmOverwrite()) {
@@ -118,8 +156,9 @@ public class InterviewServiceImpl implements InterviewService {
                 throw new AppException(
                         ErrorType.BAD_REQUEST,
                         String.format(
-                                "%s|Ứng viên đã có lịch phỏng vấn %s vào %s. Vui lòng xác nhận ghi đè để cập nhật lịch mới.",
+                                "%s|Ứng viên đã có lịch phỏng vấn vòng %d (%s) vào %s. Vui lòng xác nhận ghi đè để cập nhật lịch mới.",
                                 marker,
+                                requestedRound,
                                 currentActive.getInterviewStatus(),
                                 currentActive.getScheduledAt()));
             }
@@ -183,7 +222,7 @@ public class InterviewServiceImpl implements InterviewService {
                 .location(request.getLocation())
                 .meetingLink(meetingLink)
                 .interviewStatus(InterviewStatus.SCHEDULED)
-                .notes(request.getNotes())
+                .notes(attachRoundToNotes(request.getNotes(), requestedRound))
                 .build();
 
         Interview saved = interviewRepository.save(interview);
@@ -194,12 +233,12 @@ public class InterviewServiceImpl implements InterviewService {
             application.setStageChangedAt(LocalDateTime.now());
             application.setCurrentStageNote("Đã lên lịch phỏng vấn.");
             application.addStageHistory(ApplicationStageHistory.builder()
-                .fromStage(previousStage)
-                .toStage(ApplicationStage.INTERVIEW)
-                .note("Đã lên lịch phỏng vấn.")
-                .changedBy("Hệ thống")
-                .changedAt(LocalDateTime.now())
-                .build());
+                    .fromStage(previousStage)
+                    .toStage(ApplicationStage.INTERVIEW)
+                    .note("Đã lên lịch phỏng vấn.")
+                    .changedBy("Hệ thống")
+                    .changedAt(LocalDateTime.now())
+                    .build());
             applicationRepository.save(application);
         }
 
@@ -258,12 +297,14 @@ public class InterviewServiceImpl implements InterviewService {
             List<InterviewStatus> statuses = resolveStatusFilter(statusFilter);
             return interviewRepository.findByCandidateIdAndInterviewStatusInAndHiddenFromCandidateFalse(candidateId,
                     statuses).stream()
-                    .sorted(Comparator.comparing(Interview::getScheduledAt, Comparator.nullsLast(Comparator.reverseOrder())))
+                    .sorted(Comparator.comparing(Interview::getScheduledAt,
+                            Comparator.nullsLast(Comparator.reverseOrder())))
                     .toList();
         }
         return interviewRepository.findByCandidateIdAndInterviewStatusInAndHiddenFromCandidateFalse(
                 candidateId, List.of(InterviewStatus.values())).stream()
-                .sorted(Comparator.comparing(Interview::getScheduledAt, Comparator.nullsLast(Comparator.reverseOrder())))
+                .sorted(Comparator.comparing(Interview::getScheduledAt,
+                        Comparator.nullsLast(Comparator.reverseOrder())))
                 .toList();
     }
 
@@ -278,11 +319,12 @@ public class InterviewServiceImpl implements InterviewService {
     @Transactional(readOnly = true)
     public List<Interview> getCalendarEvents(String companyId, LocalDateTime start, LocalDateTime end) {
         return interviewRepository.findByCompanyIdAndScheduledAtBetween(companyId, start, end).stream()
-            .sorted(Comparator
-                .comparing((Interview i) -> i.getScheduledAt() != null ? i.getScheduledAt().toLocalDate() : LocalDate.MIN)
-                .thenComparing(i -> CALENDAR_STATUS_PRIORITY.getOrDefault(i.getInterviewStatus(), 999))
-                .thenComparing(Interview::getScheduledAt, Comparator.nullsLast(Comparator.naturalOrder())))
-            .toList();
+                .sorted(Comparator
+                        .comparing((Interview i) -> i.getScheduledAt() != null ? i.getScheduledAt().toLocalDate()
+                                : LocalDate.MIN)
+                        .thenComparing(i -> CALENDAR_STATUS_PRIORITY.getOrDefault(i.getInterviewStatus(), 999))
+                        .thenComparing(Interview::getScheduledAt, Comparator.nullsLast(Comparator.naturalOrder())))
+                .toList();
     }
 
     @Override
@@ -422,7 +464,8 @@ public class InterviewServiceImpl implements InterviewService {
             throw new AppException(ErrorType.BAD_REQUEST, "Interview does not belong to your company");
         }
 
-        if (interview.getInterviewStatus() == InterviewStatus.CANCELLED || interview.getInterviewStatus() == InterviewStatus.NO_SHOW) {
+        if (interview.getInterviewStatus() == InterviewStatus.CANCELLED
+                || interview.getInterviewStatus() == InterviewStatus.NO_SHOW) {
             throw new AppException(ErrorType.BAD_REQUEST, "Không thể chỉnh sửa lịch đã hủy hoặc vắng mặt");
         }
 
@@ -466,7 +509,8 @@ public class InterviewServiceImpl implements InterviewService {
         }
 
         if (nextStatus == InterviewStatus.CANCELLED) {
-            interview.setCancellationReason(StringUtils.hasText(request.getReason()) ? request.getReason() : "Cancelled by HR");
+            interview.setCancellationReason(
+                    StringUtils.hasText(request.getReason()) ? request.getReason() : "Cancelled by HR");
             interview.setHiddenFromCandidate(false);
         }
 
@@ -729,9 +773,9 @@ public class InterviewServiceImpl implements InterviewService {
         List<Interview> interviews = getInterviewsByRoomCode(roomCode);
 
         return interviews.stream()
-            .filter(i -> ACTIVE_STATUSES.contains(i.getInterviewStatus()))
-            .min(Comparator.comparing(Interview::getScheduledAt,
-                Comparator.nullsLast(Comparator.naturalOrder())))
+                .filter(i -> ACTIVE_STATUSES.contains(i.getInterviewStatus()))
+                .min(Comparator.comparing(Interview::getScheduledAt,
+                        Comparator.nullsLast(Comparator.naturalOrder())))
                 .orElse(interviews.get(0));
     }
 
@@ -844,23 +888,74 @@ public class InterviewServiceImpl implements InterviewService {
             if (application == null)
                 return;
 
-            com.hcmute.careergraph.enums.application.ApplicationStage newStage = switch (recommendation) {
-                case NEXT_ROUND -> com.hcmute.careergraph.enums.application.ApplicationStage.INTERVIEW;
-                case EXTEND_OFFER -> com.hcmute.careergraph.enums.application.ApplicationStage.OFFER_EXTENDED;
-                case REJECT -> com.hcmute.careergraph.enums.application.ApplicationStage.REJECTED;
-                case HOLD -> com.hcmute.careergraph.enums.application.ApplicationStage.INTERVIEW;
-            };
-
-            if (newStage != null && newStage != application.getCurrentStage()) {
-                application.setCurrentStage(newStage);
-                application.setStageChangedAt(LocalDateTime.now());
-                applicationRepository.save(application);
-                log.info("Application {} stage updated to {} based on feedback recommendation {}",
-                        application.getId(), newStage, recommendation);
+            ApplicationStage currentStage = application.getCurrentStage();
+            ApplicationStage newStage = resolveStageFromFeedback(application, recommendation);
+            if (newStage == null) {
+                return;
             }
+
+            LocalDateTime now = LocalDateTime.now();
+            String note = resolveFeedbackStageNote(recommendation, newStage);
+
+            if (newStage == currentStage) {
+                application.setCurrentStageNote(note);
+                application.setStageChangedAt(now);
+                applicationRepository.save(application);
+                log.info("Application {} kept at {} based on feedback recommendation {}",
+                        application.getId(), newStage, recommendation);
+                return;
+            }
+
+            application.setCurrentStage(newStage);
+            application.setStageChangedAt(now);
+            application.setCurrentStageNote(note);
+            application.addStageHistory(ApplicationStageHistory.builder()
+                    .fromStage(currentStage)
+                    .toStage(newStage)
+                    .note(note)
+                    .changedBy("Interview feedback")
+                    .changedAt(now)
+                    .build());
+            applicationRepository.save(application);
+            log.info("Application {} stage updated to {} based on feedback recommendation {}",
+                    application.getId(), newStage, recommendation);
         } catch (Exception e) {
             log.warn("Failed to auto-update application stage from feedback: {}", e.getMessage());
         }
+    }
+
+    private ApplicationStage resolveStageFromFeedback(Application application, FeedbackRecommendation recommendation) {
+        if (application == null || recommendation == null) {
+            return null;
+        }
+
+        ApplicationStage currentStage = application.getCurrentStage();
+        String companyId = application.getJob() != null && application.getJob().getCompany() != null
+                ? application.getJob().getCompany().getId()
+                : null;
+
+        return switch (recommendation) {
+            case NEXT_ROUND -> ApplicationStage.INTERVIEW;
+            case ADVANCE_NEXT_STAGE -> {
+                ApplicationStage next = companyRecruitmentStageService.findNextActiveStage(companyId, currentStage);
+                yield next;
+            }
+            case EXTEND_OFFER -> companyRecruitmentStageService.isStageActiveForCompany(companyId, ApplicationStage.OFFER_EXTENDED)
+                    ? ApplicationStage.OFFER_EXTENDED
+                    : null;
+            case REJECT -> ApplicationStage.REJECTED;
+            case HOLD -> null;
+        };
+    }
+
+    private String resolveFeedbackStageNote(FeedbackRecommendation recommendation, ApplicationStage targetStage) {
+        return switch (recommendation) {
+            case NEXT_ROUND -> "Đề xuất mời ứng viên phỏng vấn vòng tiếp theo.";
+            case ADVANCE_NEXT_STAGE -> "Đề xuất chuyển hồ sơ sang giai đoạn tiếp theo: " + targetStage.getLabel() + ".";
+            case EXTEND_OFFER -> "Đề xuất gửi offer sau phỏng vấn.";
+            case REJECT -> "Đề xuất từ chối ứng viên sau phỏng vấn.";
+            case HOLD -> "Giữ nguyên giai đoạn hiện tại sau phỏng vấn.";
+        };
     }
 
     private void validateApplicationStageForScheduling(Application application) {
@@ -874,5 +969,59 @@ public class InterviewServiceImpl implements InterviewService {
                     ErrorType.BAD_REQUEST,
                     String.format("Không thể lên lịch phỏng vấn khi hồ sơ đang ở trạng thái %s", currentStage));
         }
+    }
+
+    private int resolveRoundNumber(Interview interview) {
+        if (interview == null || interview.getNotes() == null) {
+            return 1;
+        }
+        java.util.regex.Matcher matcher = java.util.regex.Pattern.compile("\\[ROUND:(\\d+)]")
+                .matcher(interview.getNotes());
+        if (!matcher.find()) {
+            return 1;
+        }
+        try {
+            int parsed = Integer.parseInt(matcher.group(1));
+            return parsed > 0 ? parsed : 1;
+        } catch (NumberFormatException ex) {
+            return 1;
+        }
+    }
+
+    private int resolveMaxRoundForApplication(String applicationId) {
+        return interviewRepository.findByApplicationId(applicationId).stream()
+                .mapToInt(this::resolveRoundNumber)
+                .max()
+                .orElse(0);
+    }
+
+    private List<Interview> normalizeActiveInterviews(List<Interview> activeInterviews, LocalDateTime now) {
+        if (activeInterviews == null || activeInterviews.isEmpty()) {
+            return List.of();
+        }
+
+        List<Interview> stillActive = new ArrayList<>();
+        for (Interview interview : activeInterviews) {
+            LocalDateTime endAt = interview.getEndAt();
+            if (endAt != null && endAt.isBefore(now)) {
+                interview.setInterviewStatus(InterviewStatus.NO_SHOW);
+                interview.setCancellationReason("Auto-marked no-show after scheduled end time");
+                interview.setHiddenFromCandidate(false);
+                interviewRepository.save(interview);
+                continue;
+            }
+            stillActive.add(interview);
+        }
+
+        return stillActive;
+    }
+
+    private String attachRoundToNotes(String notes, int roundNumber) {
+        String normalized = notes == null ? "" : notes.trim();
+        String withoutMarker = normalized.replaceFirst("^\\[ROUND:\\d+]\\s*", "");
+        if (withoutMarker.isEmpty()) {
+            return String.format("[ROUND:%d]", roundNumber);
+        }
+        return String.format("[ROUND:%d] %s", roundNumber, withoutMarker);
     }
 }

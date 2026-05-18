@@ -247,8 +247,8 @@ public class ApplicationServiceImpl implements ApplicationService {
 
         Application saved = applicationRepository.save(application);
         Account changedByAccount = StringUtils.hasText(request.getChangeBy())
-            ? accountRepository.findByCompanyId(request.getChangeBy()).orElse(null)
-            : null;
+                ? accountRepository.findByCompanyId(request.getChangeBy()).orElse(null)
+                : null;
         notificationService.onApplicationStatusChanged(saved, currentStage, targetStage, changedByAccount);
         dispatchStageEmail(saved, targetStage, note, actor);
         log.info("Application {} moved from {} to {}", id, currentStage, targetStage);
@@ -272,17 +272,27 @@ public class ApplicationServiceImpl implements ApplicationService {
                     currentStage, targetStage, applicationId));
         }
 
-        Set<ApplicationStage> allowedTargets = BASE_TRANSITIONS.getOrDefault(currentStage, Set.of());
-        if (!allowedTargets.contains(targetStage)) {
-            throw new RuntimeException(String.format(
-                    "Stage transition from %s to %s is not allowed for application %s",
-                    currentStage, targetStage, applicationId));
-        }
-
         Company company = Optional.ofNullable(application)
                 .map(Application::getJob)
                 .map(Job::getCompany)
                 .orElse(null);
+
+        if (company != null) {
+            List<CompanyRecruitmentStage> stages = companyRecruitmentStageService.getCompanyStages(company.getId());
+            ApplicationStage nextActiveStage = resolveNextActiveStage(stages, currentStage);
+            if (nextActiveStage == null || nextActiveStage != targetStage) {
+                throw new RuntimeException(String.format(
+                        "Stage transition from %s to %s is not allowed for application %s",
+                        currentStage, targetStage, applicationId));
+            }
+        } else {
+            Set<ApplicationStage> allowedTargets = BASE_TRANSITIONS.getOrDefault(currentStage, Set.of());
+            if (!allowedTargets.contains(targetStage)) {
+                throw new RuntimeException(String.format(
+                        "Stage transition from %s to %s is not allowed for application %s",
+                        currentStage, targetStage, applicationId));
+            }
+        }
 
         boolean offerBeforeTrial = company == null || !Boolean.FALSE.equals(company.getOfferBeforeTrial());
 
@@ -317,6 +327,35 @@ public class ApplicationServiceImpl implements ApplicationService {
         if (currentStage == ApplicationStage.OFFER_ACCEPTED && targetStage == ApplicationStage.HIRED) {
             return;
         }
+    }
+
+    private ApplicationStage resolveNextActiveStage(
+            List<CompanyRecruitmentStage> stages,
+            ApplicationStage currentStage) {
+        if (stages == null || stages.isEmpty() || currentStage == null) {
+            return null;
+        }
+
+        stages.sort(Comparator.comparingInt(stage -> stage.getDisplayOrder() == null ? 0 : stage.getDisplayOrder()));
+        int currentIndex = -1;
+        for (int i = 0; i < stages.size(); i++) {
+            if (stages.get(i).getStage() == currentStage) {
+                currentIndex = i;
+                break;
+            }
+        }
+        if (currentIndex < 0) {
+            return null;
+        }
+
+        for (int i = currentIndex + 1; i < stages.size(); i++) {
+            CompanyRecruitmentStage next = stages.get(i);
+            if (next != null && next.isActive()) {
+                return next.getStage();
+            }
+        }
+
+        return null;
     }
 
     private static Map<ApplicationStage, Set<ApplicationStage>> buildBaseTransitions() {

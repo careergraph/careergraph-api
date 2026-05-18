@@ -17,4 +17,6 @@ public interface CompanyRecruitmentStageService {
     void initializeDefaultStages(Company company);
 
     boolean isStageActiveForCompany(String companyId, ApplicationStage stage);
+
+    ApplicationStage findNextActiveStage(String companyId, ApplicationStage currentStage);
 }

@@ -183,6 +183,10 @@ public class CompanyRecruitmentStageServiceImpl implements CompanyRecruitmentSta
     @Override
     @Transactional(readOnly = true)
     public boolean isStageActiveForCompany(String companyId, ApplicationStage stage) {
+        if (companyId == null) {
+            return true;
+        }
+
         if (!ApplicationStage.isConfigurableStage(stage)) {
             return true;
         }
@@ -195,6 +199,29 @@ public class CompanyRecruitmentStageServiceImpl implements CompanyRecruitmentSta
         }
 
         return true;
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public ApplicationStage findNextActiveStage(String companyId, ApplicationStage currentStage) {
+        if (companyId == null || currentStage == null) {
+            return null;
+        }
+
+        List<CompanyRecruitmentStage> stages = getCompanyStages(companyId).stream()
+                .filter(CompanyRecruitmentStage::isActive)
+                .filter(setting -> setting.getStage() != ApplicationStage.REJECTED
+                        && setting.getStage() != ApplicationStage.OFFBOARDED)
+                .sorted((a, b) -> Integer.compare(a.getDisplayOrder(), b.getDisplayOrder()))
+                .toList();
+
+        for (int i = 0; i < stages.size(); i++) {
+            if (stages.get(i).getStage() == currentStage) {
+                return i + 1 < stages.size() ? stages.get(i + 1).getStage() : null;
+            }
+        }
+
+        return null;
     }
 
     private void syncCompanyFlags(Company company, List<CompanyRecruitmentStage> stages) {

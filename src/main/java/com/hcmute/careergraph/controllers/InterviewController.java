@@ -15,6 +15,7 @@ import com.hcmute.careergraph.persistence.dtos.response.InterviewFeedbackRespons
 import com.hcmute.careergraph.persistence.dtos.response.InterviewRecordingResponse;
 import com.hcmute.careergraph.persistence.dtos.response.InterviewResponse;
 import com.hcmute.careergraph.persistence.dtos.response.InterviewTimeProposalResponse;
+import com.hcmute.careergraph.enums.candidate.ContactType;
 import com.hcmute.careergraph.persistence.models.Interview;
 import com.hcmute.careergraph.persistence.models.InterviewFeedback;
 import com.hcmute.careergraph.persistence.models.InterviewRecording;
@@ -32,8 +33,13 @@ import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDateTime;
 import java.time.YearMonth;
+import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 @RestController
 @RequestMapping("interviews")
@@ -471,8 +477,9 @@ public class InterviewController {
     }
 
     @GetMapping("/job/{jobId}/unscheduled")
-    public RestResponse<List<Map<String, Object>>> getUnscheduledApplications(
+    public RestResponse<Map<String, Object>> getUnscheduledApplications(
             @PathVariable String jobId,
+            @RequestParam(required = false) Integer round,
             Authentication authentication) {
 
         String companyId = securityUtils.extractCompanyId(authentication);
@@ -481,7 +488,28 @@ public class InterviewController {
         }
 
         var applications = interviewService.getUnscheduledApplicationsByJob(jobId, companyId);
-        List<Map<String, Object>> result = applications.stream().map(app -> {
+        List<Map<String, Object>> mapped = applications.stream().map(app -> {
+            List<Interview> interviews = interviewService.getInterviewsByApplication(app.getId());
+            int maxRound = interviews.stream()
+                    .mapToInt(this::resolveRoundNumber)
+                    .max()
+                    .orElse(0);
+            int maxCompletedRound = interviews.stream()
+                    .filter(iv -> iv.getInterviewStatus() == com.hcmute.careergraph.enums.interview.InterviewStatus.COMPLETED)
+                    .mapToInt(this::resolveRoundNumber)
+                    .max()
+                    .orElse(0);
+            boolean hasFeedback = interviews.stream()
+                    .anyMatch(iv -> iv.getFeedbacks() != null && !iv.getFeedbacks().isEmpty());
+            long activeInterviewCount = interviews.stream()
+                    .filter(iv -> iv.getInterviewStatus() != null)
+                    .filter(iv -> List.of(
+                            com.hcmute.careergraph.enums.interview.InterviewStatus.SCHEDULED,
+                            com.hcmute.careergraph.enums.interview.InterviewStatus.CONFIRMED,
+                            com.hcmute.careergraph.enums.interview.InterviewStatus.PENDING_RESCHEDULE,
+                            com.hcmute.careergraph.enums.interview.InterviewStatus.IN_PROGRESS)
+                            .contains(iv.getInterviewStatus()))
+                    .count();
             Map<String, Object> map = new java.util.LinkedHashMap<>();
             map.put("applicationId", app.getId());
             map.put("candidateId", app.getCandidate() != null ? app.getCandidate().getId() : null);
@@ -489,16 +517,102 @@ public class InterviewController {
             String lastName = app.getCandidate() != null ? app.getCandidate().getLastName() : "";
             String name = ((firstName != null ? firstName : "") + " " + (lastName != null ? lastName : "")).trim();
             map.put("candidateName", name.isEmpty() ? "Unknown" : name);
+            map.put("candidateEmail", resolveCandidateEmail(app.getCandidate()));
             map.put("jobTitle", app.getJob() != null ? app.getJob().getTitle() : null);
             map.put("currentStage", app.getCurrentStage() != null ? app.getCurrentStage().name() : null);
             map.put("appliedDate", app.getAppliedDate());
+            map.put("maxRound", maxRound);
+            map.put("maxCompletedRound", maxCompletedRound);
+            map.put("hasFeedback", hasFeedback);
+            map.put("nextRound", maxCompletedRound + 1);
+            map.put("hasActiveInterview", activeInterviewCount > 0);
+            map.put("activeInterviewCount", activeInterviewCount);
+            map.put("hasParticipatedInterview", maxCompletedRound > 0);
             return map;
         }).toList();
 
-        return RestResponse.<List<Map<String, Object>>>builder()
+        List<Map<String, Object>> filtered = mapped;
+        if (round != null && round > 0) {
+            filtered = mapped.stream()
+                    .filter(item -> {
+                        Number nextRound = (Number) item.get("nextRound");
+                        int next = nextRound != null ? nextRound.intValue() : 1;
+                        if (next != round) {
+                            return false;
+                        }
+                        if (round <= 1) {
+                            return true;
+                        }
+                        boolean hasParticipated = Boolean.TRUE.equals(item.get("hasParticipatedInterview"));
+                        boolean hasFeedback = Boolean.TRUE.equals(item.get("hasFeedback"));
+                        return hasParticipated || hasFeedback;
+                    })
+                    .toList();
+        }
+
+        Set<Integer> availableRoundsSet = new LinkedHashSet<>();
+        mapped.forEach(item -> {
+            Number nextRound = (Number) item.get("nextRound");
+            int next = nextRound != null ? nextRound.intValue() : 1;
+            if (next <= 1) {
+                availableRoundsSet.add(1);
+            } else {
+                boolean hasParticipated = Boolean.TRUE.equals(item.get("hasParticipatedInterview"));
+                boolean hasFeedback = Boolean.TRUE.equals(item.get("hasFeedback"));
+                if (hasParticipated || hasFeedback) {
+                    availableRoundsSet.add(next);
+                }
+            }
+        });
+
+        List<Integer> availableRounds = new ArrayList<>(availableRoundsSet);
+        availableRounds.sort(Integer::compareTo);
+
+        Map<String, Object> payload = new java.util.LinkedHashMap<>();
+        payload.put("applications", filtered);
+        payload.put("availableRounds", availableRounds);
+
+        return RestResponse.<Map<String, Object>>builder()
                 .status(HttpStatus.OK)
                 .message("Unscheduled applications retrieved")
-                .data(result)
+                .data(payload)
                 .build();
+    }
+
+    private int resolveRoundNumber(Interview interview) {
+        if (interview == null || interview.getNotes() == null) {
+            return 1;
+        }
+        Matcher matcher = Pattern.compile("\\[ROUND:(\\d+)]").matcher(interview.getNotes());
+        if (!matcher.find()) {
+            return 1;
+        }
+        try {
+            int parsed = Integer.parseInt(matcher.group(1));
+            return parsed > 0 ? parsed : 1;
+        } catch (NumberFormatException ex) {
+            return 1;
+        }
+    }
+
+    private String resolveCandidateEmail(com.hcmute.careergraph.persistence.models.Candidate candidate) {
+        if (candidate == null) {
+            return null;
+        }
+        if (candidate.getAccount() != null && StringUtils.hasText(candidate.getAccount().getEmail())) {
+            return candidate.getAccount().getEmail();
+        }
+        if (candidate.getContacts() == null || candidate.getContacts().isEmpty()) {
+            return null;
+        }
+
+        return candidate.getContacts().stream()
+                .filter(contact -> contact.getContactType() == ContactType.EMAIL)
+                .sorted(java.util.Comparator
+                        .comparing(contact -> Boolean.TRUE.equals(contact.getIsPrimary()) ? 0 : 1))
+                .map(com.hcmute.careergraph.persistence.models.Contact::getValue)
+                .filter(StringUtils::hasText)
+                .findFirst()
+                .orElse(null);
     }
 }

@@ -86,7 +86,7 @@ public interface JobRepository extends JpaRepository<Job, String> {
                     AND (NULLIF(TRIM(:query), '') IS NULL OR
                         lower(j.title) LIKE lower(concat('%', :query, '%')) OR
                         lower(j.description) LIKE lower(concat('%', :query, '%')))
-                ORDER BY function('RANDOM')
+                ORDER BY j.createdDate DESC, j.id DESC
             """)
     Page<Job> searchJobForCandidate(
             @Param("candidateId") String candidateId,

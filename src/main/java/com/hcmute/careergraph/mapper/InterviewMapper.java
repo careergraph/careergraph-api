@@ -63,6 +63,7 @@ public class InterviewMapper {
                                 .notes(interview.getNotes())
                                 .rescheduledFromId(interview.getRescheduledFromId())
                                 .cancellationReason(interview.getCancellationReason())
+                                .roundNumber(resolveRoundNumber(interview.getNotes()))
                                 .interviewers(mapParticipants(interview.getParticipants()))
                                 .createdDate(interview.getCreatedDate())
                                 .lastModifiedDate(interview.getLastModifiedDate());
@@ -185,5 +186,23 @@ public class InterviewMapper {
                                 .analyzedAt(recording.getAnalyzedAt())
                                 .createdDate(recording.getCreatedDate())
                                 .build();
+        }
+
+        private Integer resolveRoundNumber(String notes) {
+                if (notes == null) {
+                        return 1;
+                }
+                java.util.regex.Matcher matcher = java.util.regex.Pattern
+                                .compile("\\[ROUND:(\\d+)]")
+                                .matcher(notes);
+                if (!matcher.find()) {
+                        return 1;
+                }
+                try {
+                        int parsed = Integer.parseInt(matcher.group(1));
+                        return parsed > 0 ? parsed : 1;
+                } catch (NumberFormatException ex) {
+                        return 1;
+                }
         }
 }

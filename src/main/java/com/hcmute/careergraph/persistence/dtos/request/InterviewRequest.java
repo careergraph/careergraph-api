@@ -41,4 +41,6 @@ public class InterviewRequest {
 
     @Builder.Default
     private boolean notifyCandidate = true;
+
+    private Integer roundNumber;
 }

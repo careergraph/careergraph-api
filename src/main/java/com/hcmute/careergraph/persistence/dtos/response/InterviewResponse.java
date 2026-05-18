@@ -31,6 +31,7 @@ public class InterviewResponse {
     private String notes;
     private String rescheduledFromId;
     private String cancellationReason;
+    private Integer roundNumber;
     private List<ParticipantResponse> interviewers;
     private List<InterviewFeedbackResponse> feedback;
     private List<InterviewRecordingResponse> recordings;
