@@ -35,6 +35,8 @@ public interface NotificationService {
       ApplicationStage newStage,
       Account changedBy);
 
+  void onInterviewScheduled(Interview interview, boolean rescheduled);
+
   void onNewApplication(Application application);
 
   /**

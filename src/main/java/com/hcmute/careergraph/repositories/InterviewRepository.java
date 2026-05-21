@@ -27,6 +27,24 @@ public interface InterviewRepository extends JpaRepository<Interview, String> {
 
     Page<Interview> findByCompanyId(String companyId, Pageable pageable);
 
+    @Query("""
+            SELECT i FROM Interview i
+            WHERE i.company.id = :companyId
+              AND (:filterByStatus = false OR i.interviewStatus IN :statuses)
+              AND (:filterByJob = false OR i.job.id IN :jobIds)
+              AND (:filterByDate = false OR (i.scheduledAt >= :startAt AND i.scheduledAt < :endAt))
+            """)
+    Page<Interview> searchByCompanyFilters(
+            @Param("companyId") String companyId,
+            @Param("filterByStatus") boolean filterByStatus,
+            @Param("statuses") List<InterviewStatus> statuses,
+            @Param("filterByJob") boolean filterByJob,
+            @Param("jobIds") List<String> jobIds,
+            @Param("filterByDate") boolean filterByDate,
+            @Param("startAt") LocalDateTime startAt,
+            @Param("endAt") LocalDateTime endAt,
+            Pageable pageable);
+
     List<Interview> findByCandidateIdAndInterviewStatusIn(
             String candidateId, List<InterviewStatus> statuses);
 

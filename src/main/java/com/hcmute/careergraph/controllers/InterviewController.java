@@ -26,11 +26,13 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.Authentication;
 import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.YearMonth;
 import java.util.ArrayList;
@@ -105,6 +107,9 @@ public class InterviewController {
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size,
             @RequestParam(required = false) String status,
+            @RequestParam(required = false) String jobId,
+            @RequestParam(required = false) String jobIds,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
             Authentication authentication) {
 
         String companyId = securityUtils.extractCompanyId(authentication);
@@ -113,7 +118,8 @@ public class InterviewController {
         }
 
         PageRequest pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "scheduledAt"));
-        Page<Interview> interviews = interviewService.getInterviewsByCompany(companyId, status, pageable);
+        List<String> requestedJobIds = parseJobIds(jobId, jobIds);
+        Page<Interview> interviews = interviewService.getInterviewsByCompany(companyId, status, requestedJobIds, date, pageable);
         Page<InterviewResponse> responsePage = interviews.map(i -> interviewMapper.toResponse(i, false));
 
         return RestResponse.<Page<InterviewResponse>>builder()
@@ -121,6 +127,21 @@ public class InterviewController {
                 .message("Interviews retrieved successfully")
                 .data(responsePage)
                 .build();
+    }
+
+    private List<String> parseJobIds(String jobId, String jobIds) {
+        List<String> values = new ArrayList<>();
+        if (StringUtils.hasText(jobId)) {
+            values.add(jobId.trim());
+        }
+        if (StringUtils.hasText(jobIds)) {
+            for (String value : jobIds.split(",")) {
+                if (StringUtils.hasText(value)) {
+                    values.add(value.trim());
+                }
+            }
+        }
+        return values.stream().distinct().toList();
     }
 
     @GetMapping("/calendar")

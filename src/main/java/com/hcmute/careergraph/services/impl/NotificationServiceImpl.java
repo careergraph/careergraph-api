@@ -27,6 +27,7 @@ import org.springframework.util.StringUtils;
 import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
 import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Optional;
@@ -40,6 +41,7 @@ public class NotificationServiceImpl implements NotificationService {
 
   private static final int SEARCH_PAGE_SIZE = 10;
   private static final ZoneId VIETNAM_TIME_ZONE = ZoneId.of("Asia/Ho_Chi_Minh");
+  private static final DateTimeFormatter INTERVIEW_TIME_FORMATTER = DateTimeFormatter.ofPattern("HH:mm dd/MM/yyyy");
 
   private final NotificationRepository notificationRepository;
   private final AccountRepository accountRepository;
@@ -177,6 +179,14 @@ public class NotificationServiceImpl implements NotificationService {
     data.put("navigateTo", "/applications/" + application.getId());
 
     NotificationType notificationType = resolveApplicationNotificationType(newStage);
+    if (notificationType == NotificationType.APPLICATION_INTERVIEW_SCHEDULED
+        && hasRecentInterviewScheduleNotification(candidateAccountOpt.get().getId(), application.getId())) {
+      log.info("Skipped application interview-stage notification for application {} because an interview notification already exists",
+          application.getId());
+      dispatchUnreadCountsPush(candidateAccountOpt.get().getId());
+      return;
+    }
+
     NotificationContent content = resolveApplicationNotificationContent(companyName, jobTitle, newStage);
 
     createOrUpdateApplicationNotification(
@@ -186,6 +196,56 @@ public class NotificationServiceImpl implements NotificationService {
         content.body(),
         data,
         application.getId());
+  }
+
+  @Override
+  public void onInterviewScheduled(Interview interview, boolean rescheduled) {
+    if (interview == null || interview.getCandidate() == null) {
+      return;
+    }
+
+    Optional<Account> candidateAccountOpt = accountRepository.findByCandidateId(interview.getCandidate().getId());
+    if (candidateAccountOpt.isEmpty()) {
+      log.warn("Candidate account not found for interview notification {}", interview.getId());
+      return;
+    }
+
+    String companyName = Optional.ofNullable(interview.getCompany())
+        .map(this::resolveCompanyName)
+        .orElse("công ty");
+    String jobTitle = Optional.ofNullable(interview.getJob())
+        .map(Job::getTitle)
+        .orElse("vị trí ứng tuyển");
+    int roundNumber = resolveRoundNumber(interview);
+    String roundLabel = roundNumber > 1 ? " vòng " + roundNumber : "";
+    String scheduleText = interview.getScheduledAt() != null
+        ? interview.getScheduledAt().format(INTERVIEW_TIME_FORMATTER)
+        : "thời gian đã hẹn";
+    String interviewMode = interview.getType() != null && interview.getType().name().equals("ONLINE")
+        ? "online"
+        : "trực tiếp";
+
+    HashMap<String, Object> data = new HashMap<>();
+    data.put("interviewId", interview.getId());
+    data.put("applicationId", interview.getApplication() != null ? interview.getApplication().getId() : null);
+    data.put("jobId", interview.getJob() != null ? interview.getJob().getId() : null);
+    data.put("companyId", interview.getCompany() != null ? interview.getCompany().getId() : null);
+    data.put("scheduledAt", interview.getScheduledAt() != null ? interview.getScheduledAt().toString() : null);
+    data.put("rescheduled", rescheduled);
+    data.put("navigateTo", "/interviews?interviewId=" + interview.getId() + "&refresh=1");
+
+    createNotification(
+        candidateAccountOpt.get().getId(),
+        NotificationType.APPLICATION_INTERVIEW_SCHEDULED,
+        rescheduled ? "Lịch phỏng vấn đã được cập nhật" : "Bạn có lịch phỏng vấn mới",
+        String.format("%s đã %s phỏng vấn%s cho %s lúc %s (%s).",
+            companyName,
+            rescheduled ? "cập nhật lịch" : "lên lịch",
+            roundLabel,
+            jobTitle,
+            scheduleText,
+            interviewMode),
+        data);
   }
 
   @Override
@@ -385,6 +445,22 @@ public class NotificationServiceImpl implements NotificationService {
         .findFirst();
   }
 
+  private boolean hasRecentInterviewScheduleNotification(String recipientId, String applicationId) {
+    if (!StringUtils.hasText(recipientId) || !StringUtils.hasText(applicationId)) {
+      return false;
+    }
+
+    LocalDateTime cutoff = LocalDateTime.now().minusMinutes(Math.max(1, aggregationWindowMinutes));
+    return notificationRepository
+        .findByRecipientIdAndTypeAndCreatedDateGreaterThanEqualOrderByCreatedDateDesc(
+            recipientId,
+            NotificationType.APPLICATION_INTERVIEW_SCHEDULED,
+            cutoff,
+            PageRequest.of(0, SEARCH_PAGE_SIZE))
+        .stream()
+        .anyMatch(notification -> applicationId.equals(extractDataValue(notification, "applicationId")));
+  }
+
   private Optional<Notification> findRecentUnreadMessageNotification(String recipientId,
       String threadId,
       LocalDateTime since) {
@@ -526,6 +602,23 @@ public class NotificationServiceImpl implements NotificationService {
       return candidate.getTagname();
     }
     return "Candidate";
+  }
+
+  private int resolveRoundNumber(Interview interview) {
+    if (interview == null || interview.getNotes() == null) {
+      return 1;
+    }
+    java.util.regex.Matcher matcher = java.util.regex.Pattern.compile("\\[ROUND:(\\d+)]")
+        .matcher(interview.getNotes());
+    if (!matcher.find()) {
+      return 1;
+    }
+    try {
+      int parsed = Integer.parseInt(matcher.group(1));
+      return parsed > 0 ? parsed : 1;
+    } catch (NumberFormatException ex) {
+      return 1;
+    }
   }
 
   private String resolveCompanyName(Company company) {

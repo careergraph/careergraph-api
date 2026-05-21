@@ -16,6 +16,7 @@ import com.hcmute.careergraph.repositories.*;
 import com.hcmute.careergraph.services.CompanyRecruitmentStageService;
 import com.hcmute.careergraph.services.InterviewRoomService;
 import com.hcmute.careergraph.services.InterviewService;
+import com.hcmute.careergraph.services.NotificationService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -50,6 +51,7 @@ public class InterviewServiceImpl implements InterviewService {
     private final AccountRepository accountRepository;
     private final InterviewRoomService roomService;
     private final CompanyRecruitmentStageService companyRecruitmentStageService;
+    private final NotificationService notificationService;
 
     private static final List<InterviewStatus> ACTIVE_STATUSES = List.of(InterviewStatus.SCHEDULED,
             InterviewStatus.CONFIRMED,
@@ -269,7 +271,11 @@ public class InterviewServiceImpl implements InterviewService {
         }
 
         log.info("Interview created with id: {}", saved.getId());
-        return interviewRepository.findById(saved.getId()).orElse(saved);
+        Interview reloaded = interviewRepository.findById(saved.getId()).orElse(saved);
+        if (request.isNotifyCandidate()) {
+            notificationService.onInterviewScheduled(reloaded, request.isConfirmOverwrite());
+        }
+        return reloaded;
     }
 
     @Override
@@ -281,13 +287,38 @@ public class InterviewServiceImpl implements InterviewService {
 
     @Override
     @Transactional(readOnly = true)
-    public Page<Interview> getInterviewsByCompany(String companyId, String status, Pageable pageable) {
-        if (StringUtils.hasText(status)) {
-            InterviewStatus interviewStatus = InterviewStatus.valueOf(status.toUpperCase());
-            return interviewRepository.findByCompanyIdAndInterviewStatusIn(
-                    companyId, List.of(interviewStatus), pageable);
-        }
-        return interviewRepository.findByCompanyId(companyId, pageable);
+    public Page<Interview> getInterviewsByCompany(
+            String companyId,
+            String status,
+            List<String> jobIds,
+            LocalDate date,
+            Pageable pageable) {
+        boolean filterByStatus = StringUtils.hasText(status);
+        List<InterviewStatus> statuses = filterByStatus
+                ? List.of(InterviewStatus.valueOf(status.toUpperCase()))
+                : List.of(InterviewStatus.values());
+        boolean filterByDate = date != null;
+        LocalDateTime startAt = filterByDate ? date.atStartOfDay() : LocalDateTime.of(1970, 1, 1, 0, 0);
+        LocalDateTime endAt = filterByDate ? date.plusDays(1).atStartOfDay() : LocalDateTime.of(9999, 12, 31, 23, 59);
+        List<String> normalizedJobIds = jobIds == null
+                ? List.of()
+                : jobIds.stream()
+                        .filter(StringUtils::hasText)
+                        .map(String::trim)
+                        .distinct()
+                        .toList();
+        boolean filterByJob = !normalizedJobIds.isEmpty();
+
+        return interviewRepository.searchByCompanyFilters(
+                companyId,
+                filterByStatus,
+                statuses,
+                filterByJob,
+                filterByJob ? normalizedJobIds : List.of("__no_job_filter__"),
+                filterByDate,
+                startAt,
+                endAt,
+                pageable);
     }
 
     @Override
@@ -435,7 +466,9 @@ public class InterviewServiceImpl implements InterviewService {
         }
 
         log.info("Interview {} rescheduled to new interview {}", id, saved.getId());
-        return interviewRepository.findById(saved.getId()).orElse(saved);
+        Interview reloaded = interviewRepository.findById(saved.getId()).orElse(saved);
+        notificationService.onInterviewScheduled(reloaded, true);
+        return reloaded;
     }
 
     @Override
@@ -715,7 +748,9 @@ public class InterviewServiceImpl implements InterviewService {
         }
 
         log.info("HR accepted proposal {} — rescheduled interview {} to {}", proposalId, interviewId, saved.getId());
-        return interviewRepository.findById(saved.getId()).orElse(saved);
+        Interview reloaded = interviewRepository.findById(saved.getId()).orElse(saved);
+        notificationService.onInterviewScheduled(reloaded, true);
+        return reloaded;
     }
 
     @Override

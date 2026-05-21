@@ -11,6 +11,7 @@ import com.hcmute.careergraph.persistence.models.*;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -20,7 +21,7 @@ public interface InterviewService {
 
     Interview getInterviewById(String id);
 
-    Page<Interview> getInterviewsByCompany(String companyId, String status, Pageable pageable);
+    Page<Interview> getInterviewsByCompany(String companyId, String status, List<String> jobIds, LocalDate date, Pageable pageable);
 
     List<Interview> getInterviewsByCandidate(String candidateId, String statusFilter);
 
