@@ -103,10 +103,12 @@ public interface InterviewRepository extends JpaRepository<Interview, String> {
             SELECT DISTINCT i.application.id FROM Interview i
             WHERE i.job.id = :jobId
               AND i.interviewStatus IN :statuses
+              AND (i.endAt IS NULL OR i.endAt >= :now)
             """)
     List<String> findScheduledApplicationIdsByJobId(
             @Param("jobId") String jobId,
-            @Param("statuses") List<InterviewStatus> statuses);
+            @Param("statuses") List<InterviewStatus> statuses,
+            @Param("now") LocalDateTime now);
 
     @Query("""
             SELECT i FROM Interview i

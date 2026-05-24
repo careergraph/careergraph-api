@@ -614,7 +614,10 @@ public class InterviewServiceImpl implements InterviewService {
     @Transactional(readOnly = true)
     public List<Application> getUnscheduledApplicationsByJob(String jobId, String companyId) {
         List<Application> allApps = applicationRepository.findByCompanyIdAndJobId(companyId, jobId);
-        List<String> scheduledAppIds = interviewRepository.findScheduledApplicationIdsByJobId(jobId, ACTIVE_STATUSES);
+        List<String> scheduledAppIds = interviewRepository.findScheduledApplicationIdsByJobId(
+                jobId,
+                ACTIVE_STATUSES,
+                LocalDateTime.now());
         return allApps.stream()
                 .filter(app -> app.getCurrentStage() != null && SCHEDULABLE_STAGES.contains(app.getCurrentStage()))
                 .filter(app -> !scheduledAppIds.contains(app.getId()))

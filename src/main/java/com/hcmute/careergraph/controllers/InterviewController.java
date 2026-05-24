@@ -522,6 +522,7 @@ public class InterviewController {
                     .orElse(0);
             boolean hasFeedback = interviews.stream()
                     .anyMatch(iv -> iv.getFeedbacks() != null && !iv.getFeedbacks().isEmpty());
+            LocalDateTime now = LocalDateTime.now();
             long activeInterviewCount = interviews.stream()
                     .filter(iv -> iv.getInterviewStatus() != null)
                     .filter(iv -> List.of(
@@ -530,6 +531,7 @@ public class InterviewController {
                             com.hcmute.careergraph.enums.interview.InterviewStatus.PENDING_RESCHEDULE,
                             com.hcmute.careergraph.enums.interview.InterviewStatus.IN_PROGRESS)
                             .contains(iv.getInterviewStatus()))
+                    .filter(iv -> iv.getEndAt() == null || !iv.getEndAt().isBefore(now))
                     .count();
             Map<String, Object> map = new java.util.LinkedHashMap<>();
             map.put("applicationId", app.getId());
