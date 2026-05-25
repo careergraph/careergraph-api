@@ -1,9 +1,7 @@
 package com.hcmute.careergraph.persistence.documents;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
-import jakarta.persistence.Column;
 import jakarta.persistence.Id;
-import jakarta.persistence.Table;
 import lombok.*;
 import org.springframework.data.elasticsearch.annotations.*;
 
@@ -66,6 +64,9 @@ public class JobES {
 
     @Field(type = FieldType.Date, format = DateFormat.date)
     private LocalDate createdAt;
+
+    @Field(type = FieldType.Keyword)
+    private String contentHash;
 
     /* ========= VECTOR ========= */
     @Field(

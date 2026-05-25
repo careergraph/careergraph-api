@@ -7,6 +7,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.annotation.Order;
 import org.springframework.core.io.Resource;
 import org.springframework.core.io.ResourceLoader;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -32,6 +33,7 @@ import org.springframework.stereotype.Component;
  * - If a statement fails, logger prints line number + failed SQL statement.
  */
 @Component
+@Order(0)
 public class DataSeeder implements ApplicationRunner {
 
     private final Logger logger = LoggerFactory.getLogger(DataSeeder.class);

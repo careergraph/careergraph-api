@@ -1,0 +1,122 @@
+[
+  {
+    "source_url": "https://www.topcv.vn/viec-lam/backend-engineer/1",
+    "title": "Backend Engineer",
+    "company_name": "Acme Tech",
+    "location": "Ho Chi Minh",
+    "salary_range": "1200-2200",
+    "description": "Build backend services with Java Spring Boot and PostgreSQL.",
+    "requirements": [],
+    "benefits": []
+  },
+  {
+    "source_url": "https://www.topcv.vn/viec-lam/frontend-engineer/2",
+    "title": "Frontend Engineer",
+    "company_name": "Nova Solutions",
+    "location": "Ha Noi",
+    "salary_range": "900-1800",
+    "description": "Build React TypeScript user interfaces and optimize UX.",
+    "requirements": [],
+    "benefits": []
+  },
+  {
+    "source_url": "https://www.topcv.vn/viec-lam/data-engineer/3",
+    "title": "Data Engineer",
+    "company_name": "Zen Labs",
+    "location": "Da Nang",
+    "salary_range": "1100-2400",
+    "description": "Build ETL pipelines analytics models and SQL data marts.",
+    "requirements": [],
+    "benefits": []
+  },
+  {
+    "source_url": "https://www.topcv.vn/viec-lam/devops-engineer/4",
+    "title": "DevOps Engineer",
+    "company_name": "Atlas Systems",
+    "location": "Ho Chi Minh",
+    "salary_range": "1400-2800",
+    "description": "Operate cloud infrastructure with Kubernetes Terraform and AWS.",
+    "requirements": [],
+    "benefits": []
+  },
+  {
+    "source_url": "https://www.topcv.vn/viec-lam/mobile-engineer/5",
+    "title": "Mobile Engineer",
+    "company_name": "Lotus Digital",
+    "location": "Ha Noi",
+    "salary_range": "1000-2100",
+    "description": "Develop Android iOS and Flutter applications.",
+    "requirements": [],
+    "benefits": []
+  },
+  {
+    "source_url": "https://www.topcv.vn/viec-lam/qa-engineer/6",
+    "title": "QA Automation Engineer",
+    "company_name": "Kite Works",
+    "location": "Can Tho",
+    "salary_range": "700-1600",
+    "description": "Automate test suites with Cypress Selenium and API testing.",
+    "requirements": [],
+    "benefits": []
+  },
+  {
+    "source_url": "https://www.topcv.vn/viec-lam/product-manager/7",
+    "title": "Product Manager",
+    "company_name": "Next Dynamics",
+    "location": "Ho Chi Minh",
+    "salary_range": "1500-3000",
+    "description": "Define roadmap product strategy and business priorities.",
+    "requirements": [],
+    "benefits": []
+  },
+  {
+    "source_url": "https://www.topcv.vn/viec-lam/marketing-specialist/8",
+    "title": "Digital Marketing Specialist",
+    "company_name": "Pixel Studio",
+    "location": "Ha Noi",
+    "salary_range": "800-1700",
+    "description": "Run SEO content and paid media campaigns.",
+    "requirements": [],
+    "benefits": []
+  },
+  {
+    "source_url": "https://www.topcv.vn/viec-lam/sales-executive/9",
+    "title": "Sales Executive",
+    "company_name": "Cloud Partners",
+    "location": "Hai Phong",
+    "salary_range": "700-2000",
+    "description": "Manage pipeline sales account growth and customer success.",
+    "requirements": [],
+    "benefits": []
+  },
+  {
+    "source_url": "https://www.topcv.vn/viec-lam/financial-analyst/10",
+    "title": "Financial Analyst",
+    "company_name": "Vertex Holdings",
+    "location": "Ho Chi Minh",
+    "salary_range": "900-2100",
+    "description": "Perform finance accounting reporting and forecast analysis.",
+    "requirements": [],
+    "benefits": []
+  },
+  {
+    "source_url": "https://www.topcv.vn/viec-lam/hr-business-partner/11",
+    "title": "HR Business Partner",
+    "company_name": "Vina People",
+    "location": "Binh Duong",
+    "salary_range": "850-1900",
+    "description": "Drive recruitment HR operations and talent management.",
+    "requirements": [],
+    "benefits": []
+  },
+  {
+    "source_url": "https://www.topcv.vn/viec-lam/product-designer/12",
+    "title": "Product Designer",
+    "company_name": "Nova Creative",
+    "location": "Khanh Hoa",
+    "salary_range": "850-1900",
+    "description": "Design UI UX research and product interfaces.",
+    "requirements": [],
+    "benefits": []
+  }
+]

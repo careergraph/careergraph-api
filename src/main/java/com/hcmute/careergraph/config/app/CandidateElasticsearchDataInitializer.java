@@ -19,9 +19,14 @@ import org.springframework.data.elasticsearch.core.ElasticsearchOperations;
 import org.springframework.stereotype.Component;
 import org.springframework.ai.embedding.EmbeddingModel;
 import org.springframework.util.StringUtils;
+
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
@@ -37,6 +42,30 @@ import java.util.stream.IntStream;
 @Slf4j
 public class CandidateElasticsearchDataInitializer implements CommandLineRunner {
 
+  private record CandidateIndexPayload(
+    String id,
+    String firstName,
+    String lastName,
+    String email,
+    String gender,
+    Integer yearsOfExperience,
+    String desiredPosition,
+    String currentJobTitle,
+    String summary,
+    Boolean openToWork,
+    String educationLevel,
+    List<String> industries,
+    List<String> locations,
+    List<String> workTypes,
+    Integer salaryExpectationMin,
+    Integer salaryExpectationMax,
+    List<String> skills,
+    LocalDate createdAt,
+    String resumeText) {
+  }
+
+  private static final String LOCAL_EMBEDDING_UNAVAILABLE_MESSAGE = "Local candidate embedding service unavailable and Gemini fallback is disabled.";
+
   private final CandidateRepository candidateRepository;
   private final CandidateESRepository candidateESRepository;
   private final ElasticsearchOperations elasticsearchOperations;
@@ -46,6 +75,15 @@ public class CandidateElasticsearchDataInitializer implements CommandLineRunner 
 
   @Value("${APP_ES_SYNC_CANDIDATES_ENABLED:false}")
   private boolean syncCandidatesEnabled;
+
+  @Value("${APP_ES_FORCE_CANDIDATES_FULL_SYNC:false}")
+  private boolean forceFullSync;
+
+  @Value("${APP_ES_ALLOW_GEMINI_FALLBACK:false}")
+  private boolean allowGeminiFallback;
+
+  @Value("${APP_ES_MAX_CANDIDATE_EMBEDDINGS_PER_RUN:30}")
+  private int maxEmbeddingsPerRun;
 
   private static final int EMBEDDING_BATCH_SIZE = 100;
   private static final int MAX_RETRIES = 5;
@@ -57,10 +95,13 @@ public class CandidateElasticsearchDataInitializer implements CommandLineRunner 
       log.info("Skip Candidate Elasticsearch synchronization because APP_ES_SYNC_CANDIDATES_ENABLED=false");
       return;
     }
-    synchronizeCandidatesWithRetry();
+    syncNow(null, null);
   }
 
-  private void synchronizeCandidatesWithRetry() {
+  public ElasticsearchSyncResult syncNow(Boolean forceOverride, Integer maxEmbeddingsOverride) {
+    boolean effectiveForce = forceOverride != null ? forceOverride : forceFullSync;
+    int effectiveMaxEmbeddings = maxEmbeddingsOverride != null ? maxEmbeddingsOverride : maxEmbeddingsPerRun;
+
     for (int attempt = 1; attempt <= MAX_RETRIES; attempt++) {
       try {
         // Check if index exists
@@ -76,35 +117,89 @@ public class CandidateElasticsearchDataInitializer implements CommandLineRunner 
 
         if (allCandidates.isEmpty()) {
           log.info("No candidates found in database. Skipping synchronization.");
-          return;
+          return new ElasticsearchSyncResult("candidates", true, effectiveForce, effectiveMaxEmbeddings, 0, 0, 0,
+            "No candidates found in database.");
         }
 
-        List<String> resumeTexts = allCandidates.stream()
-          .map(candidate -> resolveResumeText(candidate.getId()))
+        List<CandidateIndexPayload> payloads = allCandidates.stream()
+          .map(this::toPayload)
           .toList();
 
-        // Build search texts for embedding
-        List<String> searchTexts = IntStream.range(0, allCandidates.size())
-          .mapToObj(i -> buildSearchTextFromCandidate(allCandidates.get(i), resumeTexts.get(i)))
-            .toList();
+        long indexedCandidatesCount = candidateESRepository.count();
+        List<Integer> candidateIndexesToEmbed = new ArrayList<>();
 
-        // Generate embeddings in batches
+        for (int i = 0; i < payloads.size(); i++) {
+          CandidateIndexPayload payload = payloads.get(i);
+          String searchText = buildSearchTextFromPayload(payload);
+          String contentHash = hashText(searchText);
+          CandidateES existing = candidateESRepository.findById(payload.id()).orElse(null);
+
+          if (!effectiveForce && existing != null && contentHash.equals(existing.getContentHash())) {
+            continue;
+          }
+
+          candidateIndexesToEmbed.add(i);
+        }
+
+        if (candidateIndexesToEmbed.isEmpty() && indexedCandidatesCount >= allCandidates.size()) {
+          log.info("Skip Candidate Elasticsearch synchronization because no candidates changed since the last index run.");
+          return new ElasticsearchSyncResult(
+            "candidates",
+            true,
+            effectiveForce,
+            effectiveMaxEmbeddings,
+            0,
+            allCandidates.size(),
+            0,
+            "No candidates changed since the last index run.");
+        }
+
+        int cappedCount = Math.min(candidateIndexesToEmbed.size(), Math.max(1, effectiveMaxEmbeddings));
+        List<Integer> indexesToEmbed = candidateIndexesToEmbed.subList(0, cappedCount);
+
+        List<String> searchTexts = indexesToEmbed.stream()
+          .map(i -> buildSearchTextFromPayload(payloads.get(i)))
+          .toList();
+
         List<float[]> embeddings = generateEmbeddingsInBatches(searchTexts);
 
-        // Clear existing data
-        clearIndexData();
+        if (effectiveForce) {
+          clearIndexData();
+        }
 
-        // Convert to CandidateES documents and save
-        List<CandidateES> candidatesToSave = IntStream.range(0, allCandidates.size())
-          .mapToObj(i -> convertToCandidateES(allCandidates.get(i), resumeTexts.get(i), embeddings.get(i)))
-            .toList();
+        List<CandidateES> candidatesToSave = IntStream.range(0, indexesToEmbed.size())
+          .mapToObj(i -> convertToCandidateES(payloads.get(indexesToEmbed.get(i)), embeddings.get(i)))
+          .toList();
 
         candidateESRepository.saveAll(candidatesToSave);
 
-        log.info("✅ Candidate data synchronization complete. Total candidates: {}", allCandidates.size());
-        return;
+        log.info("✅ Candidate Elasticsearch synchronization complete. Indexed {} changed candidates in this run, pending {} more changed candidates.",
+          candidatesToSave.size(),
+          Math.max(0, candidateIndexesToEmbed.size() - candidatesToSave.size()));
+        return new ElasticsearchSyncResult(
+          "candidates",
+          false,
+          effectiveForce,
+          effectiveMaxEmbeddings,
+          candidatesToSave.size(),
+          Math.max(0, allCandidates.size() - candidateIndexesToEmbed.size()),
+          Math.max(0, candidateIndexesToEmbed.size() - candidatesToSave.size()),
+          "Candidate Elasticsearch synchronization completed.");
 
       } catch (Exception e) {
+        if (LOCAL_EMBEDDING_UNAVAILABLE_MESSAGE.equals(e.getMessage())) {
+          log.warn("{} Skipping Candidate Elasticsearch synchronization.", LOCAL_EMBEDDING_UNAVAILABLE_MESSAGE);
+          return new ElasticsearchSyncResult(
+            "candidates",
+            true,
+            effectiveForce,
+            effectiveMaxEmbeddings,
+            0,
+            0,
+            0,
+            LOCAL_EMBEDDING_UNAVAILABLE_MESSAGE);
+        }
+
         log.error("Attempt {} failed. Reason: {}", attempt, e.getMessage());
 
         if (attempt < MAX_RETRIES) {
@@ -114,39 +209,99 @@ public class CandidateElasticsearchDataInitializer implements CommandLineRunner 
           } catch (InterruptedException ie) {
             Thread.currentThread().interrupt();
             log.error("Synchronization thread was interrupted during delay.");
-            return;
+            return new ElasticsearchSyncResult(
+              "candidates",
+              true,
+              effectiveForce,
+              effectiveMaxEmbeddings,
+              0,
+              0,
+              0,
+              "Synchronization thread was interrupted during delay.");
           }
         } else {
           log.error("Failed to synchronize Candidate data to Elasticsearch after {} attempts.", MAX_RETRIES);
+          return new ElasticsearchSyncResult(
+            "candidates",
+            true,
+            effectiveForce,
+            effectiveMaxEmbeddings,
+            0,
+            0,
+            0,
+            "Failed to synchronize Candidate data to Elasticsearch after retries: " + e.getMessage());
         }
       }
     }
+
+    return new ElasticsearchSyncResult(
+      "candidates",
+      true,
+      effectiveForce,
+      effectiveMaxEmbeddings,
+      0,
+      0,
+      0,
+      "Candidate Elasticsearch synchronization finished without processing.");
   }
 
   /**
    * Build search text from Candidate entity for embedding generation
    */
-  private String buildSearchTextFromCandidate(Candidate candidate, String resumeText) {
+  private CandidateIndexPayload toPayload(Candidate candidate) {
+    List<String> skillNames = new ArrayList<>();
+    if (candidate.getSkills() != null) {
+      skillNames = candidate.getSkills().stream()
+        .filter(cs -> cs.getSkill() != null && cs.getSkill().getName() != null)
+        .map(cs -> cs.getSkill().getName())
+        .toList();
+    }
+
+    String email = null;
+    if (candidate.getAccount() != null) {
+      email = candidate.getAccount().getEmail();
+    }
+
+    return new CandidateIndexPayload(
+      candidate.getId(),
+      candidate.getFirstName(),
+      candidate.getLastName(),
+      email,
+      candidate.getGender(),
+      candidate.getYearsOfExperience(),
+      candidate.getDesiredPosition(),
+      candidate.getCurrentJobTitle(),
+      candidate.getSummary(),
+      candidate.getIsOpenToWork(),
+      candidate.getEducationLevel(),
+      candidate.getIndustries(),
+      candidate.getLocations(),
+      candidate.getWorkTypes(),
+      candidate.getSalaryExpectationMin(),
+      candidate.getSalaryExpectationMax(),
+      skillNames,
+      candidate.getCreatedDate() != null ? candidate.getCreatedDate().toLocalDate() : LocalDate.now(),
+      resolveResumeText(candidate.getId()));
+  }
+
+  private String buildSearchTextFromPayload(CandidateIndexPayload payload) {
     StringBuilder sb = new StringBuilder();
 
-    if (candidate.getDesiredPosition() != null) {
-      sb.append(candidate.getDesiredPosition()).append(" ");
+    if (payload.desiredPosition() != null) {
+      sb.append(payload.desiredPosition()).append(" ");
     }
-    if (candidate.getCurrentJobTitle() != null) {
-      sb.append(candidate.getCurrentJobTitle()).append(" ");
+    if (payload.currentJobTitle() != null) {
+      sb.append(payload.currentJobTitle()).append(" ");
     }
-    if (candidate.getSkills() != null && !candidate.getSkills().isEmpty()) {
-      String skillNames = candidate.getSkills().stream()
-          .filter(cs -> cs.getSkill() != null && cs.getSkill().getName() != null)
-          .map(cs -> cs.getSkill().getName())
-          .collect(Collectors.joining(" "));
+    if (payload.skills() != null && !payload.skills().isEmpty()) {
+      String skillNames = payload.skills().stream().collect(Collectors.joining(" "));
       sb.append(skillNames).append(" ");
     }
-    if (candidate.getSummary() != null) {
-      sb.append(candidate.getSummary());
+    if (payload.summary() != null) {
+      sb.append(payload.summary());
     }
-    if (StringUtils.hasText(resumeText)) {
-      String snippet = resumeText.length() > 4000 ? resumeText.substring(0, 4000) : resumeText;
+    if (StringUtils.hasText(payload.resumeText())) {
+      String snippet = payload.resumeText().length() > 4000 ? payload.resumeText().substring(0, 4000) : payload.resumeText();
       sb.append(" ").append(snippet);
     }
 
@@ -164,7 +319,7 @@ public class CandidateElasticsearchDataInitializer implements CommandLineRunner 
       int end = Math.min(start + EMBEDDING_BATCH_SIZE, texts.size());
       List<String> batchTexts = texts.subList(start, end);
 
-      List<float[]> batchEmbeddings = embeddingModel.embed(batchTexts);
+      List<float[]> batchEmbeddings = embedBatch(batchTexts);
 
       allEmbeddings.addAll(batchEmbeddings);
 
@@ -174,49 +329,62 @@ public class CandidateElasticsearchDataInitializer implements CommandLineRunner 
     return allEmbeddings;
   }
 
+  private List<float[]> embedBatch(List<String> batchTexts) {
+    try {
+      return huggingFaceEmbeddingService.embed(batchTexts);
+    } catch (Exception ex) {
+      if (!allowGeminiFallback) {
+        throw new IllegalStateException(LOCAL_EMBEDDING_UNAVAILABLE_MESSAGE, ex);
+      }
+      log.warn("Local candidate embedding service unavailable, falling back to configured Spring AI embedding model: {}",
+        ex.getMessage());
+      return embeddingModel.embed(batchTexts);
+    }
+  }
+
   /**
    * Convert Candidate entity to CandidateES document
    */
-  private CandidateES convertToCandidateES(Candidate candidate, String resumeText, float[] embedding) {
-    // Extract skill names
-    List<String> skillNames = new ArrayList<>();
-    if (candidate.getSkills() != null) {
-      skillNames = candidate.getSkills().stream()
-          .filter(cs -> cs.getSkill() != null && cs.getSkill().getName() != null)
-          .map(cs -> cs.getSkill().getName())
-          .collect(Collectors.toList());
-    }
-
-    // Get email from account
-    String email = null;
-    if (candidate.getAccount() != null) {
-      email = candidate.getAccount().getEmail();
-    }
-
+  private CandidateES convertToCandidateES(CandidateIndexPayload payload, float[] embedding) {
     return CandidateES.builder()
-        .id(candidate.getId())
-        .firstName(candidate.getFirstName())
-        .lastName(candidate.getLastName())
-        .email(email)
-        .gender(candidate.getGender())
-        .yearsOfExperience(candidate.getYearsOfExperience())
-        .desiredPosition(candidate.getDesiredPosition())
-        .currentJobTitle(candidate.getCurrentJobTitle())
-        .summary(candidate.getSummary())
-        .resumeText(resumeText)
-        .isOpenToWork(candidate.getIsOpenToWork() != null ? candidate.getIsOpenToWork() : false)
-        .educationLevel(candidate.getEducationLevel())
-        .experienceLevel(determineExperienceLevel(candidate.getYearsOfExperience()))
-        .industries(candidate.getIndustries())
-        .locations(candidate.getLocations())
-        .workTypes(candidate.getWorkTypes())
-        .salaryExpectationMin(candidate.getSalaryExpectationMin())
-        .salaryExpectationMax(candidate.getSalaryExpectationMax())
-        .skills(skillNames)
-        .createdAt(candidate.getCreatedDate() != null ? candidate.getCreatedDate().toLocalDate() : LocalDate.now())
+        .id(payload.id())
+        .firstName(payload.firstName())
+        .lastName(payload.lastName())
+        .email(payload.email())
+        .gender(payload.gender())
+        .yearsOfExperience(payload.yearsOfExperience())
+        .desiredPosition(payload.desiredPosition())
+        .currentJobTitle(payload.currentJobTitle())
+        .summary(payload.summary())
+        .resumeText(payload.resumeText())
+        .isOpenToWork(payload.openToWork() != null ? payload.openToWork() : false)
+        .educationLevel(payload.educationLevel())
+        .experienceLevel(determineExperienceLevel(payload.yearsOfExperience()))
+        .industries(payload.industries())
+        .locations(payload.locations())
+        .workTypes(payload.workTypes())
+        .salaryExpectationMin(payload.salaryExpectationMin())
+        .salaryExpectationMax(payload.salaryExpectationMax())
+        .skills(payload.skills())
+        .createdAt(payload.createdAt())
         .lastActive(LocalDate.now())
+        .contentHash(hashText(buildSearchTextFromPayload(payload)))
         .embedding(embedding)
         .build();
+  }
+
+  private String hashText(String text) {
+    try {
+      MessageDigest digest = MessageDigest.getInstance("SHA-256");
+      byte[] hash = digest.digest(text.getBytes(StandardCharsets.UTF_8));
+      StringBuilder builder = new StringBuilder(hash.length * 2);
+      for (byte value : hash) {
+        builder.append(String.format(Locale.ROOT, "%02x", value));
+      }
+      return builder.toString();
+    } catch (NoSuchAlgorithmException ex) {
+      throw new IllegalStateException("SHA-256 algorithm is not available", ex);
+    }
   }
 
   private String resolveResumeText(String candidateId) {

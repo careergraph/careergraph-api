@@ -19,8 +19,14 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.annotation.Order;
 import org.springframework.data.elasticsearch.core.ElasticsearchOperations;
 import org.springframework.stereotype.Component;
+
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.time.LocalDate;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.IntStream;
 
@@ -30,6 +36,8 @@ import java.util.stream.IntStream;
 @Order(1)
 @Slf4j
 public class ElasticsearchDataInitializer implements CommandLineRunner {
+
+    private static final String LOCAL_EMBEDDING_UNAVAILABLE_MESSAGE = "Local embedding service unavailable and Gemini fallback is disabled.";
 
     private final JobRepository jobRepository;
     private final JobESRepository jobESRepository;
@@ -44,6 +52,15 @@ public class ElasticsearchDataInitializer implements CommandLineRunner {
 
     @Value("${APP_ES_SYNC_JOBS_ENABLED:false}")
     private boolean syncJobsEnabled;
+
+    @Value("${APP_ES_FORCE_FULL_SYNC:false}")
+    private boolean forceFullSync;
+
+    @Value("${APP_ES_ALLOW_GEMINI_FALLBACK:false}")
+    private boolean allowGeminiFallback;
+
+    @Value("${APP_ES_MAX_EMBEDDINGS_PER_RUN:50}")
+    private int maxEmbeddingsPerRun;
 
     private static final List<String> KEYWORDS = List.of(
             "java",
@@ -73,10 +90,13 @@ public class ElasticsearchDataInitializer implements CommandLineRunner {
             log.info("Skip Job Elasticsearch synchronization because APP_ES_SYNC_JOBS_ENABLED=false");
             return;
         }
-        synchronizeDataWithRetry();
+        syncNow(null, null);
     }
 
-    private void synchronizeDataWithRetry() {
+    public ElasticsearchSyncResult syncNow(Boolean forceOverride, Integer maxEmbeddingsOverride) {
+        boolean effectiveForce = forceOverride != null ? forceOverride : forceFullSync;
+        int effectiveMaxEmbeddings = maxEmbeddingsOverride != null ? maxEmbeddingsOverride : maxEmbeddingsPerRun;
+
         final int MAX_RETRIES = 5;
         final long DELAY_SECONDS = 10;
 
@@ -97,66 +117,95 @@ public class ElasticsearchDataInitializer implements CommandLineRunner {
                 System.out.println("Attempt " + attempt + ": Starting data synchronization to Elasticsearch...");
 
                 List<Job> allJobs = jobRepository.findAll();
-                List<String> texts = allJobs.stream()
-                        // .map(job -> job.getTitle()
-                        .map(job -> """
-                                %s
-                                %s
-                                %s
-                                """.formatted(
-                                job.getTitle(),
-                                job.getJobCategory().getDisplayName(),
-                                job.getState()))
-                        .toList();
+                if (allJobs.isEmpty()) {
+                    log.info("No jobs found in database. Skipping Elasticsearch synchronization.");
+                    return new ElasticsearchSyncResult("jobs", true, effectiveForce, effectiveMaxEmbeddings, 0, 0, 0,
+                            "No jobs found in database.");
+                }
 
-                List<float[]> vectors = new java.util.ArrayList<>();
+                long indexedJobsCount = jobESRepository.count();
+                List<Job> jobsNeedingEmbedding = new ArrayList<>();
+                List<JobES> jobsWithoutEmbeddingChanges = new ArrayList<>();
+
+                for (Job job : allJobs) {
+                    String searchText = buildSearchText(job);
+                    String contentHash = hashText(searchText);
+                    JobES existing = jobESRepository.findById(job.getId()).orElse(null);
+
+                    if (!effectiveForce && existing != null && contentHash.equals(existing.getContentHash())) {
+                        jobsWithoutEmbeddingChanges.add(existing);
+                        continue;
+                    }
+
+                    jobsNeedingEmbedding.add(job);
+                }
+
+                if (jobsNeedingEmbedding.isEmpty() && indexedJobsCount >= allJobs.size()) {
+                    log.info("Skip Job Elasticsearch synchronization because no jobs changed since the last index run.");
+                    return new ElasticsearchSyncResult(
+                            "jobs",
+                            true,
+                            effectiveForce,
+                            effectiveMaxEmbeddings,
+                            0,
+                            jobsWithoutEmbeddingChanges.size(),
+                            0,
+                            "No jobs changed since the last index run.");
+                }
+
+                int cappedCount = Math.min(jobsNeedingEmbedding.size(), Math.max(1, effectiveMaxEmbeddings));
+                List<Job> jobsToEmbed = jobsNeedingEmbedding.subList(0, cappedCount);
+                List<String> texts = jobsToEmbed.stream().map(this::buildSearchText).toList();
+                List<float[]> vectors = new ArrayList<>();
 
                 for (int start = 0; start < texts.size(); start += EMBEDDING_BATCH_SIZE) {
                     int end = Math.min(start + EMBEDDING_BATCH_SIZE, texts.size());
-
                     List<String> batchTexts = texts.subList(start, end);
-
-                    List<float[]> batchVectors = embeddingModel.embedBatch(batchTexts);
-
-                    vectors.addAll(batchVectors);
+                    vectors.addAll(embedBatch(batchTexts));
                 }
-                queueRepo.deleteAll();
-                historyRepo.deleteAll();
-                newlyPostedJobRepo.deleteAll(); // Clear newly posted jobs
 
-                List<JobES> jobsToSave = IntStream.range(0, allJobs.size())
-                        .mapToObj(i -> {
-                            Job job = allJobs.get(i);
-                            if (matchTitle(job)) {
-                                publisher.publishEvent(new JobCreatedEvent(job.getId()));
-                                System.out.println("➡️ Marked as newly posted: " + job.getTitle());
-                            }
-                            return JobES.builder()
-                                    .id(job.getId())
-                                    .title(job.getTitle())
-                                    .description(job.getDescription())
-                                    .status(job.getStatus().name())
-                                    .jobCategory(job.getJobCategory().name())
-                                    .employmentType(job.getEmploymentType().name())
-                                    .experienceLevel(job.getExperienceLevel().name())
-                                    .education(job.getEducation().name())
-                                    .state(job.getState())
-                                    .city(job.getCity())
-                                    .companyId(job.getCompany().getId())
-                                    .createdAt(job.getCreatedDate() != null ? job.getCreatedDate().toLocalDate()
-                                            : LocalDate.now())
-                                    .embedding(vectors.get(i))
-                                    .build();
-                        })
+                if (effectiveForce) {
+                    queueRepo.deleteAll();
+                    historyRepo.deleteAll();
+                    newlyPostedJobRepo.deleteAll();
+                    clearIndexData();
+                }
+
+                List<JobES> jobsToSave = IntStream.range(0, jobsToEmbed.size())
+                        .mapToObj(i -> toJobDocument(jobsToEmbed.get(i), vectors.get(i)))
                         .toList();
-                clearIndexData();
 
                 jobESRepository.saveAll(jobsToSave);
 
-                System.out.println("Data synchronization complete. Total posts: " + allJobs.size());
-                return; // Thành công, thoát khỏi vòng lặp
+                log.info(
+                        "Job Elasticsearch synchronization complete. Indexed {} changed jobs in this run, skipped {} unchanged jobs, pending {} more changed jobs.",
+                        jobsToSave.size(),
+                        jobsWithoutEmbeddingChanges.size(),
+                        Math.max(0, jobsNeedingEmbedding.size() - jobsToSave.size()));
+                return new ElasticsearchSyncResult(
+                        "jobs",
+                        false,
+                        effectiveForce,
+                        effectiveMaxEmbeddings,
+                        jobsToSave.size(),
+                        jobsWithoutEmbeddingChanges.size(),
+                        Math.max(0, jobsNeedingEmbedding.size() - jobsToSave.size()),
+                        "Job Elasticsearch synchronization completed.");
 
             } catch (Exception e) {
+                if (LOCAL_EMBEDDING_UNAVAILABLE_MESSAGE.equals(e.getMessage())) {
+                    log.warn("{} Skipping Job Elasticsearch synchronization.", LOCAL_EMBEDDING_UNAVAILABLE_MESSAGE);
+                    return new ElasticsearchSyncResult(
+                            "jobs",
+                            true,
+                            effectiveForce,
+                            effectiveMaxEmbeddings,
+                            0,
+                            0,
+                            0,
+                            LOCAL_EMBEDDING_UNAVAILABLE_MESSAGE);
+                }
+
                 System.err.println("Attempt " + attempt + " failed. Reason: " + e.getMessage());
 
                 if (attempt < MAX_RETRIES) {
@@ -168,24 +217,99 @@ public class ElasticsearchDataInitializer implements CommandLineRunner {
                         // để các mã gọi ở tầng cao hơn biết và xử lý.
                         Thread.currentThread().interrupt();
                         System.err.println("Synchronization thread was interrupted during delay.");
-                        return; // Thoát khỏi vòng lặp và kết thúc
+                        return new ElasticsearchSyncResult(
+                                "jobs",
+                                true,
+                                effectiveForce,
+                                effectiveMaxEmbeddings,
+                                0,
+                                0,
+                                0,
+                                "Synchronization thread was interrupted during delay.");
                     }
                 } else {
                     System.err.println("Failed to synchronize data to Elasticsearch after " + MAX_RETRIES
                             + " attempts. Application may experience search issues.");
-                    // Bạn có thể chọn ném RuntimeException ở đây nếu muốn dừng ứng dụng hoàn toàn
+                    return new ElasticsearchSyncResult(
+                            "jobs",
+                            true,
+                            effectiveForce,
+                            effectiveMaxEmbeddings,
+                            0,
+                            0,
+                            0,
+                            "Failed to synchronize data to Elasticsearch after retries: " + e.getMessage());
                 }
             }
         }
+
+        return new ElasticsearchSyncResult(
+                "jobs",
+                true,
+                effectiveForce,
+                effectiveMaxEmbeddings,
+                0,
+                0,
+                0,
+                "Job Elasticsearch synchronization finished without processing.");
     }
 
-    private LocalDate safeParseDate(String date) {
+    private List<float[]> embedBatch(List<String> batchTexts) {
         try {
-            return (date == null || date.isBlank())
-                    ? null
-                    : LocalDate.parse(date);
-        } catch (Exception e) {
-            return null; // ES cho phép null
+            return huggingFaceEmbeddingService.embed(batchTexts);
+        } catch (Exception ex) {
+            if (!allowGeminiFallback) {
+                throw new IllegalStateException(LOCAL_EMBEDDING_UNAVAILABLE_MESSAGE, ex);
+            }
+            log.warn("Local embedding service unavailable, falling back to configured Spring AI embedding model: {}",
+                    ex.getMessage());
+            return embeddingModel.embedBatch(batchTexts);
+        }
+    }
+
+    private String buildSearchText(Job job) {
+        return "%s\n%s\n%s".formatted(
+                job.getTitle(),
+                job.getJobCategory().getDisplayName(),
+                job.getState());
+    }
+
+    private JobES toJobDocument(Job job, float[] embedding) {
+        String searchText = buildSearchText(job);
+        String contentHash = hashText(searchText);
+        if (matchTitle(job)) {
+            publisher.publishEvent(new JobCreatedEvent(job.getId()));
+            System.out.println("➡️ Marked as newly posted: " + job.getTitle());
+        }
+        return JobES.builder()
+                .id(job.getId())
+                .title(job.getTitle())
+                .description(job.getDescription())
+                .status(job.getStatus().name())
+                .jobCategory(job.getJobCategory().name())
+                .employmentType(job.getEmploymentType().name())
+                .experienceLevel(job.getExperienceLevel().name())
+                .education(job.getEducation().name())
+                .state(job.getState())
+                .city(job.getCity())
+                .companyId(job.getCompany().getId())
+                .createdAt(job.getCreatedDate() != null ? job.getCreatedDate().toLocalDate() : LocalDate.now())
+                .contentHash(contentHash)
+                .embedding(embedding)
+                .build();
+    }
+
+    private String hashText(String text) {
+        try {
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            byte[] hash = digest.digest(text.getBytes(StandardCharsets.UTF_8));
+            StringBuilder builder = new StringBuilder(hash.length * 2);
+            for (byte value : hash) {
+                builder.append(String.format(Locale.ROOT, "%02x", value));
+            }
+            return builder.toString();
+        } catch (NoSuchAlgorithmException ex) {
+            throw new IllegalStateException("SHA-256 algorithm is not available", ex);
         }
     }
 

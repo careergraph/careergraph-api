@@ -107,6 +107,9 @@ public class CandidateES {
   @Field(type = FieldType.Date, format = DateFormat.date)
   private LocalDate lastActive;
 
+  @Field(type = FieldType.Keyword)
+  private String contentHash;
+
   /* ========= VECTOR EMBEDDING ========= */
   @Field(type = FieldType.Dense_Vector, dims = 3072, index = true, similarity = "cosine")
   private float[] embedding;
