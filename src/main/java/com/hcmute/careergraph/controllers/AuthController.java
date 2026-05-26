@@ -123,7 +123,6 @@ public class AuthController {
         @PostMapping("/login")
         public RestResponse<AuthResponses.OnlyTokenResponse> login(
                         @Valid @RequestBody AuthRequests.LoginRequest request, HttpServletResponse resp) {
-                dailyDigestScheduler.sendDailyDigest();
                 var tokens = authService.login(request);
                 ResponseCookie cookie = ResponseCookie.from(REFRESH_COOKIE, tokens.getRefreshToken())
                                 .httpOnly(true)
@@ -215,7 +214,8 @@ public class AuthController {
         }
 
         @PostMapping("/email-change/request-otp")
-        public RestResponse<Integer> requestEmailChangeOtp(@Valid @RequestBody AuthRequests.RequestEmailChangeOtp request) {
+        public RestResponse<Integer> requestEmailChangeOtp(
+                        @Valid @RequestBody AuthRequests.RequestEmailChangeOtp request) {
                 Integer ttl = authService.requestEmailChangeOtp(getCurrentAccountId(), request);
                 return RestResponse.<Integer>builder()
                                 .status(HttpStatus.OK)
@@ -225,7 +225,8 @@ public class AuthController {
         }
 
         @PostMapping("/email-change/confirm")
-        public RestResponse<Void> confirmEmailChange(@Valid @RequestBody AuthRequests.ConfirmEmailChangeRequest request) {
+        public RestResponse<Void> confirmEmailChange(
+                        @Valid @RequestBody AuthRequests.ConfirmEmailChangeRequest request) {
                 authService.confirmEmailChange(getCurrentAccountId(), request);
                 return RestResponse.<Void>builder()
                                 .status(HttpStatus.OK)
@@ -234,7 +235,8 @@ public class AuthController {
         }
 
         @PostMapping("/password-change/request-otp")
-        public RestResponse<Integer> requestPasswordChangeOtp(@Valid @RequestBody AuthRequests.RequestPasswordChangeOtp request) {
+        public RestResponse<Integer> requestPasswordChangeOtp(
+                        @Valid @RequestBody AuthRequests.RequestPasswordChangeOtp request) {
                 Integer ttl = authService.requestPasswordChangeOtp(getCurrentAccountId(), request);
                 return RestResponse.<Integer>builder()
                                 .status(HttpStatus.OK)
@@ -244,7 +246,8 @@ public class AuthController {
         }
 
         @PostMapping("/password-change/confirm")
-        public RestResponse<Void> confirmPasswordChange(@Valid @RequestBody AuthRequests.ConfirmPasswordChangeRequest request) {
+        public RestResponse<Void> confirmPasswordChange(
+                        @Valid @RequestBody AuthRequests.ConfirmPasswordChangeRequest request) {
                 authService.confirmPasswordChange(getCurrentAccountId(), request);
                 return RestResponse.<Void>builder()
                                 .status(HttpStatus.OK)
