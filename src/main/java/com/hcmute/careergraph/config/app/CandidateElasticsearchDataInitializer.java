@@ -82,6 +82,9 @@ public class CandidateElasticsearchDataInitializer implements CommandLineRunner 
   @Value("${APP_ES_ALLOW_GEMINI_FALLBACK:false}")
   private boolean allowGeminiFallback;
 
+  @Value("${APP_EMBED_USE_LOCAL_FIRST:true}")
+  private boolean useLocalFirst;
+
   @Value("${APP_ES_MAX_CANDIDATE_EMBEDDINGS_PER_RUN:30}")
   private int maxEmbeddingsPerRun;
 
@@ -101,6 +104,7 @@ public class CandidateElasticsearchDataInitializer implements CommandLineRunner 
   public ElasticsearchSyncResult syncNow(Boolean forceOverride, Integer maxEmbeddingsOverride) {
     boolean effectiveForce = forceOverride != null ? forceOverride : forceFullSync;
     int effectiveMaxEmbeddings = maxEmbeddingsOverride != null ? maxEmbeddingsOverride : maxEmbeddingsPerRun;
+    boolean recreatedIndexAfterDimensionMismatch = false;
 
     for (int attempt = 1; attempt <= MAX_RETRIES; attempt++) {
       try {
@@ -200,6 +204,27 @@ public class CandidateElasticsearchDataInitializer implements CommandLineRunner 
             LOCAL_EMBEDDING_UNAVAILABLE_MESSAGE);
         }
 
+        if (isDenseVectorDimensionMismatch(e) && !recreatedIndexAfterDimensionMismatch) {
+          log.warn("Detected Candidate Elasticsearch dense_vector dimension mismatch. Recreating index with the current mapping before retrying.");
+          recreateIndex();
+          recreatedIndexAfterDimensionMismatch = true;
+          continue;
+        }
+
+        if (isRateLimitError(e)) {
+          log.warn("Skipping Candidate Elasticsearch synchronization retries because the embedding provider is rate-limited: {}",
+            e.getMessage());
+          return new ElasticsearchSyncResult(
+            "candidates",
+            true,
+            effectiveForce,
+            effectiveMaxEmbeddings,
+            0,
+            0,
+            0,
+            "Embedding provider rate-limited. Skipped retries for this run: " + e.getMessage());
+        }
+
         log.error("Attempt {} failed. Reason: {}", attempt, e.getMessage());
 
         if (attempt < MAX_RETRIES) {
@@ -243,6 +268,53 @@ public class CandidateElasticsearchDataInitializer implements CommandLineRunner 
       0,
       0,
       "Candidate Elasticsearch synchronization finished without processing.");
+  }
+
+  private boolean isRateLimitError(Throwable throwable) {
+    Throwable current = throwable;
+    while (current != null) {
+      String message = current.getMessage();
+      if (message != null) {
+        String normalized = message.toLowerCase(Locale.ROOT);
+        if (normalized.contains("429")
+          || normalized.contains("quota exceeded")
+          || normalized.contains("rate limit")
+          || normalized.contains("too many requests")) {
+          return true;
+        }
+      }
+      current = current.getCause();
+    }
+    return false;
+  }
+
+  private boolean isDenseVectorDimensionMismatch(Throwable throwable) {
+    Throwable current = throwable;
+    while (current != null) {
+      String message = current.getMessage();
+      if (message != null) {
+        String normalized = message.toLowerCase(Locale.ROOT);
+        if (normalized.contains("dense_vector")
+          && normalized.contains("dimensions")
+          && normalized.contains("mapping")) {
+          return true;
+        }
+      }
+      current = current.getCause();
+    }
+    return false;
+  }
+
+  private void recreateIndex() {
+    var indexOps = elasticsearchOperations.indexOps(CandidateES.class);
+
+    if (indexOps.exists()) {
+      indexOps.delete();
+    }
+
+    indexOps.create();
+    indexOps.putMapping(indexOps.createMapping(CandidateES.class));
+    indexOps.refresh();
   }
 
   /**
@@ -330,15 +402,30 @@ public class CandidateElasticsearchDataInitializer implements CommandLineRunner 
   }
 
   private List<float[]> embedBatch(List<String> batchTexts) {
-    try {
-      return huggingFaceEmbeddingService.embed(batchTexts);
-    } catch (Exception ex) {
-      if (!allowGeminiFallback) {
-        throw new IllegalStateException(LOCAL_EMBEDDING_UNAVAILABLE_MESSAGE, ex);
+    if (useLocalFirst) {
+      try {
+        return huggingFaceEmbeddingService.embed(batchTexts);
+      } catch (Exception ex) {
+        if (!allowGeminiFallback) {
+          throw new IllegalStateException(LOCAL_EMBEDDING_UNAVAILABLE_MESSAGE, ex);
+        }
+        log.warn("Local candidate embedding service unavailable, falling back to configured Spring AI embedding model: {}",
+          ex.getMessage());
+        return embeddingModel.embed(batchTexts);
       }
-      log.warn("Local candidate embedding service unavailable, falling back to configured Spring AI embedding model: {}",
-        ex.getMessage());
+    }
+
+    try {
       return embeddingModel.embed(batchTexts);
+    } catch (Exception geminiEx) {
+      log.warn("Primary Spring AI embedding model unavailable, falling back to local embedding service: {}",
+        geminiEx.getMessage());
+      try {
+        return huggingFaceEmbeddingService.embed(batchTexts);
+      } catch (Exception localEx) {
+        localEx.addSuppressed(geminiEx);
+        throw new IllegalStateException("Gemini-primary batch embedding failed and local fallback is unavailable.", localEx);
+      }
     }
   }
 

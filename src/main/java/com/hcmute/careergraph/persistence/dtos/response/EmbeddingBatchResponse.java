@@ -1,12 +1,12 @@
 package com.hcmute.careergraph.persistence.dtos.response;
 
-import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.annotation.JsonAlias;
 
 import java.util.List;
 
 public record EmbeddingBatchResponse(
-    @JsonProperty("model_name") String modelName,
+    @JsonAlias({"model", "model_name"}) String modelName,
     List<List<Float>> embeddings,
     int dimensions,
-    int count) {
+    Integer count) {
 }

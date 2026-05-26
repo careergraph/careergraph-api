@@ -162,6 +162,11 @@ Bước 3: Điền thông tin lịch
 - Lọc ra đúng ứng viên cần phỏng vấn
 - Đảm bảo room được gắn đúng `job_id + interview_date`
 
+**Rule production 2026-05:**
+- Dropdown công việc ở Calendar chỉ load các job thuộc công ty HR đang đăng nhập.
+- Không được fallback sang danh sách toàn hệ thống trong luồng tạo lịch phỏng vấn.
+- Nếu auth context chưa resolve được company hiện hành thì UI giữ dropdown rỗng và báo trạng thái phù hợp.
+
 ---
 
 ## 6. Modal tạo lịch phỏng vấn
@@ -232,6 +237,10 @@ Validate toàn bộ form
     │
     ├─ Lỗi validation → Highlight field lỗi, không submit
     │
+    ├─ Đã có interview active cùng application/job
+    │   → Mở modal xác nhận ghi đè bằng component xác nhận nội bộ
+    │   → Nếu HR xác nhận: hủy lịch active cũ rồi tạo lịch mới
+    │
     └─ Hợp lệ → Gọi API
                     │
                     ▼
@@ -265,6 +274,7 @@ Validate toàn bộ form
 - Không cho trùng thời gian hoạt động cho cùng candidate và cùng interviewer.
 - Trong cùng job, mỗi application chỉ có tối đa 1 interview active tại một thời điểm.
 - Nếu đã có interview active, hệ thống phải hiển thị popup xác nhận ghi đè trước khi hủy lịch cũ và tạo lịch mới.
+- Popup xác nhận ghi đè phải dùng component xác nhận của ứng dụng, không dùng `window.confirm`.
 - Khi HR hẹn lại cùng room + cùng application trong cùng ngày, backend sẽ cập nhật slot hiện có thay vì sinh thêm slot mới.
 - Chỉ cho phép tạo lịch khi hồ sơ ứng tuyển đang ở stage có thể lên lịch (`HR_CONTACTED/SCHEDULED/INTERVIEW/INTERVIEW_SCHEDULED`).
 - Khi tạo lịch thành công cho hồ sơ hợp lệ, hệ thống tự động đồng bộ stage hồ sơ về `INTERVIEW`.
@@ -313,6 +323,13 @@ HR bấm "Chỉnh sửa"
     │
     ▼
 Modal mở lại với data cũ đã điền
+    │
+    ├─ Nếu status là `SCHEDULED/CONFIRMED/PENDING_RESCHEDULE`
+    │   → cho phép `Lưu thay đổi` và `Hủy lịch phỏng vấn`
+    │
+    └─ Nếu status là `CANCELLED/NO_SHOW/COMPLETED/IN_PROGRESS`
+        → modal chuyển sang chế độ chỉ xem
+        → không hiển thị action chỉnh sửa/hủy để tránh gọi API sai nghiệp vụ
 HR chỉnh sửa ngày/giờ/thời lượng/ghi chú
     │
     ▼
@@ -325,6 +342,10 @@ Nếu đổi ngày → kiểm tra room:
     - Ngày mới: gắn vào room ngày mới (tạo nếu chưa có)
 Gửi email thông báo đổi lịch cho ứng viên
 ```
+
+**Quy ước UX production 2026-05:**
+- Nút `Hủy lịch phỏng vấn` chỉ xuất hiện khi record hiện tại còn được phép hủy.
+- Khi record đã là lịch sử sau reschedule hoặc đã ở terminal status, modal chỉ hiển thị thông tin để đối chiếu lịch sử.
 
 ---
 

@@ -294,10 +294,72 @@ Then load it inside cron:
 ### Notes
 
 - Keep `APP_ES_SYNC_JOBS_ENABLED=false` and `APP_ES_SYNC_CANDIDATES_ENABLED=false` if cron or another scheduler will trigger sync.
+- Keep `APP_EMBED_USE_LOCAL_FIRST=true` if you want API embedding flows to prefer the local FastAPI `/embed` service.
 - Use small batch sizes when the embedding backend is rate-limited.
 - Use `force=true` only when you intentionally want to rebuild changed documents in the selected target.
 
-## 9. Login accounts
+## 9. Sync Elasticsearch automatically by scheduler
+
+The backend also supports an internal scheduler.
+This keeps the manual endpoint and startup sync intact, but adds a third option for periodic background sync.
+
+### Recommended environment flags
+
+```env
+APP_ES_SYNC_JOBS_ENABLED=false
+APP_ES_SYNC_CANDIDATES_ENABLED=false
+
+APP_EMBED_USE_LOCAL_FIRST=true
+APP_EMBED_ALLOW_GEMINI_FALLBACK=false
+
+APP_ES_CRON_ENABLED=true
+APP_ES_CRON_JOBS_ENABLED=true
+APP_ES_CRON_CANDIDATES_ENABLED=true
+
+APP_ES_CRON_JOBS_FIXED_DELAY_MS=120000
+APP_ES_CRON_JOBS_INITIAL_DELAY_MS=120000
+APP_ES_CRON_JOBS_BATCH_SIZE=25
+
+APP_ES_CRON_CANDIDATES_FIXED_DELAY_MS=240000
+APP_ES_CRON_CANDIDATES_INITIAL_DELAY_MS=240000
+APP_ES_CRON_CANDIDATES_BATCH_SIZE=10
+```
+
+If the AI service also handles chat job matching, align it with the same local embedding stack:
+
+```env
+JOB_MATCHING_USE_LOCAL_EMBEDDING_STACK=true
+HF_EMBEDDING_OUTPUT_DIMS=3072
+```
+
+Meaning:
+
+- jobs sync every 2 minutes
+- candidates sync every 4 minutes
+- each run only embeds up to the configured cron batch size
+
+### How the flags work together
+
+- `APP_ES_CRON_ENABLED` is the global master switch for scheduled sync.
+- `APP_ES_CRON_JOBS_ENABLED` enables or disables only the scheduled job sync.
+- `APP_ES_CRON_CANDIDATES_ENABLED` enables or disables only the scheduled candidate sync.
+- `APP_ES_CRON_JOBS_BATCH_SIZE` limits how many changed jobs are embedded per scheduled run.
+- `APP_ES_CRON_CANDIDATES_BATCH_SIZE` limits how many changed candidates are embedded per scheduled run.
+
+This means you can keep the scheduler on globally but temporarily disable only candidate sync or only job sync.
+
+### Suggested Gemini-safe settings
+
+If local embedding is unavailable and Gemini fallback is enabled, start with smaller limits such as:
+
+```env
+APP_ES_CRON_JOBS_BATCH_SIZE=5
+APP_ES_CRON_CANDIDATES_BATCH_SIZE=3
+```
+
+Increase only after confirming the quota is stable in your environment.
+
+## 10. Login accounts
 
 All seeded accounts share the same password:
 
@@ -314,7 +376,7 @@ The generator appends sample accounts at the bottom of the SQL file as comments:
 
 After generating `init-scripts/topcv-import.sql`, use those two accounts for quick login checks.
 
-## 10. Quick verification SQL
+## 11. Quick verification SQL
 
 After import, run these checks:
 

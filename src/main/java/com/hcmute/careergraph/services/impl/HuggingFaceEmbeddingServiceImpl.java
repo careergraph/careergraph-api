@@ -1,7 +1,6 @@
 package com.hcmute.careergraph.services.impl;
 
 import com.hcmute.careergraph.persistence.dtos.response.EmbeddingBatchResponse;
-import com.hcmute.careergraph.persistence.dtos.response.EmbeddingSingleResponse;
 import com.hcmute.careergraph.services.HuggingFaceEmbeddingService;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.MediaType;
@@ -15,17 +14,18 @@ import java.util.Map;
 @Service
 public class HuggingFaceEmbeddingServiceImpl implements HuggingFaceEmbeddingService {
 
-    private final String embeddingUrl;
     private final String embeddingBatchUrl;
     private final String modelName;
+    private final int expectedDimensions;
     private final WebClient webClient;
 
     public HuggingFaceEmbeddingServiceImpl(
             @Value("${embedding.service.url:http://localhost:8000}") String embeddingServiceUrl,
-            @Value("${embedding.service.model:}") String modelName) {
-        this.embeddingUrl = embeddingServiceUrl + "/api/v1/embeddings";
-        this.embeddingBatchUrl = embeddingServiceUrl + "/api/v1/embeddings/batch";
+            @Value("${embedding.service.model:}") String modelName,
+            @Value("${embedding.service.expected-dimensions:3072}") int expectedDimensions) {
+        this.embeddingBatchUrl = embeddingServiceUrl + "/embed";
         this.modelName = modelName;
+        this.expectedDimensions = expectedDimensions;
         this.webClient = WebClient.builder()
                 .codecs(configurer -> configurer.defaultCodecs().maxInMemorySize(10 * 1024 * 1024))
                 .build();
@@ -33,27 +33,13 @@ public class HuggingFaceEmbeddingServiceImpl implements HuggingFaceEmbeddingServ
 
     @Override
     public float[] embed(String text) {
-        Map<String, Object> body = new HashMap<>();
-        body.put("text", text);
-        if (modelName != null && !modelName.isBlank()) {
-            body.put("model_name", modelName);
-        }
-
-        EmbeddingSingleResponse response = webClient.post()
-                .uri(embeddingUrl)
-                .contentType(MediaType.APPLICATION_JSON)
-                .bodyValue(body)
-                .retrieve()
-                .bodyToMono(EmbeddingSingleResponse.class)
-                .block();
-
-        return toFloatArray(response.embedding());
+        return embed(List.of(text)).get(0);
     }
 
     @Override
     public List<float[]> embed(List<String> texts) {
         Map<String, Object> body = new HashMap<>();
-        body.put("texts", texts);
+        body.put("inputs", texts);
         if (modelName != null && !modelName.isBlank()) {
             body.put("model_name", modelName);
         }
@@ -66,10 +52,29 @@ public class HuggingFaceEmbeddingServiceImpl implements HuggingFaceEmbeddingServ
                 .bodyToMono(EmbeddingBatchResponse.class)
                 .block();
 
+        validateResponse(response, texts.size());
+
         return response.embeddings()
                 .stream()
                 .map(this::toFloatArray)
                 .toList();
+    }
+
+    private void validateResponse(EmbeddingBatchResponse response, int requestedCount) {
+        if (response == null) {
+            throw new IllegalStateException("Embedding service returned no response body.");
+        }
+        if (response.embeddings() == null || response.embeddings().isEmpty()) {
+            throw new IllegalStateException("Embedding service returned no embeddings.");
+        }
+        if (response.embeddings().size() != requestedCount) {
+            throw new IllegalStateException("Embedding service returned %d vectors for %d input texts."
+                    .formatted(response.embeddings().size(), requestedCount));
+        }
+        if (response.dimensions() != expectedDimensions) {
+            throw new IllegalStateException("Embedding service returned %d dimensions but Elasticsearch expects %d."
+                    .formatted(response.dimensions(), expectedDimensions));
+        }
     }
 
     private float[] toFloatArray(List<?> vector) {

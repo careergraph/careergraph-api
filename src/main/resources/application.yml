@@ -46,6 +46,14 @@ spring:
       max-file-size: ${MULTIPART_MAX_FILE_SIZE:10MB}
       max-request-size: ${MULTIPART_MAX_REQUEST_SIZE:20MB}
   ai:
+    retry:
+      max-attempts: ${SPRING_AI_RETRY_MAX_ATTEMPTS:1}
+      on-client-errors: ${SPRING_AI_RETRY_ON_CLIENT_ERRORS:false}
+      exclude-on-http-codes: ${SPRING_AI_RETRY_EXCLUDE_ON_HTTP_CODES:429}
+      backoff:
+        initial-interval: ${SPRING_AI_RETRY_BACKOFF_INITIAL_INTERVAL:1ms}
+        max-interval: ${SPRING_AI_RETRY_BACKOFF_MAX_INTERVAL:2ms}
+        multiplier: ${SPRING_AI_RETRY_BACKOFF_MULTIPLIER:2}
     google:
       genai:
         project-id: ${GOOGLE_PROJECT_ID:}
@@ -125,6 +133,7 @@ huggingface:
 embedding:
   service:
     url: ${EMBEDDING_SERVICE_URL:http://localhost:8000}
+    expected-dimensions: ${EMBEDDING_SERVICE_EXPECTED_DIMENSIONS:3072}
 
 integration:
   s3:

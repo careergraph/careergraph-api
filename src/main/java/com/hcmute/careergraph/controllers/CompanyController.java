@@ -217,7 +217,7 @@ public class CompanyController {
     @GetMapping("/{companyId}/jobs")
     public RestResponse<Page<JobResponse>> getJobsByCompanies(@PathVariable("companyId") String companyId,
                                                               @RequestParam(name = "page", defaultValue = "0") Integer page,
-                                                              @RequestParam(name = "size", defaultValue = "10") Integer size) {
+                                                              @RequestParam(name = "size", defaultValue = "100") Integer size) {
 
         if (companyId == null || companyId.isEmpty()) {
             throw new BadRequestException("Company ID invalid");
@@ -225,7 +225,7 @@ public class CompanyController {
 
         Pageable pageable = null;
         if (size == null) {
-            pageable = PageRequest.of(0, 5);
+            pageable = PageRequest.of(0, 100);
         } else {
             pageable = PageRequest.of(page, size);
         }

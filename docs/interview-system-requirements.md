@@ -81,6 +81,11 @@ job_id + interview_date  →  1 interview_room (unique)
 - Cấm dùng luồng reschedule để xử lý thao tác đổi status thuần túy.
 - Nếu HR hủy hoặc dời lịch, record cũ phải vẫn hiển thị cho candidate theo policy lịch sử (không hidden mặc định cho trường hợp này).
 - Candidate portal cần có chế độ xem lịch sử (`HISTORY`) để theo dõi toàn bộ biến động lịch hẹn liên quan phiên bản cũ/mới.
+- Khi candidate portal render room card có nhiều version trong cùng `meetingLink`, UI phải chọn **record hiện hành** theo thứ tự:
+    1. Version lá cuối cùng trong chuỗi `rescheduled_from_id`
+    2. Ưu tiên record còn active (`IN_PROGRESS`, `PENDING_RESCHEDULE`, `CONFIRMED`, `SCHEDULED`)
+    3. Nếu không còn active thì mới fallback sang version terminal mới nhất
+- Không được chọn record đại diện chỉ dựa trên `scheduledAt` lớn nhất, vì có thể record mới hợp lệ được dời về thời điểm sớm hơn record cũ đã hủy.
 - Calendar sorting cho danh sách theo ngày phải theo mức độ vận hành:
     1. Cần theo dõi (`IN_PROGRESS`, `PENDING_RESCHEDULE`)
     2. Đã xác nhận (`CONFIRMED`)
@@ -100,6 +105,12 @@ job_id + interview_date  →  1 interview_room (unique)
         - Nếu người dùng không thay đổi dữ liệu (thời gian, trạng thái, ghi chú), frontend **không được gửi request update**.
         - Khi lịch đã `CANCELLED` và người dùng chọn lại đúng trạng thái hủy, frontend phải chặn submit và hiển thị thông báo no-op.
         - Nút hành động phải tách rõ intent: `Lưu thay đổi` (update/reschedule) và `Hủy lịch phỏng vấn` (cancel).
+    - Với record `CANCELLED`, `NO_SHOW`, `COMPLETED`, `IN_PROGRESS`, frontend phải render modal ở chế độ chỉ xem; không hiển thị action cập nhật/hủy.
+    - Xác nhận `cancel` và `overwrite active interview` phải dùng component xác nhận nội bộ, không dùng browser confirm mặc định.
+
+- Ở màn tạo lịch từ Calendar hoặc filter job của module interview:
+    - Danh sách job chỉ lấy theo company hiện hành từ auth context.
+    - Không dùng endpoint toàn cục `getAllJobs` cho flow nội bộ của HR interview/calendar.
 
 - Eligibility cho API danh sách ứng viên có thể lên lịch (`/interviews/job/{jobId}/unscheduled`):
         - Cho phép các hồ sơ ở stage `INTERVIEW_COMPLETED` được lên lịch lại nếu **không có interview active**.

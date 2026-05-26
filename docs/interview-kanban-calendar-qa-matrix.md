@@ -22,6 +22,8 @@
 | QA-006 | Calendar Edit | Reschedule interview | Existing interview SCHEDULED/CONFIRMED | Edit in calendar modal and save | Original interview CANCELLED, new interview created |
 | QA-007 | Calendar Edit | Reschedule online interview keeps canonical daily room | Online interview | Reschedule to same job/date | New interview meetingLink is daily room code, participant slot updated |
 | QA-008 | Calendar Edit | Reschedule to past date/time | Existing interview | Edit with date/time < now | Rejected |
+| QA-008A | Calendar Edit | Historical cancelled interview opens read-only | Interview already CANCELLED after reschedule | Open edit modal from calendar | No save/cancel actions shown, only read-only information |
+| QA-008B | Calendar Edit | In-progress interview cannot be cancelled from modal | Interview status IN_PROGRESS | Open edit modal | Cancel action hidden, user sees read-only warning |
 | QA-009 | Room Access | Candidate joins before 15 minutes | Interview exists | Open room page earlier than window | Join disabled, countdown shown |
 | QA-010 | Room Access | Candidate joins during allowed window | Interview exists | Open room page after early join and before endAt | Join allowed |
 | QA-011 | Room Access | Candidate joins after endAt | Interview ended by time | Open room page | Join blocked with ended message |
@@ -39,6 +41,9 @@
 | QA-023 | Feedback | REJECT recommendation | Interview COMPLETED | Submit feedback REJECT | Application stage becomes REJECTED |
 | QA-024 | UX | Modal validation visibility | Invalid create/edit fields | Submit invalid form | Inline error shown and auto-scroll to first invalid field |
 | QA-025 | UX | Feedback modal validation | Missing required fields | Submit feedback | Inline error in modal (no validation toast) |
+| QA-026 | UX | Overwrite active interview confirmation uses app dialog | Candidate has active interview | Create new schedule from calendar | Custom confirmation dialog appears instead of browser confirm |
+| QA-027 | Candidate Portal | Room card picks active version over later cancelled time | Old cancelled interview has later scheduledAt than new active version | Open My Interviews | Card status and join button follow the active leaf version |
+| QA-028 | HR Calendar | Job dropdown is company-scoped | HR belongs to company with subset of jobs | Open create modal | Dropdown contains only jobs of current company and scrolls within modal bounds |
 
 ## HOLD vs NEXT_ROUND Governance Checks
 - HOLD and NEXT_ROUND both keep application at INTERVIEW stage.
@@ -49,6 +54,8 @@
 ## Regression Smoke Checklist
 - Create online/offline interview from Kanban and Calendar.
 - Edit schedule from Calendar and verify new interview appears in list.
+- Open a cancelled historical interview from Calendar and verify modal is read-only.
+- Verify My Interviews still shows join action for the active version when cancelled history has a later scheduled time.
 - Candidate can only join within valid time window.
 - HR cannot re-enter previous-day room by code.
 - Offboarded column visibility follows company config.

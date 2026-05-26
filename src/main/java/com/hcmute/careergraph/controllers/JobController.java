@@ -94,6 +94,22 @@ public class JobController {
          * @param id Job ID
          * @return RestResponse<JobResponse>
          */
+        @GetMapping("/my-company")
+        public RestResponse<Page<JobResponse>> getMyCompanyJobs(
+                        @RequestParam(name = "page", defaultValue = "0") Integer page,
+                        @RequestParam(name = "size", defaultValue = "100") Integer size,
+                        Authentication authentication) {
+                String companyId = securityUtils.extractCompanyId(authentication);
+                Pageable pageable = PageRequest.of(page, size);
+                Page<Job> jobPage = jobService.getJobsByCompany(companyId, pageable);
+
+                return RestResponse.<Page<JobResponse>>builder()
+                                .status(HttpStatus.OK)
+                                .message("Company jobs retrieved successfully")
+                                .data(mapToJobResponsePage(jobPage, pageable))
+                                .build();
+        }
+
         @GetMapping("/{id}")
         public RestResponse<JobResponse> getJobById(@PathVariable String id) {
                 log.info("GET /api/v1/jobs/{} - Fetching job", id);
@@ -129,7 +145,7 @@ public class JobController {
         @GetMapping
         public RestResponse<Page<JobResponse>> getAllJobs(
                         @RequestParam(name = "page", defaultValue = "0") Integer page,
-                        @RequestParam(name = "size", defaultValue = "10") Integer size) {
+                        @RequestParam(name = "size", defaultValue = "100") Integer size) {
                 log.info("GET /api/v1/jobs - Fetching all jobs (page: {}, size: {})", page, size);
 
                 Pageable pageable = PageRequest.of(page, size);
