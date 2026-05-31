@@ -93,8 +93,9 @@ public class JobServiceImpl implements JobService {
                 .state(job.getState())
                 .city(job.getCity())
                 .companyId(job.getCompany().getId())
-//                .expiredDate(safeParseDate(job.getExpiryDate()))
-                .embedding(embedService.embed(job.getTitle()+ " " +  job.getJobCategory().getDisplayName() + " " + job.getState()))
+                // .expiredDate(safeParseDate(job.getExpiryDate()))
+                .embedding(embedService
+                        .embed(job.getTitle() + " " + job.getJobCategory().getDisplayName() + " " + job.getState()))
                 .build();
         jobESRepository.save(jobES);
         // 4. Lưu vào database
@@ -181,7 +182,6 @@ public class JobServiceImpl implements JobService {
         // Update recruiment for job
         job.setResume(request.resume());
         job.setCoverLetter(request.coverLetter());
-
 
         return jobRepository.save(job);
     }
@@ -283,14 +283,14 @@ public class JobServiceImpl implements JobService {
 
         int remaining = PAGE_SIZE_PERSONAL_JOB - personalJobs.size();
         List<String> excludeIds = personalJobs.stream().map(Job::getId).toList();
-        List<Job> extraJobs = jobRepository.findLatestJobsExcluding(currentDate, excludeIds.isEmpty() ? null : excludeIds);
+        List<Job> extraJobs = jobRepository.findLatestJobsExcluding(currentDate,
+                excludeIds.isEmpty() ? null : excludeIds);
 
         List<Job> result = new ArrayList<>(personalJobs);
         result.addAll(extraJobs);
 
         return result;
     }
-
 
     @Transactional(readOnly = true)
     @Override
@@ -306,6 +306,10 @@ public class JobServiceImpl implements JobService {
                 .orElseThrow(() -> new NotFoundException("Candidate not found with id: " + userId));
 
         String keyword = _genKey(candidate);
+        System.out.println("key job" + keyword);
+        if (keyword == null || keyword.trim().length() <= 0) {
+            return getJobsForAnonymousUser();
+        }
         // Get current date for filtering expired jobs
         Pageable pageable = PageRequest.of(0, 6);
 
@@ -321,12 +325,27 @@ public class JobServiceImpl implements JobService {
 
     }
 
+    private String joinList(List<String> values) {
+        if (values == null || values.isEmpty()) {
+            return "";
+        }
+
+        return values.stream()
+                .filter(Objects::nonNull)
+                .map(String::trim)
+                .filter(s -> !s.isEmpty())
+                .collect(Collectors.joining(" "));
+    }
+
+    private String safe(String value) {
+        return value == null ? "" : value.trim();
+    }
+
     private String _genKey(Candidate candidate) {
-        StringBuilder sb = new StringBuilder();
-        sb.append(candidate.getLocations());
-        sb.append(candidate.getDesiredPosition());
-        sb.append(candidate.getIndustries());
-        return sb.toString();
+
+        return (joinList(candidate.getLocations()) + " " +
+                safe(candidate.getDesiredPosition()) + " " +
+                joinList(candidate.getIndustries())).trim();
     }
 
     @Override
@@ -394,9 +413,13 @@ public class JobServiceImpl implements JobService {
         }
 
         // Get params from filter
-        List<Status> statuses = filter.getStatuses() == null || filter.getStatuses().isEmpty() ? null : filter.getStatuses();
-        List<JobCategory> jobCategories = filter.getJobCategories() == null || filter.getJobCategories().isEmpty() ? null : filter.getJobCategories();
-        List<EmploymentType> employmentTypes = filter.getEmploymentTypes() == null || filter.getEmploymentTypes().isEmpty() ? null : filter.getEmploymentTypes();
+        List<Status> statuses = filter.getStatuses() == null || filter.getStatuses().isEmpty() ? null
+                : filter.getStatuses();
+        List<JobCategory> jobCategories = filter.getJobCategories() == null || filter.getJobCategories().isEmpty()
+                ? null
+                : filter.getJobCategories();
+        List<EmploymentType> employmentTypes = filter.getEmploymentTypes() == null
+                || filter.getEmploymentTypes().isEmpty() ? null : filter.getEmploymentTypes();
         List<EducationType> educationTypes = null;
         List<ExperienceLevel> experienceLevels = null;
         String city = filter.getCity();
@@ -404,7 +427,8 @@ public class JobServiceImpl implements JobService {
         Page<Job> jobs = null;
 
         if (type == PartyType.COMPANY) {
-            jobs = jobRepository.searchJobForCompany(partyId, statuses, jobCategories, employmentTypes, query, pageable);
+            jobs = jobRepository.searchJobForCompany(partyId, statuses, jobCategories, employmentTypes, query,
+                    pageable);
         } else {
 
             /**
@@ -418,7 +442,6 @@ public class JobServiceImpl implements JobService {
              * Recommend job trên landing page
              */
 
-
             jobs = jobRepository.searchJobForCandidate(partyId, city, jobCategories, employmentTypes,
                     experienceLevels, educationTypes, query, pageable);
         }
@@ -426,38 +449,47 @@ public class JobServiceImpl implements JobService {
     }
 
     @Override
-    public Page<Job> searchEmbed(JobFilterRequest filter, String partyId, String query, Pageable pageable, PartyType type) {
+    public Page<Job> searchEmbed(JobFilterRequest filter, String partyId, String query, Pageable pageable,
+            PartyType type) {
         // Check company ID
         if (type == PartyType.COMPANY && partyId == null) {
             throw new BadRequestException("Company ID is required");
         }
         // Get params from filter
-        List<Status> statuses = filter.getStatuses() == null || filter.getStatuses().isEmpty() ? null : filter.getStatuses();
-        List<JobCategory> jobCategories = filter.getJobCategories() == null || filter.getJobCategories().isEmpty() ? null : filter.getJobCategories();
-        List<EmploymentType> employmentTypes = filter.getEmploymentTypes() == null || filter.getEmploymentTypes().isEmpty() ? null : filter.getEmploymentTypes();
-        List<EducationType> educationTypes = filter.getEducationTypes() == null || filter.getEducationTypes().isEmpty() ? null : filter.getEducationTypes();
-        List<ExperienceLevel> experienceLevels = filter.getExperienceLevels() == null || filter.getExperienceLevels().isEmpty() ? null : filter.getExperienceLevels();
+        List<Status> statuses = filter.getStatuses() == null || filter.getStatuses().isEmpty() ? null
+                : filter.getStatuses();
+        List<JobCategory> jobCategories = filter.getJobCategories() == null || filter.getJobCategories().isEmpty()
+                ? null
+                : filter.getJobCategories();
+        List<EmploymentType> employmentTypes = filter.getEmploymentTypes() == null
+                || filter.getEmploymentTypes().isEmpty() ? null : filter.getEmploymentTypes();
+        List<EducationType> educationTypes = filter.getEducationTypes() == null || filter.getEducationTypes().isEmpty()
+                ? null
+                : filter.getEducationTypes();
+        List<ExperienceLevel> experienceLevels = filter.getExperienceLevels() == null
+                || filter.getExperienceLevels().isEmpty() ? null : filter.getExperienceLevels();
         String city = filter.getCity();
 
         Page<Job> jobs = null;
 
         if (type == PartyType.COMPANY) {
-            jobs = jobRepository.searchJobForCompany(partyId, statuses, jobCategories, employmentTypes, query, pageable);
+            jobs = jobRepository.searchJobForCompany(partyId, statuses, jobCategories, employmentTypes, query,
+                    pageable);
         } else {
-            String keyword="";
+            String keyword = "";
 
             // Nếu không có keyword → dùng filter-only search (match_all + post filter)
             boolean hasKeyword = query != null && !query.trim().isEmpty();
 
-            if(partyId != null) {
+            if (partyId != null) {
                 Candidate candidate = candidateRepository.findById(partyId)
                         .orElse(null);
-                if(candidate != null && !hasKeyword) {
+                if (candidate != null && !hasKeyword) {
                     keyword = _genKey(candidate);
                 }
             }
 
-            if(hasKeyword) {
+            if (hasKeyword) {
                 keyword = keyword.isEmpty() ? query : keyword + " " + query;
             }
 
@@ -534,7 +566,8 @@ public class JobServiceImpl implements JobService {
         StringBuilder sb = new StringBuilder();
 
         sb.append("Đóng vai là một chuyên gia tư vấn nghề nghiệp và viết CV chuyên nghiệp (Top CV Writer). ");
-        sb.append("Nhiệm vụ của bạn là viết lại nội dung CV cho ứng viên để phù hợp nhất với công việc đang ứng tuyển.\n\n");
+        sb.append(
+                "Nhiệm vụ của bạn là viết lại nội dung CV cho ứng viên để phù hợp nhất với công việc đang ứng tuyển.\n\n");
 
         // --- Input: Job Info ---
         sb.append("--- THÔNG TIN CÔNG VIỆC (TARGET JOB) ---\n");
@@ -547,14 +580,14 @@ public class JobServiceImpl implements JobService {
         sb.append("--- HỒ SƠ GỐC CỦA ỨNG VIÊN ---\n");
         sb.append("Họ tên: ").append(candidate.getFirstName() + " " + candidate.getLastName()).append("\n");
         List<String> skills = candidate.getSkills().stream()
-                        .map(skill -> skill.getSkill().getName())
-                        .toList();
+                .map(skill -> skill.getSkill().getName())
+                .toList();
         sb.append("Kỹ năng hiện có: ").append(skills).append("\n");
 
         List<String> experiences = candidate.getExperiences().stream()
-                        .map(experience -> experience.getCompany().getName() + ": from " + experience.getStartDate()
-                                + " to " + experience.getEndDate())
-                        .toList();
+                .map(experience -> experience.getCompany().getName() + ": from " + experience.getStartDate()
+                        + " to " + experience.getEndDate())
+                .toList();
         sb.append("Kinh nghiệm làm việc: ").append(experiences).append("\n");
 
         List<String> educations = candidate.getEducations().stream()
@@ -565,17 +598,23 @@ public class JobServiceImpl implements JobService {
 
         // --- Output Requirement ---
         sb.append("--- YÊU CẦU ĐẦU RA ---\n");
-        sb.append("1. Hãy viết lại phần 'summary' (tóm tắt) thật ấn tượng, thể hiện ứng viên là người phù hợp cho vị trí này.\n");
-        sb.append("2. Trong phần 'experience', hãy viết lại các 'bulletPoints' sao cho làm nổi bật các từ khóa (keywords) có trong mô tả công việc (Job Description).\n");
+        sb.append(
+                "1. Hãy viết lại phần 'summary' (tóm tắt) thật ấn tượng, thể hiện ứng viên là người phù hợp cho vị trí này.\n");
+        sb.append(
+                "2. Trong phần 'experience', hãy viết lại các 'bulletPoints' sao cho làm nổi bật các từ khóa (keywords) có trong mô tả công việc (Job Description).\n");
         sb.append("3. Chỉ giữ lại hoặc sắp xếp các kỹ năng (skills) liên quan lên đầu.\n");
-        sb.append("4. Trả về kết quả DUY NHẤT là một chuỗi JSON hợp lệ khớp với cấu trúc sau (không giải thích thêm):\n");
+        sb.append(
+                "4. Trả về kết quả DUY NHẤT là một chuỗi JSON hợp lệ khớp với cấu trúc sau (không giải thích thêm):\n");
 
         // Cung cấp mẫu JSON để AI điền vào
         sb.append("{\n" +
-                "  \"personal\": { \"fullName\": \"...\", \"headline\": \"...\", \"summary\": \"...\", \"location\": \"...\" },\n" +
+                "  \"personal\": { \"fullName\": \"...\", \"headline\": \"...\", \"summary\": \"...\", \"location\": \"...\" },\n"
+                +
                 "  \"contact\": { \"email\": \"...\", \"phone\": \"...\", \"linkedin\": \"...\" },\n" +
-                "  \"experience\": [ { \"role\": \"...\", \"company\": \"...\", \"startDate\": \"...\", \"endDate\": \"...\", \"bulletPoints\": [\"...\"] } ],\n" +
-                "  \"education\": [ { \"school\": \"...\", \"degree\": \"...\", \"startDate\": \"...\", \"endDate\": \"...\" } ],\n" +
+                "  \"experience\": [ { \"role\": \"...\", \"company\": \"...\", \"startDate\": \"...\", \"endDate\": \"...\", \"bulletPoints\": [\"...\"] } ],\n"
+                +
+                "  \"education\": [ { \"school\": \"...\", \"degree\": \"...\", \"startDate\": \"...\", \"endDate\": \"...\" } ],\n"
+                +
                 "  \"skills\": [ { \"name\": \"...\" } ]\n" +
                 "}");
 

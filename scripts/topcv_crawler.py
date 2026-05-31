@@ -111,7 +111,32 @@ COMPANY_SUFFIXES = [
     "Studio",
 ]
 
+COMPANY_SERIES = ["Group Alpha", "Group Beta", "Group Delta", "Group Horizon", "Group Nexus"]
+
 COMPANY_SIZES = ["11-50", "51-200", "201-500", "501-1000"]
+
+TRUSTED_COMPANY_LOGO_DOMAINS = [
+    "topcv.vn",
+    "fpt.com",
+    "fptsoftware.com",
+    "viettel.com.vn",
+    "vnpt.vn",
+    "vng.com.vn",
+    "cmc.com.vn",
+    "momo.vn",
+    "vnpay.vn",
+    "tiki.vn",
+    "shopee.vn",
+    "lazada.vn",
+    "masangroup.com",
+    "vinamilk.com.vn",
+    "vietcombank.com.vn",
+    "techcombank.com",
+    "vpbank.com.vn",
+    "acb.com.vn",
+    "vietjetair.com",
+    "vietnamairlines.com",
+]
 
 LOCATIONS = [
     {
@@ -665,9 +690,27 @@ def make_uuid(prefix: str, key: str) -> str:
 def normalize_company_name(value: str) -> str:
     cleaned = strip_html(value)
     cleaned = re.sub(r"\s+", " ", cleaned).strip(" -|")
+    cleaned = remove_company_numeric_suffix(cleaned)
     if not cleaned or cleaned.lower() == "unknown company":
         return "Unknown Company"
     return cleaned[:160]
+
+
+def remove_company_numeric_suffix(value: str) -> str:
+    cleaned = value.strip(" -|,.;")
+    previous = None
+    while previous != cleaned:
+        previous = cleaned
+        cleaned = re.sub(r"(?:[\s\-_/|#.,]*(?:0\d{2,}|\d{3,})\b[\s\-_/|#.,]*)+$", "", cleaned)
+        cleaned = cleaned.strip(" -|,.;")
+    return cleaned
+
+
+def clean_company_codes_in_description(value: str) -> str:
+    cleaned = strip_html(value)
+    cleaned = re.sub(r"\b([A-Z][A-Za-z]*(?:\s+[A-Z][A-Za-z]*){0,5})\s+(?:0\d{2,}|\d{3,})\b", r"\1", cleaned)
+    cleaned = re.sub(r"\s+", " ", cleaned)
+    return cleaned.strip()
 
 
 def normalize_title(value: str) -> str:
@@ -856,14 +899,17 @@ def infer_blueprint(title: str, description: str) -> dict[str, object]:
 def make_company_name(index: int) -> str:
     prefix = COMPANY_PREFIXES[index % len(COMPANY_PREFIXES)]
     suffix = COMPANY_SUFFIXES[(index // len(COMPANY_PREFIXES)) % len(COMPANY_SUFFIXES)]
-    return f"{prefix} {suffix} {index + 1:03d}"
+    cycle = index // (len(COMPANY_PREFIXES) * len(COMPANY_SUFFIXES))
+    if cycle == 0:
+        return f"{prefix} {suffix}"
+    series = COMPANY_SERIES[(cycle - 1) % len(COMPANY_SERIES)]
+    return f"{prefix} {suffix} {series}"
 
 
 def make_company_avatar(name: str) -> str:
-    return (
-        "https://ui-avatars.com/api/"
-        f"?name={quote_plus(name)}&background=0F766E&color=FFFFFF&size=256&bold=true"
-    )
+    domain_index = uuid.uuid5(uuid.NAMESPACE_DNS, f"careergraph-logo:{name}").int % len(TRUSTED_COMPANY_LOGO_DOMAINS)
+    domain = TRUSTED_COMPANY_LOGO_DOMAINS[domain_index]
+    return f"https://www.google.com/s2/favicons?domain={quote_plus(domain)}&sz=256"
 
 
 def make_seed_cover(seed: str, width: int = 1200, height: int = 320) -> str:
@@ -929,7 +975,7 @@ def build_company_pool(records: list[JobRecord], target_companies: int, rng: ran
 
 
 def base_job_description(record: JobRecord, company: CompanySeed, blueprint: dict[str, object]) -> str:
-    source_description = record.description.strip()
+    source_description = clean_company_codes_in_description(record.description)
     if source_description:
         return source_description[:2200]
     return (
