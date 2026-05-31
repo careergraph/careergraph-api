@@ -103,7 +103,9 @@ python3 scripts/topcv_crawler.py crawl-to-sql \
   --output-sql init-scripts/topcv-import.sql \
   --reset
 ```
-
+```bash
+python scripts/topcv_crawler.py crawl-to-sql --pages 10 --per-page 30 --target-jobs 1000 --target-companies 100 --target-candidates 200 --output-json scripts/output/topcv_jobs.json --output-sql init-scripts/topcv-import.sql --reset
+```
 Use this when outbound access to TopCV is available.
 
 ### Option B. Generate SQL from an existing crawled JSON file
