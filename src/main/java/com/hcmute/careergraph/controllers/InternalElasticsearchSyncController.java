@@ -6,6 +6,7 @@ import com.hcmute.careergraph.config.app.ElasticsearchSyncResult;
 import com.hcmute.careergraph.helper.RestResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.annotation.Profile;
 import org.springframework.http.HttpStatus;
 import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -22,6 +23,7 @@ import java.util.Map;
 @RestController
 @RequestMapping("internal/elasticsearch")
 @RequiredArgsConstructor
+@Profile("!test")
 public class InternalElasticsearchSyncController {
 
   private final ElasticsearchDataInitializer jobSyncInitializer;

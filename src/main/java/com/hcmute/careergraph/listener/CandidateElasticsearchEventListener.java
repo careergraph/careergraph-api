@@ -46,8 +46,8 @@ public class CandidateElasticsearchEventListener {
 
       Candidate candidate = candidateOpt.get();
 
-      // Check if candidate should be in Elasticsearch (only if open to work for some
-      // events)
+      // Async listener must not rely on request SecurityContext; all data is loaded
+      // directly from repositories with candidate id from the domain event.
       boolean shouldIndex = shouldIndexCandidate(candidate, event.updateType());
 
       if (shouldIndex) {
@@ -69,15 +69,7 @@ public class CandidateElasticsearchEventListener {
    * Determine if candidate should be indexed based on update type
    */
   private boolean shouldIndexCandidate(Candidate candidate, CandidateUpdatedEvent.CandidateUpdateType updateType) {
-    // For job search status change, respect the isOpenToWork flag
-    if (updateType == CandidateUpdatedEvent.CandidateUpdateType.JOB_SEARCH_STATUS_CHANGED) {
-      return Boolean.TRUE.equals(candidate.getIsOpenToWork());
-    }
-
-    // For job criteria updates, always sync (candidate is actively updating their
-    // profile)
-    // They should be indexed regardless of isOpenToWork status
-    return true;
+    return Boolean.TRUE.equals(candidate.getIsOpenToWork());
   }
 
 }

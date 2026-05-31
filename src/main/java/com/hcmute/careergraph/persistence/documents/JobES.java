@@ -6,6 +6,7 @@ import lombok.*;
 import org.springframework.data.elasticsearch.annotations.*;
 
 import java.time.LocalDate;
+import java.util.List;
 
 
 @Getter
@@ -61,6 +62,18 @@ public class JobES {
 
     @Field(type = FieldType.Keyword)
     private String companyId;
+
+    @Field(type = FieldType.Text, analyzer = "vi_analyzer")
+    private List<String> qualifications;
+
+    @Field(type = FieldType.Text, analyzer = "vi_analyzer")
+    private List<String> minimumQualifications;
+
+    @Field(type = FieldType.Text, analyzer = "vi_analyzer")
+    private List<String> responsibilities;
+
+    @Field(type = FieldType.Text, analyzer = "vi_analyzer")
+    private List<String> skills;
 
     @Field(type = FieldType.Date, format = DateFormat.date)
     private LocalDate createdAt;

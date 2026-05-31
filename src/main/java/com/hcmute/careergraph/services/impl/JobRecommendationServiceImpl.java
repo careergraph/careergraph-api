@@ -7,6 +7,7 @@ import com.hcmute.careergraph.persistence.models.JobNotificationQueue;
 import com.hcmute.careergraph.repositories.JobNotificationHistoryRepository;
 import com.hcmute.careergraph.repositories.JobNotificationQueueRepository;
 import com.hcmute.careergraph.repositories.NewlyPostedJobRepository;
+import com.hcmute.careergraph.services.CandidateSearchTextBuilder;
 import com.hcmute.careergraph.services.JobESService;
 import com.hcmute.careergraph.services.JobRecommendationService;
 import lombok.RequiredArgsConstructor;
@@ -35,6 +36,7 @@ public class JobRecommendationServiceImpl implements JobRecommendationService {
         private final JobNotificationQueueRepository queueRepo;
         private final JobNotificationHistoryRepository historyRepo;
         private final NewlyPostedJobRepository newlyPostedJobRepo;
+        private final CandidateSearchTextBuilder candidateSearchTextBuilder;
 
         private static final int FETCH_SIZE = 10; // Lấy top 10 job match nhất
 
@@ -108,18 +110,6 @@ public class JobRecommendationServiceImpl implements JobRecommendationService {
         }
 
         private String genKeyword(Candidate c) {
-                StringBuilder sb = new StringBuilder();
-
-                if (c.getDesiredPosition() != null && !c.getDesiredPosition().isBlank()) {
-                        sb.append(c.getDesiredPosition()).append(" ");
-                }
-                if (c.getIndustry() != null && !c.getIndustry().isBlank()) {
-                        sb.append(c.getIndustry()).append(" ");
-                }
-                if (c.getLocations() != null && !c.getLocations().isEmpty()) {
-                        sb.append(String.join(" ", c.getLocations()));
-                }
-
-                return sb.toString().trim();
+                return candidateSearchTextBuilder.build(c, true);
         }
 }

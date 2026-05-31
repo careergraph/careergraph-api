@@ -83,9 +83,9 @@ public class CandidateESServiceImpl implements CandidateESService {
                         .query(keyword)
                         .fields(
                             "desiredPosition^10",
-                            "currentJobTitle^5",
-                          "skills^3",
-                          "summary^1",
+                            "currentJobTitle^7",
+                          "skills^6",
+                          "summary^3",
                           "resumeText^2")
                         .fuzziness("AUTO")
                         .type(TextQueryType.BestFields)
@@ -102,8 +102,9 @@ public class CandidateESServiceImpl implements CandidateESService {
                         .query(keyword)
                         .fields(
                             "desiredPosition^10",
-                          "currentJobTitle^5",
-                          "resumeText^2")
+                          "currentJobTitle^7",
+                          "skills^5",
+                          "resumeText^1.5")
                         .type(TextQueryType.PhrasePrefix)
                         .boost(1.5f)));
 
@@ -154,9 +155,9 @@ public class CandidateESServiceImpl implements CandidateESService {
                   .query(title)
                   .fields(
                       "desiredPosition^10",
-                  "currentJobTitle^6",
-                  "skills^3",
-                  "summary^1",
+                  "currentJobTitle^7",
+                  "skills^6",
+                  "summary^3",
                   "resumeText^2")
                   .type(TextQueryType.BestFields)
                   .operator(Operator.Or)
@@ -462,6 +463,8 @@ public class CandidateESServiceImpl implements CandidateESService {
       email = candidate.getAccount().getEmail();
     }
 
+    ResumeProjection resume = resolveResume(candidate.getId());
+
     return CandidateES.builder()
         .id(candidate.getId())
         .firstName(candidate.getFirstName())
@@ -474,7 +477,10 @@ public class CandidateESServiceImpl implements CandidateESService {
         .desiredPosition(candidate.getDesiredPosition())
         .currentJobTitle(candidate.getCurrentJobTitle())
         .summary(candidate.getSummary())
-        .resumeText(resolveResumeText(candidate.getId()))
+        .resumeText(resume.resumeText())
+        .resumeFileId(resume.fileId())
+        .resumeUpdatedAt(resume.updatedAt())
+        .resumeContentHash(resume.contentHash())
         .isOpenToWork(candidate.getIsOpenToWork() != null ? candidate.getIsOpenToWork() : false)
         .educationLevel(candidate.getEducationLevel())
         .industries(candidate.getIndustries())
@@ -488,15 +494,26 @@ public class CandidateESServiceImpl implements CandidateESService {
         .build();
   }
 
-  private String resolveResumeText(String candidateId) {
+  private ResumeProjection resolveResume(String candidateId) {
     return fileRepository
         .findFirstByOwnerIdAndStatusAndFileTypeInAndShareToFindJobTrueOrderByCreatedDateDesc(
             candidateId,
             Status.ACTIVE,
             List.of(FileType.RESUME, FileType.CV))
-        .map(File::getResumeExtractedText)
-        .filter(StringUtils::hasText)
-        .orElse(null);
+        .filter(file -> StringUtils.hasText(file.getResumeExtractedText()))
+        .map(file -> new ResumeProjection(
+            file.getResumeExtractedText(),
+            file.getId(),
+            file.getLastModifiedDate() != null ? file.getLastModifiedDate() : file.getCreatedDate(),
+            file.getResumeContentHash()))
+        .orElse(ResumeProjection.empty());
+  }
+
+  private record ResumeProjection(String resumeText, String fileId, java.time.LocalDateTime updatedAt,
+      String contentHash) {
+    static ResumeProjection empty() {
+      return new ResumeProjection(null, null, null, null);
+    }
   }
 
   private String buildJobSearchText(Job job) {

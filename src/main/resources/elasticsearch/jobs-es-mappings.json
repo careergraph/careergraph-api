@@ -42,6 +42,22 @@
     "companyId": {
       "type": "keyword"
     },
+    "qualifications": {
+      "type": "text",
+      "analyzer": "vi_analyzer"
+    },
+    "minimumQualifications": {
+      "type": "text",
+      "analyzer": "vi_analyzer"
+    },
+    "responsibilities": {
+      "type": "text",
+      "analyzer": "vi_analyzer"
+    },
+    "skills": {
+      "type": "text",
+      "analyzer": "vi_analyzer"
+    },
 
     "createdAt": {
       "type": "date",

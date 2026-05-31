@@ -4,6 +4,9 @@ import com.hcmute.careergraph.enums.common.FileType;
 import com.hcmute.careergraph.enums.common.Status;
 import com.hcmute.careergraph.persistence.models.File;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
@@ -20,4 +23,20 @@ public interface FileRepository extends JpaRepository<File,String> {
 
     Optional<File> findFirstByOwnerIdAndFilePathAndStatusOrderByCreatedDateDesc(
             String ownerId, String filePath, Status status);
+
+    List<File> findByOwnerIdAndStatusAndFileTypeIn(String ownerId, Status status, List<FileType> fileTypes);
+
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("""
+            update File f
+               set f.shareToFindJob = :shareToFindJob
+             where f.ownerId = :ownerId
+               and f.status = :status
+               and f.fileType in :fileTypes
+            """)
+    int updateShareToFindJobForCandidateResumes(
+            @Param("ownerId") String ownerId,
+            @Param("status") Status status,
+            @Param("fileTypes") List<FileType> fileTypes,
+            @Param("shareToFindJob") Boolean shareToFindJob);
 }

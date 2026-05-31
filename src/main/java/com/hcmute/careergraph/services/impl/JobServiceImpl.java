@@ -59,6 +59,7 @@ public class JobServiceImpl implements JobService {
     private final EmbedService embedService;
     private final JobESRepository jobESRepository;
     private final FastAPIClientService fastAPIClientService;
+    private final CandidateSearchTextBuilder candidateSearchTextBuilder;
 
     private final ApplicationEventPublisher publisher;
 
@@ -93,9 +94,11 @@ public class JobServiceImpl implements JobService {
                 .state(job.getState())
                 .city(job.getCity())
                 .companyId(job.getCompany().getId())
+                .qualifications(job.getQualifications())
+                .minimumQualifications(job.getMinimumQualifications())
+                .responsibilities(job.getResponsibilities())
                 // .expiredDate(safeParseDate(job.getExpiryDate()))
-                .embedding(embedService
-                        .embed(job.getTitle() + " " + job.getJobCategory().getDisplayName() + " " + job.getState()))
+                .embedding(embedService.embed(buildJobSearchText(job)))
                 .build();
         jobESRepository.save(jobES);
         // 4. Lưu vào database
@@ -305,15 +308,20 @@ public class JobServiceImpl implements JobService {
         Candidate candidate = candidateRepository.findById(userId)
                 .orElseThrow(() -> new NotFoundException("Candidate not found with id: " + userId));
 
-        String keyword = _genKey(candidate);
-        System.out.println("key job" + keyword);
+        String keyword = candidateSearchTextBuilder.build(candidate, true);
         if (keyword == null || keyword.trim().length() <= 0) {
             return getJobsForAnonymousUser();
         }
+        log.debug("Personalized job search text built for candidateId={}, chars={}", userId, keyword.length());
         // Get current date for filtering expired jobs
         Pageable pageable = PageRequest.of(0, 6);
 
         SearchResponse<JobES> listSearch = jobESService.searchJobsByNavtiveAndFuzzy(keyword, pageable);
+        if (listSearch == null || listSearch.hits() == null || listSearch.hits().hits().isEmpty()) {
+            log.warn("Personalized ES search returned no usable response for candidateId={}, falling back to latest jobs",
+                    userId);
+            return getJobsForAnonymousUser();
+        }
 
         List<String> esIds = listSearch.hits().hits().stream()
                 .map(Hit::id)
@@ -342,10 +350,39 @@ public class JobServiceImpl implements JobService {
     }
 
     private String _genKey(Candidate candidate) {
+        return candidateSearchTextBuilder.build(candidate, true);
+    }
 
-        return (safe(candidate.getDesiredPosition()) + " " +
-                joinList(candidate.getLocations()) + " " +
-                joinList(candidate.getIndustries())).trim();
+    private String buildJobSearchText(Job job) {
+        if (job == null) {
+            return "";
+        }
+        StringBuilder sb = new StringBuilder();
+        append(sb, job.getTitle());
+        append(sb, job.getDescription());
+        append(sb, job.getJobCategory() != null ? job.getJobCategory().getDisplayName() : null);
+        append(sb, job.getEmploymentType() != null ? job.getEmploymentType().name() : null);
+        append(sb, job.getExperienceLevel() != null ? job.getExperienceLevel().name() : null);
+        append(sb, job.getEducation() != null ? job.getEducation().name() : null);
+        append(sb, job.getCity());
+        append(sb, job.getState());
+        appendAll(sb, job.getQualifications());
+        appendAll(sb, job.getMinimumQualifications());
+        appendAll(sb, job.getResponsibilities());
+        return sb.toString().replaceAll("\\s+", " ").trim();
+    }
+
+    private void appendAll(StringBuilder sb, List<String> values) {
+        if (values == null) {
+            return;
+        }
+        values.forEach(value -> append(sb, value));
+    }
+
+    private void append(StringBuilder sb, String value) {
+        if (value != null && !value.isBlank()) {
+            sb.append(value.trim()).append(' ');
+        }
     }
 
     @Override
@@ -485,12 +522,12 @@ public class JobServiceImpl implements JobService {
                 Candidate candidate = candidateRepository.findById(partyId)
                         .orElse(null);
                 if (candidate != null && !hasKeyword) {
-                    keyword = _genKey(candidate);
+                    keyword = candidateSearchTextBuilder.build(candidate, true);
                 }
             }
 
             if (hasKeyword) {
-                keyword = keyword.isEmpty() ? query : keyword + " " + query;
+                keyword = query.trim();
             }
 
             SearchResponse<JobES> esResponse;

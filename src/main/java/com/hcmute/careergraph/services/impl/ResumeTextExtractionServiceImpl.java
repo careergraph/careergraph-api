@@ -2,12 +2,14 @@ package com.hcmute.careergraph.services.impl;
 
 import com.hcmute.careergraph.enums.common.Status;
 import com.hcmute.careergraph.helper.ResumeDocumentTextExtractor;
+import com.hcmute.careergraph.persistence.event.CandidateUpdatedEvent;
 import com.hcmute.careergraph.persistence.models.File;
 import com.hcmute.careergraph.repositories.FileRepository;
 import com.hcmute.careergraph.services.ResumeTextExtractionService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -17,8 +19,11 @@ import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.web.reactive.function.client.WebClientResponseException;
 
 import java.net.URI;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
 import java.time.Duration;
 import java.util.Arrays;
+import java.util.HexFormat;
 import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
@@ -30,6 +35,7 @@ public class ResumeTextExtractionServiceImpl implements ResumeTextExtractionServ
 
     private final FileRepository fileRepository;
     private final WebClient.Builder webClientBuilder;
+    private final ApplicationEventPublisher eventPublisher;
 
     @Value("${application.resume-extraction.max-download-bytes:15728640}")
     private int maxDownloadBytes;
@@ -52,10 +58,6 @@ public class ResumeTextExtractionServiceImpl implements ResumeTextExtractionServ
             return;
         }
         File file = opt.get();
-        if (StringUtils.hasText(file.getResumeExtractedText())) {
-            log.debug("Resume extraction skip: already has text fileId={}", fileId);
-            return;
-        }
         String url = file.getFilePath();
         if (!StringUtils.hasText(url)) {
             persistError(file, "Không có URL file (file_path).");
@@ -74,13 +76,22 @@ public class ResumeTextExtractionServiceImpl implements ResumeTextExtractionServ
                 return;
             }
             String truncated = truncateForStore(text);
+            String contentHash = sha256(truncated);
+            if (contentHash.equals(file.getResumeContentHash())
+                    && StringUtils.hasText(file.getResumeExtractedText())) {
+                log.debug("Resume extraction skip: content unchanged fileId={}", fileId);
+                return;
+            }
             file.setResumeExtractedText(truncated);
             file.setResumeExtractionError(null);
+            file.setResumeContentHash(contentHash);
             fileRepository.save(file);
             log.info("Resume extraction OK fileId={} chars={}", fileId, truncated.length());
+            publishCandidateEvent(file, CandidateUpdatedEvent.CandidateUpdateType.RESUME_UPDATED);
         } catch (Exception ex) {
             log.warn("Resume extraction failed fileId={}: {}", fileId, ex.getMessage());
             persistError(file, shorten(ex.getMessage(), 500));
+            publishCandidateEvent(file, CandidateUpdatedEvent.CandidateUpdateType.RESUME_EXTRACTION_FAILED);
         }
     }
 
@@ -109,7 +120,14 @@ public class ResumeTextExtractionServiceImpl implements ResumeTextExtractionServ
     private void persistError(File file, String message) {
         file.setResumeExtractedText(null);
         file.setResumeExtractionError(message);
+        file.setResumeContentHash(null);
         fileRepository.save(file);
+    }
+
+    private void publishCandidateEvent(File file, CandidateUpdatedEvent.CandidateUpdateType updateType) {
+        if (file != null && StringUtils.hasText(file.getOwnerId())) {
+            eventPublisher.publishEvent(new CandidateUpdatedEvent(file.getOwnerId(), updateType));
+        }
     }
 
     private byte[] download(String url) {
@@ -175,5 +193,15 @@ public class ResumeTextExtractionServiceImpl implements ResumeTextExtractionServ
         }
         String t = s.replace("\n", " ").trim();
         return t.length() <= max ? t : t.substring(0, max);
+    }
+
+    private static String sha256(String text) {
+        try {
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            byte[] hash = digest.digest(text.getBytes(StandardCharsets.UTF_8));
+            return HexFormat.of().formatHex(hash);
+        } catch (Exception e) {
+            throw new IllegalStateException("Cannot calculate resume content hash", e);
+        }
     }
 }

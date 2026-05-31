@@ -52,6 +52,16 @@
       "type": "text",
       "analyzer": "vi_analyzer"
     },
+    "resumeFileId": {
+      "type": "keyword"
+    },
+    "resumeUpdatedAt": {
+      "type": "date",
+      "format": "yyyy-MM-dd'T'HH:mm:ss||yyyy-MM-dd"
+    },
+    "resumeContentHash": {
+      "type": "keyword"
+    },
     "isOpenToWork": {
       "type": "boolean"
     },

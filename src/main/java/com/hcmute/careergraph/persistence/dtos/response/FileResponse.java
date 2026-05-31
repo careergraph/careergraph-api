@@ -19,5 +19,6 @@ public class FileResponse{
         String ownerType;
         String idd;
         String fileType;
+        boolean shareToFindJob;
         boolean shareToFileJob;
 }

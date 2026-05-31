@@ -255,6 +255,15 @@ public class CandidateController {
         return ResponseEntity.ok(resp);
     }
 
+    @PutMapping("/media/{fileId}/share-to-find-job")
+    public ResponseEntity<List<com.hcmute.careergraph.persistence.dtos.response.FileResponse>> toggleShareToFindJob(
+            @PathVariable String fileId,
+            @RequestBody Map<String, Boolean> request) throws ChangeSetPersister.NotFoundException {
+        String candidateId = securityUtils.getCandidateId().get();
+        boolean enabled = Boolean.TRUE.equals(request.get("enabled"));
+        return ResponseEntity.ok(candidateService.toggleShareToFindJob(candidateId, fileId, enabled));
+    }
+
     @PutMapping("/job-search-status")
     public RestResponse<Boolean> setJobSearchStatus () throws ChangeSetPersister.NotFoundException{
         Boolean status = candidateService.setJobSearchStatus(securityUtils.getCandidateId().get());

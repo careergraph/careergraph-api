@@ -9,6 +9,12 @@ public record CandidateUpdatedEvent(
     CandidateUpdateType updateType) {
   public enum CandidateUpdateType {
     JOB_CRITERIA_UPDATED, // updateJobFindCriteriaInfo was called
-    JOB_SEARCH_STATUS_CHANGED // setJobSearchStatus was called
+    JOB_SEARCH_STATUS_CHANGED, // setJobSearchStatus was called
+    RESUME_UPDATED,
+    RESUME_DELETED,
+    RESUME_VISIBILITY_CHANGED,
+    RESUME_EXTRACTION_FAILED,
+    PROFILE_UPDATED,
+    SKILLS_UPDATED
   }
 }

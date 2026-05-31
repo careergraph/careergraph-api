@@ -67,4 +67,7 @@ public class File extends BaseEntity {
     @Column(name = "resume_extraction_error", columnDefinition = "TEXT")
     private String resumeExtractionError;
 
+    @Column(name = "resume_content_hash")
+    private String resumeContentHash;
+
 }

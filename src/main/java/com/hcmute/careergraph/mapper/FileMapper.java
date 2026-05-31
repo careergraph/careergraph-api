@@ -102,6 +102,7 @@ public class FileMapper {
                 .fileType(file.getFileType() != null
                         ? file.getFileType().name()
                         : null)
+                .shareToFindJob(Boolean.TRUE.equals(file.getShareToFindJob()))
                 .shareToFileJob(Boolean.TRUE.equals(file.getShareToFindJob()))
                 .build();
     }

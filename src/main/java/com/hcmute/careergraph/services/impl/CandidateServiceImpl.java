@@ -146,6 +146,7 @@ public class CandidateServiceImpl implements CandidateService {
             // giữ verified như cũ, đừng tự set true ở đây trừ khi BE cho phép
         }
         candidateRepository.save(candidate);
+        publishSearchEvent(candidateId, CandidateUpdatedEvent.CandidateUpdateType.PROFILE_UPDATED);
         return candidate;
     }
 
@@ -181,7 +182,9 @@ public class CandidateServiceImpl implements CandidateService {
         candidate.setYearsOfExperience(candidateRequest.yearsOfExperience());
         candidate.setEducationLevel(candidateRequest.educationLevel());
         candidate.setCurrentPosition(candidate.getCurrentPosition());
-        return candidateRepository.save(candidate);
+        Candidate saved = candidateRepository.save(candidate);
+        publishSearchEvent(candidateId, CandidateUpdatedEvent.CandidateUpdateType.PROFILE_UPDATED);
+        return saved;
     }
 
     @Override
@@ -213,7 +216,9 @@ public class CandidateServiceImpl implements CandidateService {
         }
         candidate.getExperiences().add(candidateExperience);
 
-        return candidateRepository.save(candidate);
+        Candidate saved = candidateRepository.save(candidate);
+        publishSearchEvent(candidateId, CandidateUpdatedEvent.CandidateUpdateType.PROFILE_UPDATED);
+        return saved;
     }
 
     @Override
@@ -241,6 +246,7 @@ public class CandidateServiceImpl implements CandidateService {
             candidateExperience.setCompany(company);
         }
         candidateExperienceRepository.save(candidateExperience);
+        publishSearchEvent(candidateId, CandidateUpdatedEvent.CandidateUpdateType.PROFILE_UPDATED);
         return candidateRepository.findById(candidateId)
                 .orElseThrow(ChangeSetPersister.NotFoundException::new);
     }
@@ -252,6 +258,7 @@ public class CandidateServiceImpl implements CandidateService {
                 .orElseThrow(ChangeSetPersister.NotFoundException::new);
         candidateExperience.softDelete();
         candidateExperienceRepository.save(candidateExperience);
+        publishSearchEvent(candidateId, CandidateUpdatedEvent.CandidateUpdateType.PROFILE_UPDATED);
         return candidateRepository.findById(candidateId)
                 .orElseThrow(ChangeSetPersister.NotFoundException::new);
     }
@@ -284,7 +291,9 @@ public class CandidateServiceImpl implements CandidateService {
         }
         candidate.getEducations().add(candidateEducation);
 
-        return candidateRepository.save(candidate);
+        Candidate saved = candidateRepository.save(candidate);
+        publishSearchEvent(candidateId, CandidateUpdatedEvent.CandidateUpdateType.PROFILE_UPDATED);
+        return saved;
     }
 
     @Override
@@ -306,6 +315,7 @@ public class CandidateServiceImpl implements CandidateService {
             candidateEducation.setEducation(education);
         }
         candidateEducationRepository.save(candidateEducation);
+        publishSearchEvent(candidateId, CandidateUpdatedEvent.CandidateUpdateType.PROFILE_UPDATED);
         return candidateRepository.findById(candidateId)
                 .orElseThrow(ChangeSetPersister.NotFoundException::new);
     }
@@ -317,6 +327,7 @@ public class CandidateServiceImpl implements CandidateService {
                 .orElseThrow(ChangeSetPersister.NotFoundException::new);
         candidateEducation.softDelete();
         candidateEducationRepository.save(candidateEducation);
+        publishSearchEvent(candidateId, CandidateUpdatedEvent.CandidateUpdateType.PROFILE_UPDATED);
         return candidateRepository.findById(candidateId)
                 .orElseThrow(ChangeSetPersister.NotFoundException::new);
     }
@@ -340,6 +351,7 @@ public class CandidateServiceImpl implements CandidateService {
         // Nếu request rỗng => xoá sạch thông qua orphanRemoval
         if (request == null || request.getSkills() == null || request.getSkills().isEmpty()) {
             managed.clear(); // orphanRemoval sẽ DELETE từng row
+            publishSearchEvent(candidateId, CandidateUpdatedEvent.CandidateUpdateType.SKILLS_UPDATED);
             return candidate;
         }
 
@@ -390,6 +402,7 @@ public class CandidateServiceImpl implements CandidateService {
             }
         }
 
+        publishSearchEvent(candidateId, CandidateUpdatedEvent.CandidateUpdateType.SKILLS_UPDATED);
         return candidate;
     }
 
@@ -459,7 +472,38 @@ public class CandidateServiceImpl implements CandidateService {
             throw new InternalException("You do not have permission to get this this resource");
         }
         file.setStatus(Status.DELETED);
+        file.setShareToFindJob(false);
         fileRepository.save(file);
+        if (isResumeFile(file)) {
+            publishSearchEvent(candidateId, CandidateUpdatedEvent.CandidateUpdateType.RESUME_DELETED);
+        }
+    }
+
+    @Override
+    @Transactional
+    public List<FileResponse> toggleShareToFindJob(String candidateId, String fileId, boolean enabled)
+            throws ChangeSetPersister.NotFoundException {
+        File file = fileRepository.findById(fileId)
+                .orElseThrow(ChangeSetPersister.NotFoundException::new);
+        if (!Objects.equals(file.getOwnerId(), candidateId)) {
+            throw new InternalException("You do not have permission to update this resource");
+        }
+        if (!isResumeFile(file) || file.getStatus() != Status.ACTIVE) {
+            throw new InternalException("Only active CV/resume files can be used for job search");
+        }
+
+        List<FileType> resumeTypes = List.of(FileType.RESUME, FileType.CV);
+        fileRepository.updateShareToFindJobForCandidateResumes(candidateId, Status.ACTIVE, resumeTypes, false);
+        if (enabled) {
+            file.setShareToFindJob(true);
+            fileRepository.saveAndFlush(file);
+        }
+
+        publishSearchEvent(candidateId, CandidateUpdatedEvent.CandidateUpdateType.RESUME_VISIBILITY_CHANGED);
+        return fileMapper.toFileResponses(fileRepository.findByOwnerIdAndStatusAndFileTypeIn(
+                candidateId,
+                Status.ACTIVE,
+                resumeTypes));
     }
 
     @Override
@@ -539,6 +583,16 @@ public class CandidateServiceImpl implements CandidateService {
         }
 
         return normalized;
+    }
+
+    private boolean isResumeFile(File file) {
+        return file != null && (file.getFileType() == FileType.RESUME || file.getFileType() == FileType.CV);
+    }
+
+    private void publishSearchEvent(String candidateId, CandidateUpdatedEvent.CandidateUpdateType updateType) {
+        if (StringUtils.isNotBlank(candidateId)) {
+            eventPublisher.publishEvent(new CandidateUpdatedEvent(candidateId, updateType));
+        }
     }
 
     @Override

@@ -6,6 +6,7 @@ import org.springframework.data.annotation.Id;
 import org.springframework.data.elasticsearch.annotations.*;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 
 /**
@@ -70,6 +71,15 @@ public class CandidateES {
 
   @Field(type = FieldType.Text, analyzer = "vi_analyzer")
   private String resumeText;
+
+  @Field(type = FieldType.Keyword)
+  private String resumeFileId;
+
+  @Field(type = FieldType.Date, format = DateFormat.date_hour_minute_second)
+  private LocalDateTime resumeUpdatedAt;
+
+  @Field(type = FieldType.Keyword)
+  private String resumeContentHash;
 
   /* ========= FILTER KEYWORDS ========= */
   @Field(type = FieldType.Boolean)

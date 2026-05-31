@@ -40,20 +40,34 @@ public class JobESServiceImpl implements JobESService {
         @Override
         public SearchResponse<JobES> searchJobsByNavtiveAndFuzzy(String key, Pageable pageable) {
                 try {
+                        String normalizedKey = normalizeSearchQuery(key);
+                        boolean allowFuzzy = shouldUseFuzzy(normalizedKey);
                         SearchResponse<JobES> response = client.search(s -> s
                                         .index("jobs_es")
                                         .query(q -> q
                                                         .bool(b -> b
                                                                         // Search theo text
                                                                         .must(m -> m
-                                                                                        .multiMatch(mm -> mm
-                                                                                                        .query(key)
-                                                                                                        .fields(
-                                                                                                                        "title^10",
-                                                                                                                        "jobCategory^5",
-                                                                                                                        "state^1")
-                                                                                                        .fuzziness("AUTO")
-                                                                                                        .type(TextQueryType.MostFields)))
+                                                                                        .multiMatch(mm -> {
+                                                                                                mm.query(normalizedKey)
+                                                                                                                .fields(
+                                                                                                                                "title^10",
+                                                                                                                                "jobCategory^5",
+                                                                                                                                "description^4",
+                                                                                                                                "qualifications^5",
+                                                                                                                                "minimumQualifications^5",
+                                                                                                                                "responsibilities^4",
+                                                                                                                                "skills^6",
+                                                                                                                                "state^2",
+                                                                                                                                "city^1")
+                                                                                                                .operator(Operator.Or)
+                                                                                                                .minimumShouldMatch("30%")
+                                                                                                                .type(TextQueryType.MostFields);
+                                                                                                if (allowFuzzy) {
+                                                                                                        mm.fuzziness("AUTO");
+                                                                                                }
+                                                                                                return mm;
+                                                                                        }))
 
                                                         ))
                                         .from((int) pageable.getOffset())
@@ -62,9 +76,23 @@ public class JobESServiceImpl implements JobESService {
 
                         return response;
                 } catch (Exception e) {
-                        e.printStackTrace();
+                        log.error("Error in searchJobsByNavtiveAndFuzzy: {}", e.getMessage(), e);
                         return null;
                 }
+        }
+
+        private String normalizeSearchQuery(String key) {
+                if (key == null) {
+                        return "";
+                }
+                return key.replaceAll("\\s+", " ").trim();
+        }
+
+        private boolean shouldUseFuzzy(String query) {
+                if (query == null || query.length() > 256) {
+                        return false;
+                }
+                return query.split("\\s+").length <= 12;
         }
 
         /**
@@ -312,7 +340,9 @@ public class JobESServiceImpl implements JobESService {
                         Pageable pageable,
                         PartyType type) {
                 try {
-                        float[] queryVector = embedService.embed(keyword);
+                        String normalizedKeyword = normalizeSearchQuery(keyword);
+                        boolean allowFuzzy = shouldUseFuzzy(normalizedKeyword);
+                        float[] queryVector = embedService.embed(normalizedKeyword);
 
                         return client.search(s -> s
                                         .index("jobs_es")
@@ -341,19 +371,28 @@ public class JobESServiceImpl implements JobESService {
                                                                          * field
                                                                          */
                                                                         .should(sh -> sh
-                                                                                        .multiMatch(mm -> mm
-                                                                                                        .query(keyword)
-                                                                                                        .fields(
-                                                                                                                        "title^10",
-                                                                                                                        "jobCategory^5",
-                                                                                                                        "state^2",
-                                                                                                                        "city^1")
-                                                                                                        .fuzziness("AUTO")
-                                                                                                        .type(TextQueryType.BestFields)
-                                                                                                        .operator(Operator.Or)
-                                                                                                        .minimumShouldMatch(
-                                                                                                                        "50%")
-                                                                                                        .boost(1.0f)))
+                                                                                        .multiMatch(mm -> {
+                                                                                                mm.query(normalizedKeyword)
+                                                                                                                .fields(
+                                                                                                                                "title^10",
+                                                                                                                                "jobCategory^5",
+                                                                                                                                "description^4",
+                                                                                                                                "qualifications^5",
+                                                                                                                                "minimumQualifications^5",
+                                                                                                                                "responsibilities^4",
+                                                                                                                                "skills^6",
+                                                                                                                                "state^2",
+                                                                                                                                "city^1")
+                                                                                                                .type(TextQueryType.BestFields)
+                                                                                                                .operator(Operator.Or)
+                                                                                                                .minimumShouldMatch(
+                                                                                                                                "50%")
+                                                                                                                .boost(1.0f);
+                                                                                                if (allowFuzzy) {
+                                                                                                        mm.fuzziness("AUTO");
+                                                                                                }
+                                                                                                return mm;
+                                                                                        }))
 
                                                                         /*
                                                                          * ===== 3. PHRASE PREFIX =====
@@ -361,10 +400,12 @@ public class JobESServiceImpl implements JobESService {
                                                                          */
                                                                         .should(sh -> sh
                                                                                         .multiMatch(mm -> mm
-                                                                                                        .query(keyword)
+                                                                                                        .query(normalizedKeyword)
                                                                                                         .fields(
                                                                                                                         "title^10",
-                                                                                                                        "jobCategory^5")
+                                                                                                                        "jobCategory^5",
+                                                                                                                        "skills^5",
+                                                                                                                        "qualifications^4")
                                                                                                         .type(TextQueryType.PhrasePrefix)
                                                                                                         .boost(1.5f)))
 
@@ -374,10 +415,15 @@ public class JobESServiceImpl implements JobESService {
                                                                          */
                                                                         .should(sh -> sh
                                                                                         .multiMatch(mm -> mm
-                                                                                                        .query(keyword)
+                                                                                                        .query(normalizedKeyword)
                                                                                                         .fields(
                                                                                                                         "title^10",
                                                                                                                         "jobCategory^5",
+                                                                                                                        "description^4",
+                                                                                                                        "qualifications^5",
+                                                                                                                        "minimumQualifications^5",
+                                                                                                                        "responsibilities^4",
+                                                                                                                        "skills^6",
                                                                                                                         "state^2",
                                                                                                                         "city^1")
                                                                                                         .type(TextQueryType.CrossFields)
@@ -509,6 +555,9 @@ public class JobESServiceImpl implements JobESService {
                                 log.debug("No newly posted jobs to search");
                                 return null;
                         }
+                        String normalizedKeyword = normalizeSearchQuery(keyword);
+                        boolean allowFuzzy = shouldUseFuzzy(normalizedKeyword);
+                        float[] queryVector = embedService.embed(normalizedKeyword);
 
                         return client.search(s -> s
                                         .index("jobs_es")
@@ -518,20 +567,38 @@ public class JobESServiceImpl implements JobESService {
                                                                                         .bool(b -> {
                                                                                                 // Text matching với
                                                                                                 // relevance
-                                                                                                b.must(m -> m
-                                                                                                                .multiMatch(mm -> mm
-                                                                                                                                .query(keyword)
-                                                                                                                                .fields(
-                                                                                                                                                "title^10",
-                                                                                                                                                "jobCategory^5",
-                                                                                                                                                "state^2",
-                                                                                                                                                "city^1")
-                                                                                                                                .fuzziness("AUTO")
-                                                                                                                                .type(TextQueryType.MostFields)));
+                                                                                                b.should(sh -> sh
+                                                                                                                .knn(knn -> knn
+                                                                                                                                .field("embedding")
+                                                                                                                                .queryVector(toFloatList(queryVector))
+                                                                                                                                .numCandidates(200)
+                                                                                                                                .boost(0.8f)));
+
+                                                                                                b.should(m -> m
+                                                                                                                .multiMatch(mm -> {
+                                                                                                                        mm.query(normalizedKeyword)
+                                                                                                                                        .fields(
+                                                                                                                                                        "title^10",
+                                                                                                                                                        "jobCategory^5",
+                                                                                                                                                        "description^4",
+                                                                                                                                                        "qualifications^5",
+                                                                                                                                                        "minimumQualifications^5",
+                                                                                                                                                        "responsibilities^4",
+                                                                                                                                                        "skills^6",
+                                                                                                                                                        "state^2",
+                                                                                                                                                        "city^1")
+                                                                                                                                        .type(TextQueryType.MostFields);
+                                                                                                                        if (allowFuzzy) {
+                                                                                                                                mm.fuzziness("AUTO");
+                                                                                                                        }
+                                                                                                                        return mm;
+                                                                                                                }));
 
                                                                                                 // Filter: CHỈ search
                                                                                                 // trong danh sách job
                                                                                                 // mới đăng
+                                                                                                b.minimumShouldMatch("1");
+
                                                                                                 b.filter(f -> f
                                                                                                                 .ids(ids -> ids
                                                                                                                                 .values(newlyPostedJobIds)));
