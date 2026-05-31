@@ -452,6 +452,7 @@ public class AuthServiceImpl implements AuthService {
                             .firstName(givenName)
                             .lastName(familyName)
                             .avatar(pictureUrl)
+
                             .build();
                     account.setCandidate(candidate);
                     candidateRepository.save(candidate);

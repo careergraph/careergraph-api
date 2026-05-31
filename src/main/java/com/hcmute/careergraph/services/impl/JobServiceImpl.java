@@ -343,8 +343,8 @@ public class JobServiceImpl implements JobService {
 
     private String _genKey(Candidate candidate) {
 
-        return (joinList(candidate.getLocations()) + " " +
-                safe(candidate.getDesiredPosition()) + " " +
+        return (safe(candidate.getDesiredPosition()) + " " +
+                joinList(candidate.getLocations()) + " " +
                 joinList(candidate.getIndustries())).trim();
     }
 

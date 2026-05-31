@@ -7,7 +7,9 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.ToString;
+import lombok.Builder;
 import lombok.experimental.SuperBuilder;
+import com.hcmute.careergraph.enums.common.ConstDefault;
 
 import java.util.Set;
 
@@ -23,19 +25,24 @@ import java.util.Set;
 public class Company extends Party {
 
     @Column(name = "size")
-    private String size;
+    @Builder.Default
+    private String size = ConstDefault.EMPTY_STRING.getValue();
 
     @Column(name = "name")
-    private String name;
+    @Builder.Default
+    private String name = ConstDefault.EMPTY_STRING.getValue();
 
     @Column(name = "website")
-    private String website;
+    @Builder.Default
+    private String website = ConstDefault.EMPTY_STRING.getValue();
 
     @Column(name = "ceo_name")
-    private String ceoName;
+    @Builder.Default
+    private String ceoName = ConstDefault.EMPTY_STRING.getValue();
 
     @Column(name = "description", columnDefinition = "TEXT")
-    private String description;
+    @Builder.Default
+    private String description = ConstDefault.EMPTY_STRING.getValue();
 
     @Column(name = "no_of_members", columnDefinition = "int default 0")
     private Integer noOfMembers;

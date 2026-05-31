@@ -7,7 +7,9 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.ToString;
+import lombok.Builder;
 import lombok.experimental.SuperBuilder;
+import com.hcmute.careergraph.enums.common.ConstDefault;
 
 @Entity
 @Table(name = "candidate_education")
@@ -27,16 +29,19 @@ public class CandidateEducation extends BaseEntity {
     private String endDate;
 
     @Column(name = "degree_title")
-    private String degreeTitle;
+    @Builder.Default
+    private String degreeTitle = ConstDefault.EMPTY_STRING.getValue();
 
     @Column(name = "major")
-    private String major;
+    @Builder.Default
+    private String major = ConstDefault.EMPTY_STRING.getValue();
 
     @Column(name = "is_current")
     private Boolean isCurrent;
 
     @Column(name = "description", columnDefinition = "TEXT")
-    private String description;
+    @Builder.Default
+    private String description = ConstDefault.EMPTY_STRING.getValue();
 
     // Many-to-One relationship with Candidate
     @ManyToOne(fetch = FetchType.LAZY)

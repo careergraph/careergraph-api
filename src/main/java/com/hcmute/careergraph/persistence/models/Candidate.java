@@ -3,11 +3,8 @@ package com.hcmute.careergraph.persistence.models;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.hcmute.careergraph.helper.JsonUtils;
 import jakarta.persistence.*;
-import lombok.EqualsAndHashCode;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
-import lombok.Setter;
-import lombok.ToString;
+import com.hcmute.careergraph.enums.common.ConstDefault;
+import lombok.*;
 import lombok.experimental.SuperBuilder;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
@@ -28,47 +25,60 @@ import java.util.Set;
 public class Candidate extends Party {
 
     @Column(name = "first_name")
-    private String firstName;
+    @Builder.Default
+    private String firstName = ConstDefault.EMPTY_STRING.getValue();
 
     @Column(name = "last_name")
-    private String lastName;
+    @Builder.Default
+    private String lastName = ConstDefault.EMPTY_STRING.getValue();
 
     @Column(name = "date_of_birth")
-    private String dateOfBirth;
+    @Builder.Default
+    private String dateOfBirth = ConstDefault.EMPTY_STRING.getValue();
 
     @Column(name = "gender")
-    private String gender;
+    @Builder.Default
+    private String gender = ConstDefault.EMPTY_STRING.getValue();
 
     @Column(name = "current_job_title")
-    private String currentJobTitle;
+    @Builder.Default
+    private String currentJobTitle = ConstDefault.EMPTY_STRING.getValue();
 
     @Column(name = "desired_position")
-    private String desiredPosition;
+    @Builder.Default
+    private String desiredPosition = ConstDefault.EMPTY_STRING.getValue();
 
     @Column(name = "current_company")
-    private String currentCompany;
+    @Builder.Default
+    private String currentCompany = ConstDefault.EMPTY_STRING.getValue();
 
     @Column(name = "industry")
-    private String industry;
+    @Builder.Default
+    private String industry = ConstDefault.EMPTY_STRING.getValue();
 
     @Column(name = "years_of_experience")
     private Integer yearsOfExperience;
 
     @Column(name = "work_location")
-    private String workLocation;
+    @Builder.Default
+    private String workLocation = ConstDefault.EMPTY_STRING.getValue();
 
     @Column(name = "is_open_to_work")
-    private Boolean isOpenToWork;
+    @Builder.Default
+    private Boolean isOpenToWork = true;
 
     @Column(name = "is_open_to_notify_new_job",
             columnDefinition = "BOOLEAN DEFAULT FALSE"
     )
+    @Builder.Default
     private Boolean isOpenToNotifyNewJob = false;
 
     @Column(name = "summary", columnDefinition = "TEXT")
-    private String summary;
+    @Builder.Default
+    private String summary = ConstDefault.EMPTY_STRING.getValue();
 
     @Column(name = "is_married")
+    @Builder.Default
     private Boolean isMarried = false;
 
     @Column(name = "salary_expectation_min")
@@ -83,10 +93,12 @@ public class Candidate extends Party {
     private List<String> resumes;
 
     @Column(name="education_level")
-    private String educationLevel;
+    @Builder.Default
+    private String educationLevel = ConstDefault.EMPTY_STRING.getValue();
 
     @Column(name="current_position")
-    private String currentPosition;
+    @Builder.Default
+    private String currentPosition = ConstDefault.EMPTY_STRING.getValue();
 
     // Account
     @OneToOne(mappedBy = "candidate", cascade = CascadeType.ALL, orphanRemoval = true)

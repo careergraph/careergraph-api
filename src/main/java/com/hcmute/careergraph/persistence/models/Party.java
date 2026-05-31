@@ -6,7 +6,9 @@ import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.ToString;
+import lombok.Builder;
 import lombok.experimental.SuperBuilder;
+import com.hcmute.careergraph.enums.common.ConstDefault;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 
 import java.util.HashSet;
@@ -26,13 +28,16 @@ import java.util.Set;
 public abstract class Party extends BaseEntity {
 
     @Column(name = "tagname")
-    private String tagname;
+    @Builder.Default
+    private String tagname = ConstDefault.EMPTY_STRING.getValue();
 
     @Column(name = "avatar")
-    private String avatar;
+    @Builder.Default
+    private String avatar = ConstDefault.EMPTY_STRING.getValue();
 
     @Column(name = "cover")
-    private String cover;
+    @Builder.Default
+    private String cover = ConstDefault.EMPTY_STRING.getValue();
 
     @Column(name = "no_of_followers", columnDefinition = "int default 0")
     private int noOfFollowers;

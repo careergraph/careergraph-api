@@ -8,7 +8,9 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.ToString;
+import lombok.Builder;
 import lombok.experimental.SuperBuilder;
+import com.hcmute.careergraph.enums.common.ConstDefault;
 
 @Entity
 @Table(name = "addresses")
@@ -22,19 +24,24 @@ import lombok.experimental.SuperBuilder;
 public class Address extends BaseEntity {
 
     @Column(name = "name")
-    private String name;
+    @Builder.Default
+    private String name = ConstDefault.EMPTY_STRING.getValue();
 
     @Column(name = "country")
-    private String country;
+    @Builder.Default
+    private String country = ConstDefault.EMPTY_STRING.getValue();
 
     @Column(name = "province")
-    private String province;
+    @Builder.Default
+    private String province = ConstDefault.EMPTY_STRING.getValue();
 
     @Column(name = "district")
-    private String district;
+    @Builder.Default
+    private String district = ConstDefault.EMPTY_STRING.getValue();
 
     @Column(name = "ward")
-    private String ward;
+    @Builder.Default
+    private String ward = ConstDefault.EMPTY_STRING.getValue();
 
     @Column(name = "is_primary")
     private Boolean isPrimary;

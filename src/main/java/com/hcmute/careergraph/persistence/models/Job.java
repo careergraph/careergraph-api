@@ -12,7 +12,9 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.ToString;
+import lombok.Builder;
 import lombok.experimental.SuperBuilder;
+import com.hcmute.careergraph.enums.common.ConstDefault;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 
@@ -32,13 +34,16 @@ import java.util.Set;
 public class Job extends BaseEntity {
 
     @Column(name = "title", nullable = false, columnDefinition = "TEXT")
-    private String title;
+    @Builder.Default
+    private String title = ConstDefault.EMPTY_STRING.getValue();
 
     @Column(name = "description", columnDefinition = "TEXT")
-    private String description;
+    @Builder.Default
+    private String description = ConstDefault.EMPTY_STRING.getValue();
 
     @Column(name = "department", columnDefinition = "TEXT")
-    private String department;
+    @Builder.Default
+    private String department = ConstDefault.EMPTY_STRING.getValue();
 
     /**
      * Field JSON for converter (UI Job): responsibilities
@@ -77,7 +82,8 @@ public class Job extends BaseEntity {
      * Fields JOB detail
      */
     @Column(name = "salary_range")
-    private String salaryRange;
+    @Builder.Default
+    private String salaryRange = ConstDefault.EMPTY_STRING.getValue();
 
     @Column(name = "min_experience")
     private Integer minExperience;
@@ -108,35 +114,43 @@ public class Job extends BaseEntity {
     private String postedDate;
 
     @Column(name = "expiry_date")
-    private String expiryDate;
+    @Builder.Default
+    private String expiryDate = ConstDefault.EMPTY_STRING.getValue();
 
     @Column(name = "number_of_positions")
     private Integer numberOfPositions;
 
     @Column(name = "contact_email")
-    private String contactEmail;
+    @Builder.Default
+    private String contactEmail = ConstDefault.EMPTY_STRING.getValue();
 
     @Column(name = "contact_phone")
-    private String contactPhone;
+    @Builder.Default
+    private String contactPhone = ConstDefault.EMPTY_STRING.getValue();
 
     @Column(name = "promotion_type")
-    private String promotionType; // "free" or "paid"
+    @Builder.Default
+    private String promotionType = ConstDefault.EMPTY_STRING.getValue(); // "free" or "paid"
 
     /**
      * Address for JOB - CẬP NHẬT: Thêm state (tỉnh/thành phố)
      * Cấu trúc: state (tỉnh) -> city (quận/huyện) -> district (phường/xã) -> address (địa chỉ cụ thể)
      */
     @Column(name = "state", columnDefinition = "TEXT")
-    private String state; // Tỉnh/Thành phố (code từ API location)
+    @Builder.Default
+    private String state = ConstDefault.EMPTY_STRING.getValue(); // Tỉnh/Thành phố (code từ API location)
 
     @Column(name = "city", columnDefinition = "TEXT")
-    private String city; // Quận/Huyện (code từ API location)
+    @Builder.Default
+    private String city = ConstDefault.EMPTY_STRING.getValue(); // Quận/Huyện (code từ API location)
 
     @Column(name = "district", columnDefinition = "TEXT")
-    private String district; // Phường/Xã (code từ API location)
+    @Builder.Default
+    private String district = ConstDefault.EMPTY_STRING.getValue(); // Phường/Xã (code từ API location)
 
     @Column(name = "address", columnDefinition = "TEXT")
-    private String address; // Địa chỉ cụ thể
+    @Builder.Default
+    private String address = ConstDefault.EMPTY_STRING.getValue(); // Địa chỉ cụ thể
 
     @Column(name = "remote_job")
     private boolean remoteJob;
@@ -145,18 +159,23 @@ public class Job extends BaseEntity {
      * Stats fields for JOB
      */
     @Column(name = "views")
+    @Builder.Default
     private Integer views = 0;
 
     @Column(name = "applicants")
+    @Builder.Default
     private Integer applicants = 0;
 
     @Column(name = "saved")
+    @Builder.Default
     private Integer saved = 0;
 
     @Column(name = "liked")
+    @Builder.Default
     private Integer liked = 0;
 
     @Column(name = "shared")
+    @Builder.Default
     private Integer shared = 0;
 
     // ===== Application Recruiment ====
@@ -169,6 +188,7 @@ public class Job extends BaseEntity {
     // ===== Thêm status field =====
     @Enumerated(EnumType.STRING)
     @Column(name = "status")
+    @Builder.Default
     private Status status = Status.ACTIVE; // Default là ACTIVE khi tạo mới
 
     // Many-to-One relationship with Company
@@ -178,6 +198,7 @@ public class Job extends BaseEntity {
 
     // One-to-Many relationship with Application
     @OneToMany(mappedBy = "job", cascade = CascadeType.ALL, orphanRemoval = true)
+    @Builder.Default
     private Set<Application> applications = new HashSet<>();
 
     @Override

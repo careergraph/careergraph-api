@@ -9,7 +9,9 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.ToString;
+import lombok.Builder;
 import lombok.experimental.SuperBuilder;
+import com.hcmute.careergraph.enums.common.ConstDefault;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 
 import java.util.HashSet;
@@ -40,7 +42,8 @@ public class Education extends Party {
     private String officialName;
 
     @Column(name = "short_name", length = 64)
-    private String shortName;
+    @Builder.Default
+    private String shortName = ConstDefault.EMPTY_STRING.getValue();
 
     @Column(name = "established_year")
     private Integer establishedYear;
@@ -54,19 +57,24 @@ public class Education extends Party {
     private EducationLevel level;
 
     @Column(name = "website", length = 255)
-    private String website;
+    @Builder.Default
+    private String website = ConstDefault.EMPTY_STRING.getValue();
 
     @Column(name = "overview", columnDefinition = "TEXT")
-    private String overview;
+    @Builder.Default
+    private String overview = ConstDefault.EMPTY_STRING.getValue();
 
     @Column(name = "accreditation", length = 128)
-    private String accreditation;
+    @Builder.Default
+    private String accreditation = ConstDefault.EMPTY_STRING.getValue();
 
     @OneToMany(mappedBy = "education", cascade = CascadeType.ALL, orphanRemoval = true)
+    @Builder.Default
     private Set<CandidateEducation> candidateEducations = new HashSet<>();
 
     @OneToMany(cascade = CascadeType.ALL, orphanRemoval = true)
     @JoinColumn(name = "connected_education_id")
+    @Builder.Default
     private Set<Connection> educationConnections = new HashSet<>();
 
     /* ---------------- Helper ---------------- */
