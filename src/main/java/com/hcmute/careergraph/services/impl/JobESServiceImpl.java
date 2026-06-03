@@ -333,7 +333,7 @@ public class JobESServiceImpl implements JobESService {
                                                                                                         .queryVector(toFloatList(
                                                                                                                         queryVector))
                                                                                                         .numCandidates(300)
-                                                                                                        .boost(10.0f)))
+                                                                                                        .boost(50.0f)))
 
                                                                         /*
                                                                          * ===== 2. BM25 TEXT SEARCH =====
@@ -353,7 +353,7 @@ public class JobESServiceImpl implements JobESService {
                                                                                                         .operator(Operator.Or)
                                                                                                         .minimumShouldMatch(
                                                                                                                         "50%")
-                                                                                                        .boost(1.0f)))
+                                                                                                        .boost(0.2f)))
 
                                                                         /*
                                                                          * ===== 3. PHRASE PREFIX =====
@@ -366,7 +366,7 @@ public class JobESServiceImpl implements JobESService {
                                                                                                                         "title^10",
                                                                                                                         "jobCategory^5")
                                                                                                         .type(TextQueryType.PhrasePrefix)
-                                                                                                        .boost(1.5f)))
+                                                                                                        .boost(0.3f)))
 
                                                                         /*
                                                                          * ===== 4. CROSS FIELDS =====
@@ -384,7 +384,7 @@ public class JobESServiceImpl implements JobESService {
                                                                                                         .operator(Operator.Or)
                                                                                                         .minimumShouldMatch(
                                                                                                                         "50%")
-                                                                                                        .boost(0.5f)))
+                                                                                                        .boost(0.1f)))
 
                                                                         // Ít nhất 1 should clause phải match
                                                                         .minimumShouldMatch("1")))

@@ -51,10 +51,12 @@ public class Company extends Party {
     private Integer yearFounded;
 
     @Column(name = "offer_before_trial", nullable = false, columnDefinition = "boolean default true")
-    private Boolean offerBeforeTrial;
+    @Builder.Default
+    private Boolean offerBeforeTrial = true;
 
     @Column(name = "enable_offboarded_stage", nullable = false, columnDefinition = "boolean default false")
-    private Boolean enableOffboardedStage;
+    @Builder.Default
+    private Boolean enableOffboardedStage = false;
 
     // Account
     @OneToOne(mappedBy = "company", cascade = CascadeType.ALL, orphanRemoval = true)
