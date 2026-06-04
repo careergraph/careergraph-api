@@ -172,4 +172,33 @@ public class CandidateSuggestionController {
         .data(count)
         .build();
   }
+
+  /**
+   * POST /api/v1/candidates/suggestion/sync/{candidateId}
+   * Sync specific candidate to Elasticsearch immediately
+   * Useful for testing or when a candidate just uploaded CV
+   *
+   * @param candidateId Candidate ID to sync
+   * @return Success message
+   */
+  @PostMapping("/sync/{candidateId}")
+  public RestResponse<String> syncCandidate(@PathVariable String candidateId) {
+    log.info("POST /api/v1/candidates/suggestion/sync/{} - Syncing candidate to ES", candidateId);
+
+    try {
+      candidateESService.syncCandidate(candidateId);
+      return RestResponse.<String>builder()
+          .status(HttpStatus.OK)
+          .message("Successfully synced candidate " + candidateId + " to Elasticsearch")
+          .data(candidateId)
+          .build();
+    } catch (Exception e) {
+      log.error("Failed to sync candidate {}: {}", candidateId, e.getMessage());
+      return RestResponse.<String>builder()
+          .status(HttpStatus.INTERNAL_SERVER_ERROR)
+          .message("Failed to sync candidate: " + e.getMessage())
+          .data(null)
+          .build();
+    }
+  }
 }

@@ -15,6 +15,7 @@ import com.hcmute.careergraph.persistence.models.Job;
 import com.hcmute.careergraph.services.CandidateService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.crossstore.ChangeSetPersister;
 import org.springframework.data.repository.query.Param;
 import org.springframework.http.HttpStatus;
@@ -35,6 +36,7 @@ import java.util.Map;
 @RestController
 @RequestMapping("candidates")
 @RequiredArgsConstructor
+@Slf4j
 public class CandidateController {
 
     private final CandidateService candidateService;
@@ -283,6 +285,33 @@ public class CandidateController {
                 .build();
     }
 
+    /**
+     * Parse date string to YearMonth, handling both formats:
+     * - "2019-01" (YYYY-MM)
+     * - "2019-01-01" (YYYY-MM-DD)
+     */
+    private YearMonth parseToYearMonth(String dateStr) {
+        if (dateStr == null || dateStr.isBlank()) {
+            return YearMonth.now();
+        }
+        
+        try {
+            // Try YYYY-MM format first
+            if (dateStr.length() == 7) {
+                return YearMonth.parse(dateStr);
+            }
+            // Handle YYYY-MM-DD format (convert LocalDate to YearMonth)
+            if (dateStr.length() == 10) {
+                return YearMonth.from(LocalDate.parse(dateStr));
+            }
+            // Fallback: parse as LocalDate then convert
+            return YearMonth.from(LocalDate.parse(dateStr));
+        } catch (Exception e) {
+            log.warn("Failed to parse date '{}', using current month: {}", dateStr, e.getMessage());
+            return YearMonth.now();
+        }
+    }
+
     private double calcTotalYearsSimple(List<CandidateClientResponse.CandidateExperienceResponse> exps) {
         if (exps == null || exps.isEmpty()) return 0;
 
@@ -291,12 +320,10 @@ public class CandidateController {
         for (var exp : exps) {
             if (exp.startDate() == null) continue;
 
-            YearMonth start = YearMonth.parse(exp.startDate());
+            YearMonth start = parseToYearMonth(exp.startDate());
             YearMonth end = Boolean.TRUE.equals(exp.isCurrent())
                     ? YearMonth.now()
-                    : YearMonth.parse(exp.endDate() == null || exp.endDate().isBlank()
-                    ? YearMonth.now().toString()
-                    : exp.endDate());
+                    : parseToYearMonth(exp.endDate());
 
             long months = end.getYear() * 12 + end.getMonthValue()
                     - (start.getYear() * 12 + start.getMonthValue());
