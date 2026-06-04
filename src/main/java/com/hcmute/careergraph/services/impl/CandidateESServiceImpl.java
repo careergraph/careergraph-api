@@ -19,6 +19,8 @@ import com.hcmute.careergraph.repositories.FileRepository;
 import com.hcmute.careergraph.repositories.JobRepository;
 import com.hcmute.careergraph.services.CandidateESService;
 import com.hcmute.careergraph.services.EmbedService;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.PageRequest;
@@ -29,7 +31,6 @@ import org.springframework.util.StringUtils;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -42,6 +43,7 @@ public class CandidateESServiceImpl implements CandidateESService {
   private final FileRepository fileRepository;
   private final ElasticsearchClient client;
   private final EmbedService embedService;
+  private final ObjectMapper objectMapper;
 
   /**
    * Hybrid Search: BM25 Text Search + KNN Embedding Search
@@ -77,16 +79,18 @@ public class CandidateESServiceImpl implements CandidateESService {
                 /*
                  * ===== 2. BM25 TEXT SEARCH =====
                  * BestFields: Tìm term match tốt nhất trong 1 field
+                 * V2: Thêm cvKeywords^5, giảm resumeText xuống ^1
                  */
                 b.should(sh -> sh
                     .multiMatch(mm -> mm
                         .query(keyword)
                         .fields(
-                            "desiredPosition^10",
-                            "currentJobTitle^7",
-                          "skills^6",
-                          "summary^3",
-                          "resumeText^2")
+                            "desiredPosition^10",    // Intent signal: cao nhất
+                            "currentJobTitle^7",     // Evidence: đang làm gì
+                            "skills^6",              // Evidence: kỹ năng cụ thể
+                            "cvKeywords^5",          // CV keywords (NEW, sạch hơn resumeText)
+                            "summary^3",             // Tóm tắt (thường generic)
+                            "resumeText^1")          // Raw CV (giảm từ ^2, chỉ backup)
                         .fuzziness("AUTO")
                         .type(TextQueryType.BestFields)
                         .operator(Operator.Or)
@@ -96,15 +100,17 @@ public class CandidateESServiceImpl implements CandidateESService {
                 /*
                  * ===== 3. PHRASE PREFIX =====
                  * Boost cao cho exact phrase match
+                 * V2: Thêm cvKeywords
                  */
                 b.should(sh -> sh
                     .multiMatch(mm -> mm
                         .query(keyword)
                         .fields(
                             "desiredPosition^10",
-                          "currentJobTitle^7",
-                          "skills^5",
-                          "resumeText^1.5")
+                            "currentJobTitle^7",
+                            "skills^5",
+                            "cvKeywords^4",
+                            "resumeText^1.5")
                         .type(TextQueryType.PhrasePrefix)
                         .boost(1.5f)));
 
@@ -150,15 +156,17 @@ public class CandidateESServiceImpl implements CandidateESService {
           .query(q -> q.bool(b -> {
 
             /* ========= OR theo từng JOB (BM25) ========= */
+            /* V2: Thêm cvKeywords^5, giảm resumeText xuống ^1 */
             for (String title : jobSearchTexts) {
               b.should(sh -> sh.multiMatch(mm -> mm
                   .query(title)
                   .fields(
                       "desiredPosition^10",
-                  "currentJobTitle^7",
-                  "skills^6",
-                  "summary^3",
-                  "resumeText^2")
+                      "currentJobTitle^7",
+                      "skills^6",
+                      "cvKeywords^5",       // NEW: CV keywords
+                      "summary^3",
+                      "resumeText^1")       // Giảm từ ^2
                   .type(TextQueryType.BestFields)
                   .operator(Operator.Or)
                   .fuzziness("AUTO")
@@ -200,6 +208,7 @@ public class CandidateESServiceImpl implements CandidateESService {
    * Search candidates for company - when no keyword provided
    * Gets job titles from company's active jobs and matches with candidates'
    * desiredPosition
+   * V2: Giảm từ 50 → 20 jobs để tránh query quá dài
    */
   @Override
   public SearchResponse<CandidateES> searchCandidatesForCompany(
@@ -207,9 +216,9 @@ public class CandidateESServiceImpl implements CandidateESService {
       CandidateFilterRequest filter,
       Pageable pageable) {
     try {
-      // Get active job titles from company
+      // Get active job titles from company (V2: giảm từ 50 → 20)
         List<Job> companyJobs = jobRepository
-          .findActiveJobsByCompanyId(companyId, LocalDate.now().toString(), PageRequest.of(0, 50))
+          .findActiveJobsByCompanyId(companyId, LocalDate.now().toString(), PageRequest.of(0, 20))
           .getContent();
 
       if (companyJobs.isEmpty()) {
@@ -437,6 +446,7 @@ public class CandidateESServiceImpl implements CandidateESService {
 
   /**
    * Map JPA Candidate entity to CandidateES document
+   * V2: Thêm cvKeywords extraction từ File.cvKeywordsJson
    */
   private CandidateES mapToES(Candidate candidate) {
     List<String> skillNames = new ArrayList<>();
@@ -478,6 +488,7 @@ public class CandidateESServiceImpl implements CandidateESService {
         .currentJobTitle(candidate.getCurrentJobTitle())
         .summary(candidate.getSummary())
         .resumeText(resume.resumeText())
+        .cvKeywords(resume.cvKeywords())  // V2: CV keywords từ extraction service
         .resumeFileId(resume.fileId())
         .resumeUpdatedAt(resume.updatedAt())
         .resumeContentHash(resume.contentHash())
@@ -494,54 +505,115 @@ public class CandidateESServiceImpl implements CandidateESService {
         .build();
   }
 
+  /**
+   * V2: Resolve resume projection với cvKeywords
+   * Không filter shareToFindJob - dùng CV mới nhất active
+   */
   private ResumeProjection resolveResume(String candidateId) {
     return fileRepository
-        .findFirstByOwnerIdAndStatusAndFileTypeInAndShareToFindJobTrueOrderByCreatedDateDesc(
+        .findFirstByOwnerIdAndStatusAndFileTypeInOrderByCreatedDateDesc(
             candidateId,
             Status.ACTIVE,
             List.of(FileType.RESUME, FileType.CV))
         .filter(file -> StringUtils.hasText(file.getResumeExtractedText()))
-        .map(file -> new ResumeProjection(
-            file.getResumeExtractedText(),
-            file.getId(),
-            file.getLastModifiedDate() != null ? file.getLastModifiedDate() : file.getCreatedDate(),
-            file.getResumeContentHash()))
+        .map(file -> {
+          String cvKeywords = extractCvKeywords(file);
+          return new ResumeProjection(
+              file.getResumeExtractedText(),
+              cvKeywords,
+              file.getId(),
+              file.getLastModifiedDate() != null ? file.getLastModifiedDate() : file.getCreatedDate(),
+              file.getResumeContentHash());
+        })
         .orElse(ResumeProjection.empty());
   }
+  
+  /**
+   * V2: Extract CV keywords từ File.cvKeywordsJson
+   * Parse JSON và lấy searchKeywords field
+   */
+  private String extractCvKeywords(File file) {
+    if (file == null || !StringUtils.hasText(file.getCvKeywordsJson())) {
+      return null;
+    }
+    
+    try {
+      JsonNode node = objectMapper.readTree(file.getCvKeywordsJson());
+      JsonNode searchKeywords = node.get("searchKeywords");
+      if (searchKeywords != null && !searchKeywords.isNull()) {
+        return searchKeywords.asText("");
+      }
+    } catch (Exception e) {
+      log.warn("Failed to parse cvKeywordsJson for file {}: {}", file.getId(), e.getMessage());
+    }
+    
+    return null;
+  }
 
-  private record ResumeProjection(String resumeText, String fileId, java.time.LocalDateTime updatedAt,
+  private record ResumeProjection(
+      String resumeText, 
+      String cvKeywords,  // V2: Thêm field
+      String fileId, 
+      java.time.LocalDateTime updatedAt,
       String contentHash) {
     static ResumeProjection empty() {
-      return new ResumeProjection(null, null, null, null);
+      return new ResumeProjection(null, null, null, null, null);
     }
   }
 
+  /**
+   * V2: Build compact job search text - chỉ title + top qualifications
+   * Giảm từ 2000-5000 chars xuống ~200-400 chars để BM25 scoring chính xác hơn
+   */
   private String buildJobSearchText(Job job) {
     if (job == null) {
       return null;
     }
     StringBuilder sb = new StringBuilder();
+    
+    // CHỈ dùng title + top qualifications (không description full)
     if (StringUtils.hasText(job.getTitle())) {
       sb.append(job.getTitle()).append(" ");
     }
-    if (StringUtils.hasText(job.getDescription())) {
-      sb.append(job.getDescription()).append(" ");
-    }
-    appendLines(sb, job.getQualifications());
-    appendLines(sb, job.getMinimumQualifications());
-    appendLines(sb, job.getResponsibilities());
+    
+    // Top 3 qualifications/requirements (thường chứa tech keywords)
+    appendTopLines(sb, job.getMinimumQualifications(), 3);
+    appendTopLines(sb, job.getQualifications(), 3);
+    
     return sb.toString().trim();
   }
-
-  private void appendLines(StringBuilder sb, List<String> lines) {
+  
+  /**
+   * V2: Append only top N lines from a list
+   */
+  private void appendTopLines(StringBuilder sb, List<String> lines, int maxLines) {
     if (lines == null || lines.isEmpty()) {
       return;
     }
+    int count = 0;
     for (String line : lines) {
+      if (count >= maxLines) break;
       if (StringUtils.hasText(line)) {
         sb.append(line).append(" ");
+        count++;
       }
     }
+  }
+  
+  /**
+   * V2: Normalize ES score thành % match (0-100).
+   * Dùng min-max normalization trên batch results.
+   * 
+   * @param rawScore ES raw score
+   * @param maxScore Max score trong batch results
+   * @return Normalized score 0-100
+   */
+  private float normalizeScore(float rawScore, float maxScore) {
+    if (maxScore <= 0) return 0f;
+    
+    // Min-max normalization: (score / maxScore) * 100
+    float normalized = (rawScore / maxScore) * 100f;
+    return Math.min(normalized, 100f);
   }
 
   private List<Float> toFloatList(float[] vector) {

@@ -80,23 +80,43 @@ public class CandidateSuggestionController {
       response = candidateESService.hybridSearchCandidates(keyword.trim(), filter, pageable);
     }
 
-    // Convert response to DTOs
+    // Convert response to DTOs with normalized scores (V2)
     List<CandidateSuggestionResponse> candidates = new ArrayList<>();
     if (response != null && response.hits() != null && response.hits().hits() != null) {
+      // Get maxScore for normalization
+      float maxScore = 0f;
+      for (Hit<CandidateES> hit : response.hits().hits()) {
+        Double scoreValue = hit.score();
+        if (scoreValue != null && scoreValue.floatValue() > maxScore) {
+          maxScore = scoreValue.floatValue();
+        }
+      }
+      
+      // Convert hits with normalized scores
       for (Hit<CandidateES> hit : response.hits().hits()) {
         if (hit.source() != null) {
+          Double scoreValue = hit.score();
+          float rawScore = scoreValue != null ? scoreValue.floatValue() : 0f;
+          // Normalize: (rawScore / maxScore) * 100
+          float normalizedScore = maxScore > 0 ? (rawScore / maxScore) * 100f : 0f;
+          normalizedScore = Math.min(normalizedScore, 100f);
+          
           CandidateSuggestionResponse dto = candidateESService.toSuggestionResponse(
               hit.source(),
-              hit.score() != null ? hit.score().floatValue() : 0f);
+              normalizedScore);
           candidates.add(dto);
         }
       }
     }
 
     // Get total count
-    long total = response != null && response.hits() != null && response.hits().total() != null
-        ? response.hits().total().value()
-        : 0;
+    long total = 0;
+    if (response != null && response.hits() != null) {
+      var totalHits = response.hits().total();
+      if (totalHits != null) {
+        total = totalHits.value();
+      }
+    }
 
     Page<CandidateSuggestionResponse> resultPage = new PageImpl<>(
         candidates,

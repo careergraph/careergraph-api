@@ -72,6 +72,9 @@ public class CandidateES {
   @Field(type = FieldType.Text, analyzer = "vi_analyzer")
   private String resumeText;
 
+  @Field(type = FieldType.Text, analyzer = "vi_analyzer")
+  private String cvKeywords;  // Extracted keywords từ CV (~300 chars, clean)
+
   @Field(type = FieldType.Keyword)
   private String resumeFileId;
 
@@ -126,23 +129,31 @@ public class CandidateES {
 
   /**
    * Build search text for embedding generation
-   * Combines desiredPosition, currentJobTitle, skills, summary
+   * V2: Dùng cvKeywords thay vì raw resumeText để tập trung professional signals
    */
   public String buildSearchText() {
     StringBuilder sb = new StringBuilder();
-    if (desiredPosition != null)
-      sb.append(desiredPosition).append(" ");
-    if (currentJobTitle != null)
+    
+    // Intent signals (ưu tiên cao — repeat 2x cho embedding weight)
+    if (desiredPosition != null && !desiredPosition.isBlank()) {
+      sb.append(desiredPosition).append(" ").append(desiredPosition).append(" ");
+    }
+    if (currentJobTitle != null && !currentJobTitle.isBlank()) {
       sb.append(currentJobTitle).append(" ");
+    }
     if (skills != null && !skills.isEmpty()) {
       sb.append(String.join(" ", skills)).append(" ");
     }
-    if (summary != null)
-      sb.append(summary);
-    if (resumeText != null && !resumeText.isBlank()) {
-      String snippet = resumeText.length() > 4000 ? resumeText.substring(0, 4000) : resumeText;
-      sb.append(" ").append(snippet);
+    
+    // CV keywords (clean, focused) thay vì raw resumeText
+    if (cvKeywords != null && !cvKeywords.isBlank()) {
+      sb.append(cvKeywords);
+    } else if (resumeText != null && !resumeText.isBlank()) {
+      // Fallback: chỉ 500 chars đầu nếu chưa có cvKeywords
+      String snippet = resumeText.length() > 500 ? resumeText.substring(0, 500) : resumeText;
+      sb.append(snippet);
     }
+    
     return sb.toString().trim();
   }
 }
