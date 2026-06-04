@@ -8,7 +8,6 @@ import com.hcmute.careergraph.persistence.documents.CandidateES;
 import com.hcmute.careergraph.persistence.dtos.request.CandidateFilterRequest;
 import com.hcmute.careergraph.persistence.dtos.response.CandidateSuggestionResponse;
 import com.hcmute.careergraph.services.CandidateESService;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
@@ -26,13 +25,17 @@ import java.util.List;
  * Used by HR/Company to find suitable candidates
  */
 @RestController
-@RequiredArgsConstructor
 @Slf4j
 @RequestMapping("candidates/suggestion")
 public class CandidateSuggestionController {
 
   private final CandidateESService candidateESService;
   private final SecurityUtils securityUtils;
+
+  public CandidateSuggestionController(CandidateESService candidateESService, SecurityUtils securityUtils) {
+    this.candidateESService = candidateESService;
+    this.securityUtils = securityUtils;
+  }
 
   /**
    * POST /api/v1/candidates/suggestion/search

@@ -79,4 +79,12 @@ public interface CandidateESService {
    * @return Number of candidates indexed
    */
   int syncAllCandidates();
+
+  /**
+   * Sync specific candidate by ID to Elasticsearch
+   * V2.1: Used by FileEventListener when CV changes
+   *
+   * @param candidateId Candidate ID to sync
+   */
+  void syncCandidate(String candidateId);
 }

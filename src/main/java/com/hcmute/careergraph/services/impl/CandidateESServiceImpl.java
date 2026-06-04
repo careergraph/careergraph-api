@@ -444,6 +444,24 @@ public class CandidateESServiceImpl implements CandidateESService {
     return count;
   }
 
+  @Override
+  @org.springframework.transaction.annotation.Transactional(readOnly = true)
+  public void syncCandidate(String candidateId) {
+    log.info("Syncing candidate {} to Elasticsearch", candidateId);
+    
+    try {
+      // V2.1: Fetch với eager loading để tránh LazyInitializationException trong async context
+      Candidate candidate = candidateRepository.findByIdWithCollections(candidateId)
+          .orElseThrow(() -> new RuntimeException("Candidate not found: " + candidateId));
+      
+      indexCandidate(candidate);
+      log.info("Successfully synced candidate {} to Elasticsearch", candidateId);
+    } catch (Exception e) {
+      log.error("Failed to sync candidate {} to Elasticsearch: {}", candidateId, e.getMessage());
+      throw new RuntimeException("Failed to sync candidate to Elasticsearch", e);
+    }
+  }
+
   /**
    * Map JPA Candidate entity to CandidateES document
    * V2: Thêm cvKeywords extraction từ File.cvKeywordsJson
@@ -506,26 +524,62 @@ public class CandidateESServiceImpl implements CandidateESService {
   }
 
   /**
-   * V2: Resolve resume projection với cvKeywords
-   * Không filter shareToFindJob - dùng CV mới nhất active
+   * V2.1: Resolve ALL resumes với shareToFindJob = true
+   * Aggregate tất cả CV text & keywords để candidate search dựa vào cả tiêu chí + CV
    */
   private ResumeProjection resolveResume(String candidateId) {
-    return fileRepository
-        .findFirstByOwnerIdAndStatusAndFileTypeInOrderByCreatedDateDesc(
+    List<File> activeResumes = fileRepository
+        .findByOwnerIdAndStatusAndFileTypeInAndShareToFindJobOrderByCreatedDateDesc(
             candidateId,
             Status.ACTIVE,
-            List.of(FileType.RESUME, FileType.CV))
+            List.of(FileType.RESUME, FileType.CV),
+            true)  // Chỉ lấy CV đang bật tìm việc
+        .stream()
         .filter(file -> StringUtils.hasText(file.getResumeExtractedText()))
-        .map(file -> {
-          String cvKeywords = extractCvKeywords(file);
-          return new ResumeProjection(
-              file.getResumeExtractedText(),
-              cvKeywords,
-              file.getId(),
-              file.getLastModifiedDate() != null ? file.getLastModifiedDate() : file.getCreatedDate(),
-              file.getResumeContentHash());
-        })
-        .orElse(ResumeProjection.empty());
+        .toList();
+    
+    if (activeResumes.isEmpty()) {
+      return ResumeProjection.empty();
+    }
+    
+    // Aggregate all CV texts (limit mỗi CV 1000 chars để tránh quá dài)
+    StringBuilder aggregatedText = new StringBuilder();
+    StringBuilder aggregatedKeywords = new StringBuilder();
+    String latestFileId = null;
+    java.time.LocalDateTime latestUpdatedAt = null;
+    String latestContentHash = null;
+    
+    for (File file : activeResumes) {
+      // Resume text (limit 1000 chars per CV)
+      if (StringUtils.hasText(file.getResumeExtractedText())) {
+        String snippet = file.getResumeExtractedText().length() > 1000 
+            ? file.getResumeExtractedText().substring(0, 1000) 
+            : file.getResumeExtractedText();
+        aggregatedText.append(snippet).append(" ");
+      }
+      
+      // CV keywords
+      String keywords = extractCvKeywords(file);
+      if (StringUtils.hasText(keywords)) {
+        aggregatedKeywords.append(keywords).append(" ");
+      }
+      
+      // Track latest file metadata
+      if (latestFileId == null) {
+        latestFileId = file.getId();
+        latestUpdatedAt = file.getLastModifiedDate() != null 
+            ? file.getLastModifiedDate() 
+            : file.getCreatedDate();
+        latestContentHash = file.getResumeContentHash();
+      }
+    }
+    
+    return new ResumeProjection(
+        aggregatedText.toString().trim(),
+        aggregatedKeywords.toString().trim(),
+        latestFileId,
+        latestUpdatedAt,
+        latestContentHash);
   }
   
   /**
