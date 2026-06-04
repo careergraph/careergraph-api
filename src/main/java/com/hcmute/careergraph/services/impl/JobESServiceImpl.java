@@ -2,27 +2,20 @@ package com.hcmute.careergraph.services.impl;
 
 import co.elastic.clients.elasticsearch.ElasticsearchClient;
 import co.elastic.clients.elasticsearch._types.FieldValue;
-import co.elastic.clients.elasticsearch._types.Script;
-import co.elastic.clients.elasticsearch._types.ScriptLanguage;
 import co.elastic.clients.elasticsearch._types.query_dsl.FunctionBoostMode;
 import co.elastic.clients.elasticsearch._types.query_dsl.FunctionScoreMode;
 import co.elastic.clients.elasticsearch._types.query_dsl.Operator;
 import co.elastic.clients.elasticsearch._types.query_dsl.TextQueryType;
 import co.elastic.clients.elasticsearch.core.SearchResponse;
-import co.elastic.clients.json.JsonData;
 import com.hcmute.careergraph.enums.common.PartyType;
 import com.hcmute.careergraph.persistence.documents.JobES;
 import com.hcmute.careergraph.persistence.dtos.request.JobFilterRequest;
-import com.hcmute.careergraph.repositories.JobESRepository;
 import com.hcmute.careergraph.services.EmbedService;
 import com.hcmute.careergraph.services.JobESService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
-
-import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -30,8 +23,6 @@ import java.util.List;
 @RequiredArgsConstructor
 @Slf4j
 public class JobESServiceImpl implements JobESService {
-
-        private final JobESRepository jobESRepository;
 
         private final ElasticsearchClient client;
 
@@ -363,7 +354,7 @@ public class JobESServiceImpl implements JobESService {
                                                                                                         .queryVector(toFloatList(
                                                                                                                         queryVector))
                                                                                                         .numCandidates(300)
-                                                                                                        .boost(10.0f)))
+                                                                                                        .boost(50.0f)))
 
                                                                         /*
                                                                          * ===== 2. BM25 TEXT SEARCH =====
@@ -407,7 +398,7 @@ public class JobESServiceImpl implements JobESService {
                                                                                                                         "skills^5",
                                                                                                                         "qualifications^4")
                                                                                                         .type(TextQueryType.PhrasePrefix)
-                                                                                                        .boost(1.5f)))
+                                                                                                        .boost(0.3f)))
 
                                                                         /*
                                                                          * ===== 4. CROSS FIELDS =====
@@ -430,7 +421,7 @@ public class JobESServiceImpl implements JobESService {
                                                                                                         .operator(Operator.Or)
                                                                                                         .minimumShouldMatch(
                                                                                                                         "50%")
-                                                                                                        .boost(0.5f)))
+                                                                                                        .boost(0.1f)))
 
                                                                         // Ít nhất 1 should clause phải match
                                                                         .minimumShouldMatch("1")))
