@@ -38,6 +38,7 @@ import org.springframework.data.elasticsearch.ResourceNotFoundException;
 import org.springframework.security.core.userdetails.User;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
 
 import java.time.LocalDate;
 import java.util.*;
@@ -308,11 +309,22 @@ public class JobServiceImpl implements JobService {
         Candidate candidate = candidateRepository.findById(userId)
                 .orElseThrow(() -> new NotFoundException("Candidate not found with id: " + userId));
 
-        String keyword = candidateSearchTextBuilder.build(candidate, true);
-        if (keyword == null || keyword.trim().length() <= 0) {
+        // V2: Use structured profile instead of raw text dump
+        var profile = candidateSearchTextBuilder.buildProfile(candidate);
+        // Prefer intentText for BM25 (high signal), fallback to cvKeywords
+        String keyword = profile.getIntentText();
+        if (!StringUtils.hasText(keyword)) {
+            keyword = profile.getCvKeywords();
+        } else if (StringUtils.hasText(profile.getCvKeywords())) {
+            // Append cvKeywords as boost signal (but intent leads)
+            keyword = keyword + " " + profile.getCvKeywords();
+        }
+
+        if (!StringUtils.hasText(keyword)) {
             return getJobsForAnonymousUser();
         }
-        log.debug("Personalized job search text built for candidateId={}, chars={}", userId, keyword.length());
+        log.debug("Personalized job search V2 for candidateId={}, intent={}, cvSrc={}, chars={}",
+                userId, profile.isHasIntent(), profile.getCvKeywordsSource(), keyword.length());
         // Get current date for filtering expired jobs
         Pageable pageable = PageRequest.of(0, 6);
 
@@ -522,7 +534,9 @@ public class JobServiceImpl implements JobService {
                 Candidate candidate = candidateRepository.findById(partyId)
                         .orElse(null);
                 if (candidate != null && !hasKeyword) {
-                    keyword = candidateSearchTextBuilder.build(candidate, true);
+                    // V2: Use embeddingText from structured profile for KNN search
+                    var profile = candidateSearchTextBuilder.buildProfile(candidate);
+                    keyword = profile.getEmbeddingText();
                 }
             }
 

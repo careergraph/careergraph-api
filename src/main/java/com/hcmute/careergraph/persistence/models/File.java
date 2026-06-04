@@ -70,4 +70,11 @@ public class File extends BaseEntity {
     @Column(name = "resume_content_hash")
     private String resumeContentHash;
 
+    /**
+     * JSON chứa keywords được extract từ CV bởi AI (Gemini) hoặc null nếu chưa extract.
+     * Format: {"jobTitle":"...","skills":[...],"searchKeywords":"..."}
+     */
+    @Column(name = "cv_keywords_json", columnDefinition = "TEXT")
+    private String cvKeywordsJson;
+
 }

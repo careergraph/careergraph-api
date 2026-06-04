@@ -110,6 +110,9 @@ public class JobRecommendationServiceImpl implements JobRecommendationService {
         }
 
         private String genKeyword(Candidate c) {
-                return candidateSearchTextBuilder.build(c, true);
+                var profile = candidateSearchTextBuilder.buildProfile(c);
+                // For daily digest: use embeddingText (combined intent + cv keywords)
+                String keyword = profile.getEmbeddingText();
+                return org.springframework.util.StringUtils.hasText(keyword) ? keyword : "";
         }
 }

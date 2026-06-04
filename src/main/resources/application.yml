@@ -105,6 +105,10 @@ application:
     max-download-bytes: ${RESUME_EXTRACTION_MAX_DOWNLOAD_BYTES:15728640}
     max-stored-chars: ${RESUME_EXTRACTION_MAX_STORED_CHARS:50000}
     allowed-hosts: ${RESUME_EXTRACTION_ALLOWED_HOSTS:res.cloudinary.com}
+  cv-keywords:
+    # Strategy: HEURISTIC (default, instant, no external call) | GEMINI (async AI extract) | HYBRID (heuristic first, gemini override)
+    strategy: ${CV_KEYWORDS_STRATEGY:HYBRID}
+    max-keywords-chars: ${CV_KEYWORDS_MAX_CHARS:300}
 
 springdoc:
   api-docs:

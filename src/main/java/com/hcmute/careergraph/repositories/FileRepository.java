@@ -20,7 +20,8 @@ public interface FileRepository extends JpaRepository<File,String> {
 
         Optional<File> findFirstByOwnerIdAndStatusAndFileTypeInAndShareToFindJobTrueOrderByCreatedDateDesc(
             String ownerId, Status status, List<FileType> fileTypes);
-
+    Optional<File> findFirstByOwnerIdAndStatusAndFileTypeInOrderByCreatedDateDesc(
+        String ownerId, Status status, List<FileType> fileTypes);
     Optional<File> findFirstByOwnerIdAndFilePathAndStatusOrderByCreatedDateDesc(
             String ownerId, String filePath, Status status);
 

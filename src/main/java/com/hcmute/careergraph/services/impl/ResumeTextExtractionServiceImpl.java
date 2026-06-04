@@ -36,6 +36,7 @@ public class ResumeTextExtractionServiceImpl implements ResumeTextExtractionServ
     private final FileRepository fileRepository;
     private final WebClient.Builder webClientBuilder;
     private final ApplicationEventPublisher eventPublisher;
+    private final CvKeywordsExtractionService cvKeywordsExtractionService;
 
     @Value("${application.resume-extraction.max-download-bytes:15728640}")
     private int maxDownloadBytes;
@@ -87,6 +88,14 @@ public class ResumeTextExtractionServiceImpl implements ResumeTextExtractionServ
             file.setResumeContentHash(contentHash);
             fileRepository.save(file);
             log.info("Resume extraction OK fileId={} chars={}", fileId, truncated.length());
+
+            // V2: Trigger CV keywords extraction (async, non-blocking)
+            try {
+                cvKeywordsExtractionService.extractAndPersistKeywords(file.getId(), truncated);
+            } catch (Exception kwEx) {
+                log.warn("CV keywords extraction failed fileId={}: {}", fileId, kwEx.getMessage());
+            }
+
             publishCandidateEvent(file, CandidateUpdatedEvent.CandidateUpdateType.RESUME_UPDATED);
         } catch (Exception ex) {
             log.warn("Resume extraction failed fileId={}: {}", fileId, ex.getMessage());

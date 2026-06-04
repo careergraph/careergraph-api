@@ -13,4 +13,10 @@ public interface FastAPIClientService {
      * POST /api/v1/review-cv — JSON body (CvJobFitReviewRequest), trả về JSON string.
      */
     String reviewCvJobFit(String jsonBody);
+
+    /**
+     * POST /api/v1/extract-cv-keywords — Extract structured keywords từ CV text bằng Gemini.
+     * Trả về JSON string hoặc null nếu thất bại.
+     */
+    String extractCvKeywords(String jsonBody);
 }
