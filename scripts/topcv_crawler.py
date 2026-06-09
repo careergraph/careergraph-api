@@ -220,6 +220,21 @@ BLUEPRINTS = [
         "work_types": ["FULL_TIME"],
     },
     {
+        "key": "engineer",
+        "keywords": ["engineer", "engineering", "systems", "developer", "software", "platform"],
+        "titles": ["Engineer", "Software Engineer", "Systems Engineer", "Platform Engineer", "Embedded Engineer"],
+        "department": "Engineering",
+        # Use ENGINEER category for true engineering jobs in VN
+        "job_category": "ENGINEER",
+        "employment_type": "FULL_TIME",
+        "experience_level": "MIDDLE",
+        "education": "BACHELORS_DEGREE",
+        "salary": (800, 2600),
+        "skills": ["Problem Solving", "System Design", "Debugging", "CI/CD", "Testing"],
+        "industries": ["TECHNOLOGY"],
+        "work_types": ["FULL_TIME", "CONTRACT"],
+    },
+    {
         "key": "frontend",
         "keywords": ["frontend", "react", "ui", "javascript", "typescript", "it phần mềm"],
         "titles": ["Frontend Engineer", "React Developer", "UI Engineer", "Web Developer"],
@@ -1001,6 +1016,7 @@ def build_jobs(
     companies_by_name = {company.name: company for company in companies}
     jobs: list[JobSeed] = []
     company_cursor = 0
+    used_titles: set[str] = set()
     variant_words = ["Platform", "Growth", "Core", "Regional", "Digital", "Enterprise", "Automation", "Customer", "Insight", "Operations"]
 
     for index in range(target_jobs):
@@ -1018,6 +1034,19 @@ def build_jobs(
         if index >= len(source_records):
             title = blueprint["titles"][(index // len(source_records)) % len(blueprint["titles"])]
             title = f"{title} ({variant_words[index % len(variant_words)]})"
+
+        # Ensure generated titles are unique across the seed bundle to avoid
+        # accidental duplication between different blueprints/categories.
+        # If a title is already used, append a numeric suffix until unique.
+        original_title = title
+        if title in used_titles:
+            suffix = 1
+            candidate_title = f"{original_title} ({suffix})"
+            while candidate_title in used_titles:
+                suffix += 1
+                candidate_title = f"{original_title} ({suffix})"
+            title = candidate_title
+        used_titles.add(title)
 
         min_experience = max(0, index % 5)
         max_experience = min_experience + 2 + (index % 4)
