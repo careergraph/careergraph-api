@@ -51,6 +51,12 @@ public class CandidateSuggestionResponse {
   private Boolean isOpenToWork;
   private LocalDate lastActive;
 
+  // Shared resume/profile links for HR actions
+  private String resumeFileId;
+  private String resumeFileName;
+  private String resumeUrl;
+  private String profileUrl;
+
   // Search relevance score (from Elasticsearch)
   private Float score;
 

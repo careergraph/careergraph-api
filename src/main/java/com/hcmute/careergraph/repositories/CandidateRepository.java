@@ -19,10 +19,14 @@ public interface CandidateRepository extends JpaRepository<Candidate, String> {
      */
     @Query("""
         SELECT DISTINCT c FROM Candidate c
+        LEFT JOIN FETCH c.account
         LEFT JOIN FETCH c.contacts
         LEFT JOIN FETCH c.skills cs
         LEFT JOIN FETCH cs.skill
         WHERE c.id = :candidateId
     """)
     java.util.Optional<Candidate> findByIdWithCollections(@Param("candidateId") String candidateId);
+
+    @Query("SELECT c.id FROM Candidate c")
+    List<String> findAllIds();
 }

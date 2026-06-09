@@ -59,6 +59,12 @@
     "resumeFileId": {
       "type": "keyword"
     },
+    "resumeFileName": {
+      "type": "keyword"
+    },
+    "resumeUrl": {
+      "type": "keyword"
+    },
     "resumeUpdatedAt": {
       "type": "date",
       "format": "yyyy-MM-dd'T'HH:mm:ss||yyyy-MM-dd"

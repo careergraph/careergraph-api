@@ -78,6 +78,12 @@ public class CandidateES {
   @Field(type = FieldType.Keyword)
   private String resumeFileId;
 
+  @Field(type = FieldType.Keyword)
+  private String resumeFileName;
+
+  @Field(type = FieldType.Keyword)
+  private String resumeUrl;
+
   @Field(type = FieldType.Date, format = DateFormat.date_hour_minute_second)
   private LocalDateTime resumeUpdatedAt;
 

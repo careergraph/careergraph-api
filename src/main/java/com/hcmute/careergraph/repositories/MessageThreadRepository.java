@@ -52,6 +52,7 @@ public interface MessageThreadRepository extends JpaRepository<MessageThread, St
       FROM MessageThread t
       WHERE t.candidate.id = :candidateId
         AND t.archivedByCandidate = :archived
+        AND t.lastMessageAt IS NOT NULL
         AND NOT EXISTS (
           SELECT 1
           FROM ThreadDeletion td
@@ -84,6 +85,7 @@ public interface MessageThreadRepository extends JpaRepository<MessageThread, St
       FROM MessageThread t
       WHERE t.candidate.id = :candidateId
         AND t.archivedByCandidate = false
+        AND t.lastMessageAt IS NOT NULL
         AND NOT EXISTS (
           SELECT 1
           FROM ThreadDeletion td

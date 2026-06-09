@@ -4,16 +4,19 @@ import com.cloudinary.Cloudinary;
 import com.cloudinary.utils.ObjectUtils;
 import com.hcmute.careergraph.enums.common.FileType;
 import com.hcmute.careergraph.enums.common.PartyType;
+import com.hcmute.careergraph.helper.ResumeDocumentTextExtractor;
 import com.hcmute.careergraph.mapper.CloudFileMapper;
 import com.hcmute.careergraph.mapper.FileMapper;
 import com.hcmute.careergraph.persistence.dtos.response.CloudFileResponse;
 import com.hcmute.careergraph.persistence.dtos.response.FileResponse;
+import com.hcmute.careergraph.persistence.event.CandidateUpdatedEvent;
 import com.hcmute.careergraph.persistence.models.File;
 import com.hcmute.careergraph.repositories.FileRepository;
 import com.hcmute.careergraph.services.CloudinaryService;
-import com.hcmute.careergraph.persistence.event.ResumeFilePersistedEvent;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
@@ -23,6 +26,8 @@ import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
 import java.text.Normalizer;
 import java.util.*;
 import java.util.Locale;
@@ -36,12 +41,17 @@ import java.util.Locale;
  */
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class CloudinaryServiceImpl implements CloudinaryService {
 
     private final Cloudinary cloudinary;
     private final FileRepository fileRepository;
     private final FileMapper fileMapper;
     private final ApplicationEventPublisher applicationEventPublisher;
+    private final CvKeywordsExtractionService cvKeywordsExtractionService;
+
+    @Value("${application.resume-extraction.max-stored-chars:50000}")
+    private int maxStoredChars;
 
     /* ================= UPLOAD IMAGE ================= */
 
@@ -99,6 +109,10 @@ public class CloudinaryServiceImpl implements CloudinaryService {
                 ? convertWordToPdf(inputTmp)
                 : inputTmp;
         String uploadDisplayName = convertToPdf ? replaceExtension(displayName, "pdf") : displayName;
+        boolean resumeFile = fileType == FileType.RESUME || fileType == FileType.CV;
+        LocalResumeExtraction localExtraction = resumeFile
+                ? extractResumeFromLocalUpload(uploadPath, uploadDisplayName, convertToPdf ? "application/pdf" : multipart.getContentType())
+                : LocalResumeExtraction.notResume();
 
         try {
             @SuppressWarnings("unchecked")
@@ -128,9 +142,24 @@ public class CloudinaryServiceImpl implements CloudinaryService {
                 entity.setMimeType("application/pdf");
             }
 
-            fileRepository.save(entity);
-            if (fileType == FileType.RESUME || fileType == FileType.CV) {
-                applicationEventPublisher.publishEvent(new ResumeFilePersistedEvent(entity.getId()));
+            if (resumeFile) {
+                entity.setResumeExtractedText(localExtraction.text());
+                entity.setResumeExtractionError(localExtraction.error());
+                entity.setResumeContentHash(localExtraction.contentHash());
+                fileRepository.save(entity);
+                if (StringUtils.isNotBlank(localExtraction.text())) {
+                    cvKeywordsExtractionService.extractAndPersistKeywords(entity.getId(), localExtraction.text());
+                    applicationEventPublisher.publishEvent(new CandidateUpdatedEvent(
+                            entity.getOwnerId(),
+                            CandidateUpdatedEvent.CandidateUpdateType.RESUME_UPDATED));
+                    log.info("Resume local extraction saved fileId={} chars={}", entity.getId(), localExtraction.text().length());
+                } else {
+                    applicationEventPublisher.publishEvent(new CandidateUpdatedEvent(
+                            entity.getOwnerId(),
+                            CandidateUpdatedEvent.CandidateUpdateType.RESUME_EXTRACTION_FAILED));
+                }
+            } else {
+                fileRepository.save(entity);
             }
             return fileMapper.toFileResponse(entity);
 
@@ -205,6 +234,60 @@ public class CloudinaryServiceImpl implements CloudinaryService {
         }
     }
     /* ======================= HELPERS ======================= */
+
+    private LocalResumeExtraction extractResumeFromLocalUpload(Path uploadPath, String uploadDisplayName, String mimeType) {
+        try {
+            byte[] bytes = Files.readAllBytes(uploadPath);
+            String text = ResumeDocumentTextExtractor.extractText(bytes, mimeType, uploadDisplayName);
+            if (StringUtils.isBlank(text)) {
+                return LocalResumeExtraction.failed("Cannot extract text from uploaded CV.");
+            }
+
+            String truncated = truncateForStore(text);
+            return LocalResumeExtraction.success(truncated, sha256(truncated));
+        } catch (Exception e) {
+            log.warn("Resume local extraction failed before Cloudinary upload: {}", e.getMessage());
+            return LocalResumeExtraction.failed(shorten(e.getMessage(), 500));
+        }
+    }
+
+    private record LocalResumeExtraction(String text, String error, String contentHash) {
+        static LocalResumeExtraction success(String text, String contentHash) {
+            return new LocalResumeExtraction(text, null, contentHash);
+        }
+
+        static LocalResumeExtraction failed(String error) {
+            return new LocalResumeExtraction(null, error, null);
+        }
+
+        static LocalResumeExtraction notResume() {
+            return new LocalResumeExtraction(null, null, null);
+        }
+    }
+
+    private String truncateForStore(String text) {
+        if (text.length() <= maxStoredChars) {
+            return text;
+        }
+        return text.substring(0, maxStoredChars) + "\n...[truncated]";
+    }
+
+    private static String shorten(String s, int max) {
+        if (s == null) {
+            return null;
+        }
+        String t = s.replace("\n", " ").trim();
+        return t.length() <= max ? t : t.substring(0, max);
+    }
+
+    private static String sha256(String text) {
+        try {
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            return HexFormat.of().formatHex(digest.digest(text.getBytes(StandardCharsets.UTF_8)));
+        } catch (Exception e) {
+            throw new IllegalStateException("Cannot calculate resume content hash", e);
+        }
+    }
 
     private Path convertWordToPdf(Path inputFile) throws IOException {
         Path outDir = Files.createTempDirectory("cv_pdf_");

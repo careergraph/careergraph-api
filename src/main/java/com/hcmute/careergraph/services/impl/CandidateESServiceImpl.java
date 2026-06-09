@@ -28,9 +28,13 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
 import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.HexFormat;
 import java.util.List;
+import java.util.Optional;
 
 @Service
 @RequiredArgsConstructor
@@ -88,9 +92,9 @@ public class CandidateESServiceImpl implements CandidateESService {
                             "desiredPosition^10",    // Intent signal: cao nhất
                             "currentJobTitle^7",     // Evidence: đang làm gì
                             "skills^6",              // Evidence: kỹ năng cụ thể
-                            "cvKeywords^5",          // CV keywords (NEW, sạch hơn resumeText)
+                            "cvKeywords^9",          // CV keywords/shared CV signal
                             "summary^3",             // Tóm tắt (thường generic)
-                            "resumeText^1")          // Raw CV (giảm từ ^2, chỉ backup)
+                            "resumeText^3")          // Raw/fallback CV text
                         .fuzziness("AUTO")
                         .type(TextQueryType.BestFields)
                         .operator(Operator.Or)
@@ -109,10 +113,10 @@ public class CandidateESServiceImpl implements CandidateESService {
                             "desiredPosition^10",
                             "currentJobTitle^7",
                             "skills^5",
-                            "cvKeywords^4",
-                            "resumeText^1.5")
+                            "cvKeywords^15",
+                            "resumeText^5")
                         .type(TextQueryType.PhrasePrefix)
-                        .boost(1.5f)));
+                        .boost(6.0f)));
 
                 /*
                  * ===== 4. FILTER: isOpenToWork = true =====
@@ -164,9 +168,9 @@ public class CandidateESServiceImpl implements CandidateESService {
                       "desiredPosition^10",
                       "currentJobTitle^7",
                       "skills^6",
-                      "cvKeywords^5",       // NEW: CV keywords
+                      "cvKeywords^9",
                       "summary^3",
-                      "resumeText^1")       // Giảm từ ^2
+                      "resumeText^3")
                   .type(TextQueryType.BestFields)
                   .operator(Operator.Or)
                   .fuzziness("AUTO")
@@ -370,6 +374,8 @@ public class CandidateESServiceImpl implements CandidateESService {
 
   @Override
   public CandidateSuggestionResponse toSuggestionResponse(CandidateES candidateES, Float score) {
+    ResumeProjection resume = resolveResponseResume(candidateES);
+
     return CandidateSuggestionResponse.builder()
         .id(candidateES.getId())
         .firstName(candidateES.getFirstName())
@@ -392,13 +398,76 @@ public class CandidateESServiceImpl implements CandidateESService {
         .summary(candidateES.getSummary())
         .isOpenToWork(candidateES.getIsOpenToWork())
         .lastActive(candidateES.getLastActive())
+        .resumeFileId(resume.fileId())
+        .resumeFileName(resume.fileName())
+        .resumeUrl(resume.url())
+        .profileUrl("/candidates?candidateId=" + candidateES.getId())
         .score(score)
         .build();
+  }
+
+  private ResumeProjection resolveResponseResume(CandidateES candidateES) {
+    if (candidateES == null) {
+      return ResumeProjection.empty();
+    }
+
+    if (StringUtils.hasText(candidateES.getResumeFileId())
+        && StringUtils.hasText(candidateES.getResumeUrl())
+        && StringUtils.hasText(candidateES.getResumeFileName())) {
+      return new ResumeProjection(
+          candidateES.getResumeText(),
+          candidateES.getCvKeywords(),
+          candidateES.getResumeFileId(),
+          candidateES.getResumeFileName(),
+          candidateES.getResumeUrl(),
+          candidateES.getResumeUpdatedAt(),
+          candidateES.getResumeContentHash());
+    }
+
+    if (StringUtils.hasText(candidateES.getResumeFileId())) {
+      Optional<File> file = fileRepository.findById(candidateES.getResumeFileId())
+          .filter(item -> candidateES.getId().equals(item.getOwnerId()))
+          .filter(item -> Status.ACTIVE.equals(item.getStatus()))
+          .filter(item -> Boolean.TRUE.equals(item.getShareToFindJob()));
+
+      if (file.isPresent()) {
+        File resume = file.get();
+        return new ResumeProjection(
+            candidateES.getResumeText(),
+            candidateES.getCvKeywords(),
+            resume.getId(),
+            resolveResumeFileName(resume),
+            resume.getFilePath(),
+            resume.getLastModifiedDate() != null ? resume.getLastModifiedDate() : resume.getCreatedDate(),
+            resume.getResumeContentHash());
+      }
+    }
+
+    ResumeProjection sharedResume = resolveSharedResume(candidateES.getId());
+    if (StringUtils.hasText(sharedResume.fileId())) {
+      return sharedResume;
+    }
+
+    return new ResumeProjection(
+        candidateES.getResumeText(),
+        candidateES.getCvKeywords(),
+        candidateES.getResumeFileId(),
+        candidateES.getResumeFileName(),
+        candidateES.getResumeUrl(),
+        candidateES.getResumeUpdatedAt(),
+        candidateES.getResumeContentHash());
   }
 
   @Override
   public CandidateES indexCandidate(Candidate candidate) {
     try {
+      if (!shouldIndexCandidate(candidate)) {
+        deleteCandidate(candidate.getId());
+        log.info("Skipped indexing candidate {} because the profile is not searchable: {}",
+            candidate.getId(), explainNotSearchable(candidate));
+        return null;
+      }
+
       CandidateES candidateES = mapToES(candidate);
 
       // Generate embedding from search text
@@ -426,17 +495,22 @@ public class CandidateESServiceImpl implements CandidateESService {
   }
 
   @Override
+  @org.springframework.transaction.annotation.Transactional
   public int syncAllCandidates() {
     log.info("Starting sync all candidates to Elasticsearch...");
-    List<Candidate> candidates = candidateRepository.findAll();
+    List<String> candidateIds = candidateRepository.findAllIds();
     int count = 0;
 
-    for (Candidate candidate : candidates) {
+    for (String candidateId : candidateIds) {
       try {
-        indexCandidate(candidate);
-        count++;
+        Candidate candidate = candidateRepository.findByIdWithCollections(candidateId)
+            .orElseThrow(() -> new RuntimeException("Candidate not found: " + candidateId));
+        CandidateES indexed = indexCandidate(candidate);
+        if (indexed != null) {
+          count++;
+        }
       } catch (Exception e) {
-        log.error("Failed to index candidate {}: {}", candidate.getId(), e.getMessage());
+        log.error("Failed to index candidate {}: {}", candidateId, e.getMessage());
       }
     }
 
@@ -479,7 +553,7 @@ public class CandidateESServiceImpl implements CandidateESService {
     String phone = null;
     if (candidate.getContacts() != null) {
       phone = candidate.getContacts().stream()
-          .filter(c -> "PHONE".equals(c.getContactType()))
+          .filter(c -> c.getContactType() != null && "PHONE".equals(c.getContactType().name()))
           .map(c -> c.getValue())
           .findFirst()
           .orElse(null);
@@ -491,7 +565,7 @@ public class CandidateESServiceImpl implements CandidateESService {
       email = candidate.getAccount().getEmail();
     }
 
-    ResumeProjection resume = resolveResume(candidate.getId());
+    ResumeProjection resume = resolveSharedResume(candidate.getId());
 
     return CandidateES.builder()
         .id(candidate.getId())
@@ -508,10 +582,13 @@ public class CandidateESServiceImpl implements CandidateESService {
         .resumeText(resume.resumeText())
         .cvKeywords(resume.cvKeywords())  // V2: CV keywords từ extraction service
         .resumeFileId(resume.fileId())
+        .resumeFileName(resume.fileName())
+        .resumeUrl(resume.url())
         .resumeUpdatedAt(resume.updatedAt())
         .resumeContentHash(resume.contentHash())
         .isOpenToWork(candidate.getIsOpenToWork() != null ? candidate.getIsOpenToWork() : false)
         .educationLevel(candidate.getEducationLevel())
+        .experienceLevel(determineExperienceLevel(candidate.getYearsOfExperience()))
         .industries(candidate.getIndustries())
         .locations(candidate.getLocations())
         .workTypes(candidate.getWorkTypes())
@@ -520,6 +597,7 @@ public class CandidateESServiceImpl implements CandidateESService {
         .skills(skillNames)
         .createdAt(LocalDate.now())
         .lastActive(LocalDate.now())
+        .contentHash(buildContentHash(candidate, resume, skillNames))
         .build();
   }
 
@@ -578,6 +656,8 @@ public class CandidateESServiceImpl implements CandidateESService {
         aggregatedText.toString().trim(),
         aggregatedKeywords.toString().trim(),
         latestFileId,
+        null,
+        null,
         latestUpdatedAt,
         latestContentHash);
   }
@@ -586,6 +666,85 @@ public class CandidateESServiceImpl implements CandidateESService {
    * V2: Extract CV keywords từ File.cvKeywordsJson
    * Parse JSON và lấy searchKeywords field
    */
+  private ResumeProjection resolveSharedResume(String candidateId) {
+    Optional<File> sharedResume = fileRepository
+        .findFirstByOwnerIdAndStatusAndFileTypeInAndShareToFindJobTrueOrderByCreatedDateDesc(
+            candidateId,
+            Status.ACTIVE,
+            List.of(FileType.RESUME, FileType.CV));
+
+    if (sharedResume.isEmpty()) {
+      return ResumeProjection.empty();
+    }
+
+    File file = sharedResume.get();
+    String resumeText = null;
+    String metadataFallback = buildResumeMetadataFallback(file);
+    if (StringUtils.hasText(file.getResumeExtractedText())) {
+      resumeText = file.getResumeExtractedText().length() > 1000
+          ? file.getResumeExtractedText().substring(0, 1000)
+          : file.getResumeExtractedText();
+    } else {
+      resumeText = metadataFallback;
+    }
+
+    String cvKeywords = extractCvKeywords(file);
+    if (!StringUtils.hasText(cvKeywords)) {
+      cvKeywords = metadataFallback;
+    }
+
+    return new ResumeProjection(
+        resumeText,
+        cvKeywords,
+        file.getId(),
+        resolveResumeFileName(file),
+        file.getFilePath(),
+        file.getLastModifiedDate() != null ? file.getLastModifiedDate() : file.getCreatedDate(),
+        file.getResumeContentHash());
+  }
+
+  private String resolveResumeFileName(File file) {
+    if (file == null) {
+      return null;
+    }
+    if (StringUtils.hasText(file.getOriginalFileName())) {
+      return file.getOriginalFileName();
+    }
+    return file.getFileName();
+  }
+
+  private String buildResumeMetadataFallback(File file) {
+    if (file == null) {
+      return null;
+    }
+    StringBuilder sb = new StringBuilder();
+    if (StringUtils.hasText(file.getFileName())) {
+      sb.append(file.getFileName()).append(' ');
+    }
+    if (StringUtils.hasText(file.getOriginalFileName())
+        && !file.getOriginalFileName().equals(file.getFileName())) {
+      sb.append(file.getOriginalFileName()).append(' ');
+    }
+    String value = sb.toString()
+        .replaceAll("([a-z])([A-Z])", "$1 $2")
+        .replaceAll("([A-Za-z])([0-9])", "$1 $2")
+        .replaceAll("([0-9])([A-Za-z])", "$1 $2")
+        .replaceAll("[._\\-]+", " ")
+        .replaceAll("(?i)\\b(pdf|docx?|resume|cv)\\b", " ")
+        .replaceAll("\\s+", " ")
+        .trim();
+    if (!StringUtils.hasText(value)) {
+      return null;
+    }
+
+    String[] tokens = value.split("\\s+");
+    if (tokens.length >= 2) {
+      String tail = tokens[tokens.length - 2] + " " + tokens[tokens.length - 1];
+      return (tail + " " + tail + " " + value).trim();
+    }
+    return value;
+  }
+
   private String extractCvKeywords(File file) {
     if (file == null || !StringUtils.hasText(file.getCvKeywordsJson())) {
       return null;
@@ -608,10 +767,12 @@ public class CandidateESServiceImpl implements CandidateESService {
       String resumeText, 
       String cvKeywords,  // V2: Thêm field
       String fileId, 
+      String fileName,
+      String url,
       java.time.LocalDateTime updatedAt,
       String contentHash) {
     static ResumeProjection empty() {
-      return new ResumeProjection(null, null, null, null, null);
+      return new ResumeProjection(null, null, null, null, null, null, null);
     }
   }
 
@@ -619,6 +780,97 @@ public class CandidateESServiceImpl implements CandidateESService {
    * V2: Build compact job search text - chỉ title + top qualifications
    * Giảm từ 2000-5000 chars xuống ~200-400 chars để BM25 scoring chính xác hơn
    */
+  private boolean shouldIndexCandidate(Candidate candidate) {
+    if (candidate == null || !Boolean.TRUE.equals(candidate.getIsOpenToWork())) {
+      return false;
+    }
+
+    if (hasCandidateIntent(candidate)) {
+      return true;
+    }
+
+    ResumeProjection sharedResume = resolveSharedResume(candidate.getId());
+    return StringUtils.hasText(sharedResume.cvKeywords()) || StringUtils.hasText(sharedResume.resumeText());
+  }
+
+  private String explainNotSearchable(Candidate candidate) {
+    if (candidate == null) {
+      return "candidate is null";
+    }
+    if (!Boolean.TRUE.equals(candidate.getIsOpenToWork())) {
+      return "isOpenToWork is false";
+    }
+    if (hasCandidateIntent(candidate)) {
+      return "unexpected state: candidate has profile intent";
+    }
+
+    ResumeProjection sharedResume = resolveSharedResume(candidate.getId());
+    if (!StringUtils.hasText(sharedResume.fileId())) {
+      return "no profile intent and no active shared CV";
+    }
+    return "shared CV " + sharedResume.fileId() + " has no extracted text or keywords yet";
+  }
+
+  private boolean hasCandidateIntent(Candidate candidate) {
+    if (StringUtils.hasText(candidate.getDesiredPosition())
+        || StringUtils.hasText(candidate.getCurrentJobTitle())
+        || StringUtils.hasText(candidate.getSummary())) {
+      return true;
+    }
+
+    return candidate.getSkills() != null && candidate.getSkills().stream()
+        .anyMatch(cs -> cs.getSkill() != null && StringUtils.hasText(cs.getSkill().getName()));
+  }
+
+  private String buildContentHash(Candidate candidate, ResumeProjection resume, List<String> skillNames) {
+    String content = String.join("|",
+        safe(candidate.getDesiredPosition()),
+        safe(candidate.getCurrentJobTitle()),
+        safe(candidate.getSummary()),
+        safe(candidate.getEducationLevel()),
+        String.valueOf(candidate.getYearsOfExperience()),
+        String.join(",", safeList(candidate.getIndustries())),
+        String.join(",", safeList(candidate.getLocations())),
+        String.join(",", safeList(candidate.getWorkTypes())),
+        String.join(",", safeList(skillNames)),
+        safe(resume.cvKeywords()),
+        safe(resume.contentHash()));
+    return sha256(content);
+  }
+
+  private List<String> safeList(List<String> values) {
+    return values == null ? List.of() : values;
+  }
+
+  private String safe(String value) {
+    return value == null ? "" : value;
+  }
+
+  private String sha256(String text) {
+    try {
+      MessageDigest digest = MessageDigest.getInstance("SHA-256");
+      return HexFormat.of().formatHex(digest.digest(text.getBytes(StandardCharsets.UTF_8)));
+    } catch (Exception e) {
+      throw new IllegalStateException("Cannot calculate candidate content hash", e);
+    }
+  }
+
+  private String determineExperienceLevel(Integer yearsOfExperience) {
+    if (yearsOfExperience == null || yearsOfExperience == 0) {
+      return "FRESHER";
+    }
+    if (yearsOfExperience <= 2) {
+      return "JUNIOR";
+    }
+    if (yearsOfExperience <= 5) {
+      return "MIDDLE";
+    }
+    if (yearsOfExperience <= 10) {
+      return "SENIOR";
+    }
+    return "EXPERT";
+  }
+
   private String buildJobSearchText(Job job) {
     if (job == null) {
       return null;

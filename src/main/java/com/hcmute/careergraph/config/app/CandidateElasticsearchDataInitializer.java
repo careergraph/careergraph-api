@@ -8,6 +8,7 @@ import com.hcmute.careergraph.enums.common.Status;
 import com.hcmute.careergraph.repositories.CandidateESRepository;
 import com.hcmute.careergraph.repositories.CandidateRepository;
 import com.hcmute.careergraph.repositories.FileRepository;
+import com.hcmute.careergraph.services.CandidateESService;
 import com.hcmute.careergraph.services.HuggingFaceEmbeddingService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -70,6 +71,7 @@ public class CandidateElasticsearchDataInitializer implements CommandLineRunner 
   private final CandidateESRepository candidateESRepository;
   private final ElasticsearchOperations elasticsearchOperations;
   private final FileRepository fileRepository;
+  private final CandidateESService candidateESService;
   private final HuggingFaceEmbeddingService huggingFaceEmbeddingService;
   private final EmbeddingModel embeddingModel;
 
@@ -102,6 +104,34 @@ public class CandidateElasticsearchDataInitializer implements CommandLineRunner 
   }
 
   public ElasticsearchSyncResult syncNow(Boolean forceOverride, Integer maxEmbeddingsOverride) {
+    boolean effectiveForce = forceOverride != null ? forceOverride : forceFullSync;
+    int effectiveMaxEmbeddings = maxEmbeddingsOverride != null ? maxEmbeddingsOverride : maxEmbeddingsPerRun;
+    try {
+      int synced = candidateESService.syncAllCandidates();
+      return new ElasticsearchSyncResult(
+          "candidates",
+          false,
+          effectiveForce,
+          effectiveMaxEmbeddings,
+          synced,
+          0,
+          0,
+          "Candidate Elasticsearch synchronization completed via CandidateESService.");
+    } catch (Exception e) {
+      log.error("Candidate Elasticsearch synchronization failed: {}", e.getMessage(), e);
+      return new ElasticsearchSyncResult(
+          "candidates",
+          true,
+          effectiveForce,
+          effectiveMaxEmbeddings,
+          0,
+          0,
+          0,
+          "Candidate Elasticsearch synchronization failed: " + e.getMessage());
+    }
+  }
+
+  public ElasticsearchSyncResult syncNowLegacy(Boolean forceOverride, Integer maxEmbeddingsOverride) {
     boolean effectiveForce = forceOverride != null ? forceOverride : forceFullSync;
     int effectiveMaxEmbeddings = maxEmbeddingsOverride != null ? maxEmbeddingsOverride : maxEmbeddingsPerRun;
     boolean recreatedIndexAfterDimensionMismatch = false;
