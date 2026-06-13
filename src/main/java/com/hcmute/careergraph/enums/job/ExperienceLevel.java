@@ -4,15 +4,15 @@ import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonValue;
 
 public enum ExperienceLevel {
-    ENTRY("Entry"),
-    INTERN("Intern"),
-    MIDDLE("Middle"),
-    FRESHER("Fresher"),
-    JUNIOR("Junior"),
-    SENIOR("Senior"),
-    LEADER("Leader"),
-    CTO("CTO"),
-    CFO("CFO");
+    ENTRY("Mới vào nghề"),
+    INTERN("Thực tập sinh"),
+    MIDDLE("Chuyên viên"),
+    FRESHER("Mới tốt nghiệp"),
+    JUNIOR("Nhân viên Junior"),
+    SENIOR("Nhân viên Senior"),
+    LEADER("Trưởng nhóm"),
+    CTO("Giám đốc công nghệ"),
+    CFO("Giám đốc tài chính");
 
     private final String label;
 

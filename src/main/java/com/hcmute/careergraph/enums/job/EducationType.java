@@ -4,18 +4,18 @@ import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonValue;
 
 public enum EducationType {
-  HIGH_SCHOOL("High School"),
-  ASSOCIATE_DEGREE("Associate"),
-  ASSOCIATE("Associate"),
-  BACHELORS_DEGREE("Bachelor"),
-  BACHELOR("Bachelor"),
-  MASTERS_DEGREE("Master"),
-  MASTER("Master"),
-  DOCTORATE("Doctorate"),
-  VOCATIONAL("Vocational"),
-  CERTIFICATION("Certification"),
-  OTHER("No Formal Education"),
-  NONE("No Formal Education");
+  HIGH_SCHOOL("Trung học phổ thông"),
+  ASSOCIATE_DEGREE("Cao đẳng"),
+  ASSOCIATE("Cao đẳng"),
+  BACHELORS_DEGREE("Đại học"),
+  BACHELOR("Đại học"),
+  MASTERS_DEGREE("Thạc sĩ"),
+  MASTER("Thạc sĩ"),
+  DOCTORATE("Tiến sĩ"),
+  VOCATIONAL("Đào tạo nghề"),
+  CERTIFICATION("Chứng chỉ chuyên môn"),
+  OTHER("Không yêu cầu"),
+  NONE("Không yêu cầu");
 
   private final String label;
 

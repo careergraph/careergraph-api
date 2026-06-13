@@ -4,12 +4,12 @@ import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonValue;
 
 public enum EmploymentType {
-    FULL_TIME("Full-time"),
-    PART_TIME("Part-time"),
-    CONTRACT("Contract"),
-    INTERNSHIP("Internship"),
-    FREELANCE("Freelance"),
-    TEMPORARY("Temporary");
+    FULL_TIME("Toàn thời gian"),
+    PART_TIME("Bán thời gian"),
+    CONTRACT("Hợp đồng"),
+    INTERNSHIP("Thực tập"),
+    FREELANCE("Làm tự do"),
+    TEMPORARY("Tạm thời");
 
     private final String label;
 
