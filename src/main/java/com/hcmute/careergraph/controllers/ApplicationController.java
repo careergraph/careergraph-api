@@ -28,7 +28,7 @@ public class ApplicationController {
     private final SecurityUtils securityUtils;
 
     @PostMapping
-    public RestResponse<ApplicationResponse> createApplication(@RequestBody ApplicationRequest request, Authentication authentication) {
+    public RestResponse<ApplicationResponse> createApplication(@Valid @RequestBody ApplicationRequest request, Authentication authentication) {
 
         String candidateId = securityUtils.extractCandidateId(authentication);
         if (candidateId == null || candidateId.isBlank()) {
@@ -36,7 +36,11 @@ public class ApplicationController {
         }
         request.setCandidateId(candidateId);
 
-        if (request.getResumeUrl().isBlank()) {
+        if (!StringUtils.hasText(request.getJobId())) {
+            throw new BadRequestException("Job ID invalid");
+        }
+
+        if (!StringUtils.hasText(request.getResumeUrl())) {
             throw new BadRequestException("Application invalid. Resume is required");
         }
 

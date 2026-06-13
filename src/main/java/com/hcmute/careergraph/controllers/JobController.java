@@ -37,6 +37,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.util.StringUtils;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -563,16 +564,17 @@ public class JobController {
         @PostMapping("/{id}/application")
         public RestResponse<ApplicationResponse> apply(
                         @PathVariable("id") String jobId,
-                        @RequestBody ApplicationRequest request,
+                        @Valid @RequestBody ApplicationRequest request,
                         Authentication authentication) {
 
                 String candidateId = securityUtils.extractCandidateId(authentication);
                 if (candidateId == null || candidateId.isBlank()) {
                         throw new BadRequestException("Candidate ID invalid");
                 }
+                request.setJobId(jobId);
                 request.setCandidateId(candidateId);
 
-                if (request.getResumeUrl().isBlank()) {
+                if (!StringUtils.hasText(request.getResumeUrl())) {
                         throw new BadRequestException("Application invalid. Resume is required");
                 }
 
