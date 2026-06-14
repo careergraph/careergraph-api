@@ -122,7 +122,7 @@ services:
       - "traefik.docker.network=proxy"
 
       # Router
-      - "traefik.http.routers.api.rule=Host(`api.thinz.io.vn`) && PathPrefix(`/careergraph`)"
+      - "traefik.http.routers.api.rule=Host(`api.careergraph.io.vn`) && PathPrefix(`/careergraph`)"
       - "traefik.http.routers.api.entrypoints=websecure"
 
       # TLS

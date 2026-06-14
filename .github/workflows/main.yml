@@ -247,13 +247,14 @@ jobs:
             fi
 
             cd "$VPS_APP_DIR"
-            log_step "Changed directory to $VPS_APP_DIR"
+            APP_DIR_ABS="$(pwd)"
+            log_step "Changed directory to $APP_DIR_ABS"
 
             log_step "Cleaning legacy temporary deploy files from previous workflow versions"
-            find "$VPS_APP_DIR" -maxdepth 1 -type f \( -name "docker-compose-api-*.yaml" -o -name "env-api-*.list" \) -delete || true
+            find "$APP_DIR_ABS" -maxdepth 1 -type f \( -name "docker-compose-api-*.yaml" -o -name "env-api-*.list" \) -delete || true
 
             DEPLOY_TMP_DIR="$(mktemp -d)"
-            COMPOSE_SOURCE_FILE="$VPS_APP_DIR/docker-compose.prod.yaml"
+            COMPOSE_SOURCE_FILE="$APP_DIR_ABS/docker-compose.prod.yaml"
             COMPOSE_FILE_TMP="$DEPLOY_TMP_DIR/docker-compose.yaml"
             ENV_FILE_TMP="$DEPLOY_TMP_DIR/.env"
             log_step "Created temporary deploy directory: $DEPLOY_TMP_DIR"
@@ -262,7 +263,7 @@ jobs:
               log_step "Cleaning up temporary deploy directory"
               rm -rf "$DEPLOY_TMP_DIR"
               rm -f "$COMPOSE_SOURCE_FILE"
-              find "$VPS_APP_DIR" -maxdepth 1 -type f \( -name "docker-compose-api-*.yaml" -o -name "env-api-*.list" \) -delete || true
+              find "$APP_DIR_ABS" -maxdepth 1 -type f \( -name "docker-compose-api-*.yaml" -o -name "env-api-*.list" \) -delete || true
             }
             trap cleanup EXIT
 
