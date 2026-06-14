@@ -1,5 +1,6 @@
 package com.hcmute.careergraph.config.app;
 
+import com.hcmute.careergraph.helper.VietnamProvinceUtils;
 import com.hcmute.careergraph.persistence.documents.JobES;
 import com.hcmute.careergraph.persistence.event.JobCreatedEvent;
 import com.hcmute.careergraph.persistence.models.Job;
@@ -376,6 +377,8 @@ public class ElasticsearchDataInitializer implements CommandLineRunner {
                 .experienceLevel(job.getExperienceLevel().name())
                 .education(job.getEducation().name())
                 .state(job.getState())
+                .provinceSlug(VietnamProvinceUtils.slugFromStateName(job.getState()))
+                .provinceCode(VietnamProvinceUtils.codeFromStateName(job.getState()))
                 .city(job.getCity())
                 .companyId(job.getCompany().getId())
                 .createdAt(job.getCreatedDate() != null ? job.getCreatedDate().toLocalDate() : LocalDate.now())

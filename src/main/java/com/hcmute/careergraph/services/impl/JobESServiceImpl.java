@@ -8,6 +8,7 @@ import co.elastic.clients.elasticsearch._types.query_dsl.Operator;
 import co.elastic.clients.elasticsearch._types.query_dsl.TextQueryType;
 import co.elastic.clients.elasticsearch.core.SearchResponse;
 import com.hcmute.careergraph.enums.common.PartyType;
+import com.hcmute.careergraph.helper.JobLocationFilterSupport;
 import com.hcmute.careergraph.persistence.documents.JobES;
 import com.hcmute.careergraph.persistence.dtos.request.JobFilterRequest;
 import com.hcmute.careergraph.services.EmbedService;
@@ -170,12 +171,7 @@ public class JobESServiceImpl implements JobESService {
                                                                                                                         .toList()))));
                                                                 }
 
-                                                                if (filter.getCity() != null
-                                                                                && !filter.getCity().isEmpty()) {
-                                                                        b.filter(fq -> fq.term(t -> t
-                                                                                        .field("city.keyword")
-                                                                                        .value(filter.getCity())));
-                                                                }
+                                                                JobLocationFilterSupport.applyLocationFilter(b, filter);
 
                                                                 if (type == PartyType.COMPANY && partyId != null) {
                                                                         b.filter(fq -> fq.term(t -> t
@@ -277,13 +273,8 @@ public class JobESServiceImpl implements JobESService {
                                                                                                                         .toList()))));
                                                                 }
 
-                                                                /* ===== CITY ===== */
-                                                                if (filter.getCity() != null
-                                                                                && !filter.getCity().isEmpty()) {
-                                                                        b.filter(q -> q.term(t -> t
-                                                                                        .field("city")
-                                                                                        .value(filter.getCity())));
-                                                                }
+                                                                /* ===== LOCATION ===== */
+                                                                JobLocationFilterSupport.applyLocationFilter(b, filter);
 
                                                                 /* ===== COMPANY ===== */
                                                                 if (type == PartyType.COMPANY && partyId != null) {
@@ -498,13 +489,8 @@ public class JobESServiceImpl implements JobESService {
                                                                                                                         .toList()))));
                                                                 }
 
-                                                                /* ===== CITY ===== */
-                                                                if (filter.getCity() != null
-                                                                                && !filter.getCity().isEmpty()) {
-                                                                        b.filter(fq -> fq.term(t -> t
-                                                                                        .field("city.keyword")
-                                                                                        .value(filter.getCity())));
-                                                                }
+                                                                /* ===== LOCATION ===== */
+                                                                JobLocationFilterSupport.applyLocationFilter(b, filter);
 
                                                                 /* ===== COMPANY ===== */
                                                                 if (type == PartyType.COMPANY && partyId != null) {

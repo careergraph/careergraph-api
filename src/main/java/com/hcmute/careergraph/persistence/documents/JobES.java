@@ -58,6 +58,12 @@ public class JobES {
     private String state;
 
     @Field(type = FieldType.Keyword)
+    private String provinceSlug;
+
+    @Field(type = FieldType.Keyword)
+    private String provinceCode;
+
+    @Field(type = FieldType.Keyword)
     private String city;
 
     @Field(type = FieldType.Keyword)

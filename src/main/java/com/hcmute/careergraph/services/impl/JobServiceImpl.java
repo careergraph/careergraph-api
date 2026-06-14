@@ -11,6 +11,7 @@ import com.hcmute.careergraph.enums.job.ExperienceLevel;
 import com.hcmute.careergraph.enums.job.JobCategory;
 import com.hcmute.careergraph.exception.BadRequestException;
 import com.hcmute.careergraph.exception.NotFoundException;
+import com.hcmute.careergraph.helper.VietnamProvinceUtils;
 import com.hcmute.careergraph.mapper.JobMapper;
 import com.hcmute.careergraph.persistence.documents.JobES;
 import com.hcmute.careergraph.persistence.dtos.request.JobCreationRequest;
@@ -93,6 +94,8 @@ public class JobServiceImpl implements JobService {
                 .experienceLevel(job.getExperienceLevel().name())
                 .education(job.getEducation().name())
                 .state(job.getState())
+                .provinceSlug(VietnamProvinceUtils.slugFromStateName(job.getState()))
+                .provinceCode(VietnamProvinceUtils.codeFromStateName(job.getState()))
                 .city(job.getCity())
                 .companyId(job.getCompany().getId())
                 .qualifications(job.getQualifications())
@@ -471,7 +474,7 @@ public class JobServiceImpl implements JobService {
                 || filter.getEmploymentTypes().isEmpty() ? null : filter.getEmploymentTypes();
         List<EducationType> educationTypes = null;
         List<ExperienceLevel> experienceLevels = null;
-        String city = filter.getCity();
+        String location = filter.getLocation();
 
         Page<Job> jobs = null;
 
@@ -491,7 +494,7 @@ public class JobServiceImpl implements JobService {
              * Recommend job trên landing page
              */
 
-            jobs = jobRepository.searchJobForCandidate(partyId, city, jobCategories, employmentTypes,
+            jobs = jobRepository.searchJobForCandidate(partyId, location, jobCategories, employmentTypes,
                     experienceLevels, educationTypes, query, pageable);
         }
         return jobs;
@@ -517,7 +520,7 @@ public class JobServiceImpl implements JobService {
                 : filter.getEducationTypes();
         List<ExperienceLevel> experienceLevels = filter.getExperienceLevels() == null
                 || filter.getExperienceLevels().isEmpty() ? null : filter.getExperienceLevels();
-        String city = filter.getCity();
+        String location = filter.getLocation();
 
         Page<Job> jobs = null;
 

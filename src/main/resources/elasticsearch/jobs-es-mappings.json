@@ -34,7 +34,18 @@
     },
     "state": {
       "type": "text",
-      "analyzer": "vi_analyzer"
+      "analyzer": "vi_analyzer",
+      "fields": {
+        "keyword": {
+          "type": "keyword"
+        }
+      }
+    },
+    "provinceSlug": {
+      "type": "keyword"
+    },
+    "provinceCode": {
+      "type": "keyword"
     },
     "city": {
       "type": "keyword"

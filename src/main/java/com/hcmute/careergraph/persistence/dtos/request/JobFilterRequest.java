@@ -1,7 +1,7 @@
 package com.hcmute.careergraph.persistence.dtos.request;
 
+import com.fasterxml.jackson.annotation.JsonAlias;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
-import com.fasterxml.jackson.annotation.JsonInclude;
 import com.hcmute.careergraph.enums.common.Status;
 import com.hcmute.careergraph.enums.job.EducationType;
 import com.hcmute.careergraph.enums.job.EmploymentType;
@@ -23,7 +23,22 @@ public class JobFilterRequest {
 
     private List<Status> statuses;
 
-    private String city;
+    /**
+     * Tên tỉnh/thành (shortName), ví dụ: "Hà Nội", "Tuyên Quang".
+     * {@code city} được giữ làm alias để tương thích client cũ.
+     */
+    @JsonAlias("city")
+    private String location;
+
+    /**
+     * Slug URL-friendly, ví dụ: "ha-noi", "tuyen-quang".
+     */
+    private String provinceSlug;
+
+    /**
+     * Mã tỉnh/thành từ API địa giới hành chính, ví dụ: "01", "08".
+     */
+    private String provinceCode;
 
     private List<JobCategory> jobCategories;
 
