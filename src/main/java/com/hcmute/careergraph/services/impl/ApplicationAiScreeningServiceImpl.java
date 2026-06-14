@@ -61,9 +61,12 @@ public class ApplicationAiScreeningServiceImpl implements ApplicationAiScreening
     @Transactional
     public void screenApplication(String applicationId) {
         if (!screeningEnabled) {
-            log.debug("AI screening disabled; skip applicationId={}", applicationId);
+            log.info("AI screening is disabled (application.ai-screening.enabled=false); skip applicationId={}",
+                    applicationId);
             return;
         }
+
+        log.info("AI screening started for applicationId={}", applicationId);
 
         Optional<Application> opt = applicationRepository.findById(applicationId);
         if (opt.isEmpty()) {
@@ -82,6 +85,12 @@ public class ApplicationAiScreeningServiceImpl implements ApplicationAiScreening
         Candidate candidate = application.getCandidate();
         if (job == null || candidate == null) {
             log.warn("AI screening skip: missing job or candidate on application {}", applicationId);
+            return;
+        }
+
+        if (!Boolean.TRUE.equals(job.getAiScreeningEnabled())) {
+            log.info("AI screening skip: job {} has AI screening disabled for application {}",
+                    job.getId(), applicationId);
             return;
         }
 
@@ -138,12 +147,37 @@ public class ApplicationAiScreeningServiceImpl implements ApplicationAiScreening
             log.info("AI screening: application {} rejected (score={} < min={})",
                     applicationId, clamped, minScorePercent);
         } else {
-            log.info("AI screening: application {} passed (score={} >= min={})",
-                    applicationId, clamped, minScorePercent);
+            String summary = StringUtils.hasText(ai.getSummary()) ? ai.getSummary().trim() : "";
+            String note = buildScreeningPassNote(clamped, summary);
+            ApplicationStageUpdateRequest stageReq = ApplicationStageUpdateRequest.builder()
+                    .stage(ApplicationStage.SCREENING)
+                    .note(note)
+                    .changeBy(AI_SCREENING_ACTOR)
+                    .build();
+            try {
+                applicationService.updateApplicationStage(applicationId, stageReq);
+                log.info("AI screening: application {} promoted to SCREENING (score={} >= min={})",
+                        applicationId, clamped, minScorePercent);
+            } catch (Exception ex) {
+                log.error("AI screening: failed to promote application {} to SCREENING (score={}): {}",
+                        applicationId, clamped, ex.getMessage(), ex);
+            }
         }
 
         String summaryForHr = StringUtils.hasText(ai.getSummary()) ? ai.getSummary().trim() : "";
         notificationService.onApplicationAiScreeningCompleted(applicationId, clamped, autoRejected, summaryForHr);
+    }
+
+    private static String buildScreeningPassNote(int score, String summary) {
+        if (StringUtils.hasText(summary)) {
+            String shortSummary = summary.length() > 220 ? summary.substring(0, 217) + "..." : summary;
+            return String.format(
+                    "Sàng lọc tự động (AI): độ phù hợp %d%% — đạt ngưỡng, chuyển sang Sàng lọc. %s",
+                    score, shortSummary);
+        }
+        return String.format(
+                "Sàng lọc tự động (AI): độ phù hợp %d%% — đạt ngưỡng, chuyển sang Sàng lọc.",
+                score);
     }
 
     private static String buildRejectionNote(int score, String summary) {

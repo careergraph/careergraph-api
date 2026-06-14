@@ -155,6 +155,7 @@ public class JobMapper {
                 // Application recruiment
                 .resume(job.getResume())
                 .coverLetter(job.getCoverLetter())
+                .aiScreeningEnabled(Boolean.TRUE.equals(job.getAiScreeningEnabled()))
 
                 // Timeline - null for now, có thể implement sau
                 .timeline(null)
@@ -228,6 +229,7 @@ public class JobMapper {
                 // Application recruiment
                 .resume(job.getResume())
                 .coverLetter(job.getCoverLetter())
+                .aiScreeningEnabled(Boolean.TRUE.equals(job.getAiScreeningEnabled()))
 
                 // Timeline - null for now, có thể implement sau
                 .timeline(null)

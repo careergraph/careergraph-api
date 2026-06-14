@@ -5,6 +5,7 @@ import com.hcmute.careergraph.enums.job.JobCategory;
 import com.hcmute.careergraph.persistence.dtos.request.JobCreationRequest;
 import com.hcmute.careergraph.persistence.dtos.request.JobFilterRequest;
 import com.hcmute.careergraph.persistence.dtos.request.JobRecruimentRequest;
+import com.hcmute.careergraph.persistence.dtos.request.JobSettingsUpdateRequest;
 import com.hcmute.careergraph.persistence.dtos.response.CvSuggestionResponse;
 import com.hcmute.careergraph.persistence.models.Job;
 import org.springframework.data.domain.Page;
@@ -36,6 +37,8 @@ public interface JobService {
     void activateJob(String jobId, String companyId);
 
     void deactivateJob(String jobId, String companyId);
+
+    Job updateJobSettings(String jobId, String companyId, JobSettingsUpdateRequest request);
 
     // ============================== JOB FOR CANDIDATE ==============================
 

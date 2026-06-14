@@ -411,18 +411,29 @@ public class ApplicationServiceImpl implements ApplicationService {
         if (currentStage == targetStage) {
             return;
         }
-        if (currentStage.isTerminal()) {
-            throw new RuntimeException(String.format(
-                    "Stage transition from %s to %s is not allowed for application %s",
-                    currentStage, targetStage, applicationId));
-        }
 
         Company company = Optional.ofNullable(application)
                 .map(Application::getJob)
                 .map(Job::getCompany)
                 .orElse(null);
 
+        if (targetStage == ApplicationStage.REJECTED) {
+            validateHrContactedStageActive(company, targetStage);
+            return;
+        }
+
+        if (currentStage.isTerminal()) {
+            throw new RuntimeException(String.format(
+                    "Stage transition from %s to %s is not allowed for application %s",
+                    currentStage, targetStage, applicationId));
+        }
+
         if (isHrMessagingPromotion(currentStage, targetStage)) {
+            validateHrContactedStageActive(company, targetStage);
+            return;
+        }
+
+        if (isAiScreeningPromotion(currentStage, targetStage)) {
             validateHrContactedStageActive(company, targetStage);
             return;
         }
@@ -511,6 +522,10 @@ public class ApplicationServiceImpl implements ApplicationService {
     private static boolean isHrMessagingPromotion(ApplicationStage currentStage, ApplicationStage targetStage) {
         return targetStage == ApplicationStage.HR_CONTACTED
                 && (currentStage == ApplicationStage.APPLIED || currentStage == ApplicationStage.SCREENING);
+    }
+
+    private static boolean isAiScreeningPromotion(ApplicationStage currentStage, ApplicationStage targetStage) {
+        return currentStage == ApplicationStage.APPLIED && targetStage == ApplicationStage.SCREENING;
     }
 
     private void validateHrContactedStageActive(Company company, ApplicationStage targetStage) {

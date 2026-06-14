@@ -14,6 +14,7 @@ import com.hcmute.careergraph.persistence.dtos.request.ApplicationRequest;
 import com.hcmute.careergraph.persistence.dtos.request.JobCreationRequest;
 import com.hcmute.careergraph.persistence.dtos.request.JobFilterRequest;
 import com.hcmute.careergraph.persistence.dtos.request.JobRecruimentRequest;
+import com.hcmute.careergraph.persistence.dtos.request.JobSettingsUpdateRequest;
 import com.hcmute.careergraph.persistence.dtos.response.ApplicationResponse;
 import com.hcmute.careergraph.persistence.dtos.response.CvSuggestionResponse;
 import com.hcmute.careergraph.persistence.dtos.response.JobEnumMetadataResponse;
@@ -202,6 +203,21 @@ public class JobController {
                 return RestResponse.<JobResponse>builder()
                                 .status(HttpStatus.OK)
                                 .message("Job updated successfully")
+                                .data(jobMapper.toResponse(job))
+                                .build();
+        }
+
+        @PatchMapping("/{id}/settings")
+        public RestResponse<JobResponse> updateJobSettings(
+                        @PathVariable("id") String jobId,
+                        @Valid @RequestBody JobSettingsUpdateRequest request,
+                        Authentication authentication) {
+                String companyId = securityUtils.extractCompanyId(authentication);
+                Job job = jobService.updateJobSettings(jobId, companyId, request);
+
+                return RestResponse.<JobResponse>builder()
+                                .status(HttpStatus.OK)
+                                .message("Job settings updated successfully")
                                 .data(jobMapper.toResponse(job))
                                 .build();
         }

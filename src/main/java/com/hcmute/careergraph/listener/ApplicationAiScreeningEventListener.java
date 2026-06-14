@@ -22,6 +22,7 @@ public class ApplicationAiScreeningEventListener {
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     @Async
     public void onApplicationCreated(ApplicationCreatedEvent event) {
+        log.info("Application AI screening queued for applicationId={}", event.applicationId());
         try {
             applicationAiScreeningService.screenApplication(event.applicationId());
         } catch (Exception ex) {

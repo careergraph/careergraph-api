@@ -185,6 +185,10 @@ public class Job extends BaseEntity {
     @Column(name = "cover_letter")
     private Boolean coverLetter;
 
+    @Column(name = "ai_screening_enabled")
+    @Builder.Default
+    private Boolean aiScreeningEnabled = false;
+
     // ===== Thêm status field =====
     @Enumerated(EnumType.STRING)
     @Column(name = "status")

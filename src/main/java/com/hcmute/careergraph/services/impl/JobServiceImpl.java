@@ -17,6 +17,7 @@ import com.hcmute.careergraph.persistence.documents.JobES;
 import com.hcmute.careergraph.persistence.dtos.request.JobCreationRequest;
 import com.hcmute.careergraph.persistence.dtos.request.JobFilterRequest;
 import com.hcmute.careergraph.persistence.dtos.request.JobRecruimentRequest;
+import com.hcmute.careergraph.persistence.dtos.request.JobSettingsUpdateRequest;
 import com.hcmute.careergraph.persistence.dtos.response.CvSuggestionResponse;
 import com.hcmute.careergraph.persistence.event.JobCreatedEvent;
 import com.hcmute.careergraph.persistence.models.Candidate;
@@ -241,6 +242,20 @@ public class JobServiceImpl implements JobService {
         jobRepository.save(job);
 
         log.info("Job deleted successfully with ID: {}", jobId);
+    }
+
+    @Override
+    @Transactional
+    public Job updateJobSettings(String jobId, String companyId, JobSettingsUpdateRequest request) {
+        Job job = jobRepository.findById(jobId)
+                .orElseThrow(() -> new NotFoundException("Job not found with ID: " + jobId));
+
+        if (!job.getCompany().getId().equals(companyId)) {
+            throw new BadRequestException("Job does not belong to this company");
+        }
+
+        job.setAiScreeningEnabled(Boolean.TRUE.equals(request.aiScreeningEnabled()));
+        return jobRepository.save(job);
     }
 
     @Transactional

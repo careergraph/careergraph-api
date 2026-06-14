@@ -73,6 +73,7 @@ public record JobResponse(
         // Application recruiment
         Boolean resume,
         Boolean coverLetter,
+        Boolean aiScreeningEnabled,
 
         // Timeline (optional - for detail view)
         List<JobTimelineEventResponse> timeline,
