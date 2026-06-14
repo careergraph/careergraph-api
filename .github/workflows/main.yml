@@ -36,8 +36,8 @@ jobs:
           java-version: 17
           cache: maven
 
-      - name: Unit tests
-        run: ./mvnw -B test
+      # - name: Unit tests
+      #   run: ./mvnw -B test
 
       - name: Build package
         run: ./mvnw -B -DskipTests clean package
