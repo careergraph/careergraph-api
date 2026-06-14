@@ -8,6 +8,7 @@ import com.hcmute.careergraph.persistence.dtos.request.MessagingRequests;
 import com.hcmute.careergraph.persistence.dtos.response.MessagingResponses;
 import com.hcmute.careergraph.persistence.models.*;
 import com.hcmute.careergraph.repositories.*;
+import com.hcmute.careergraph.services.ApplicationService;
 import com.hcmute.careergraph.services.NotificationService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -60,6 +61,8 @@ class MessageServiceImplTest {
   private UserBlockRepository userBlockRepository;
   @Mock
   private NotificationService notificationService;
+  @Mock
+  private ApplicationService applicationService;
   @Mock
   private PlatformTransactionManager transactionManager;
 
@@ -209,6 +212,82 @@ class MessageServiceImplTest {
     assertNotNull(thread.getLastMessageAt());
     assertEquals("Hello candidate", thread.getLastMessagePreview());
     verify(notificationService).onNewMessage(any(Message.class), eq(thread));
+  }
+
+  @Test
+  void sendMessage_shouldPromoteApplicationWhenHrMessagesFromKanbanThread() {
+    Application application = Application.builder()
+        .id("app-1")
+        .candidate(candidate)
+        .build();
+    thread.setApplication(application);
+
+    MessagingRequests.SendMessageRequest request = new MessagingRequests.SendMessageRequest();
+    request.setContent("Hello candidate");
+    request.setContentType(MessageContentType.TEXT);
+
+    when(messageThreadRepository.findById(thread.getId())).thenReturn(Optional.of(thread));
+    when(applicationRepository.findById(application.getId())).thenReturn(Optional.of(application));
+    when(messageReadRepository.findByThreadIdAndAccountId(thread.getId(), hrAccount.getId()))
+        .thenReturn(Optional.empty());
+    when(messageReadRepository.findByThreadIdAndAccountId(thread.getId(), candidateAccount.getId()))
+        .thenReturn(Optional.empty());
+
+    Message savedMessage = Message.builder()
+        .id("msg-1")
+        .thread(thread)
+        .sender(hrAccount)
+        .content("Hello candidate")
+        .contentType(MessageContentType.TEXT)
+        .deleted(false)
+        .build();
+    savedMessage.setCreatedDate(LocalDateTime.now());
+
+    when(messageRepository.save(any(Message.class))).thenReturn(savedMessage);
+    when(messageThreadRepository.save(any(MessageThread.class))).thenAnswer(inv -> inv.getArgument(0));
+    when(messageReadRepository.save(any(MessageRead.class))).thenAnswer(inv -> inv.getArgument(0));
+
+    messageService.sendMessage(hrAccount, thread.getId(), request);
+
+    verify(applicationService).promoteToHrContactedOnHrMessage(application.getId(), hrAccount);
+  }
+
+  @Test
+  void sendMessage_shouldNotPromoteApplicationWhenCandidateReplies() {
+    Application application = Application.builder()
+        .id("app-1")
+        .candidate(candidate)
+        .build();
+    thread.setApplication(application);
+
+    MessagingRequests.SendMessageRequest request = new MessagingRequests.SendMessageRequest();
+    request.setContent("Xin chao HR");
+    request.setContentType(MessageContentType.TEXT);
+
+    when(messageThreadRepository.findById(thread.getId())).thenReturn(Optional.of(thread));
+    when(applicationRepository.findById(application.getId())).thenReturn(Optional.of(application));
+    when(messageReadRepository.findByThreadIdAndAccountId(thread.getId(), candidateAccount.getId()))
+        .thenReturn(Optional.empty());
+    when(messageReadRepository.findByThreadIdAndAccountId(thread.getId(), hrAccount.getId()))
+        .thenReturn(Optional.empty());
+
+    Message savedMessage = Message.builder()
+        .id("msg-candidate")
+        .thread(thread)
+        .sender(candidateAccount)
+        .content("Xin chao HR")
+        .contentType(MessageContentType.TEXT)
+        .deleted(false)
+        .build();
+    savedMessage.setCreatedDate(LocalDateTime.now());
+
+    when(messageRepository.save(any(Message.class))).thenReturn(savedMessage);
+    when(messageThreadRepository.save(any(MessageThread.class))).thenAnswer(inv -> inv.getArgument(0));
+    when(messageReadRepository.save(any(MessageRead.class))).thenAnswer(inv -> inv.getArgument(0));
+
+    messageService.sendMessage(candidateAccount, thread.getId(), request);
+
+    verify(applicationService, never()).promoteToHrContactedOnHrMessage(anyString(), any(Account.class));
   }
 
   @Test

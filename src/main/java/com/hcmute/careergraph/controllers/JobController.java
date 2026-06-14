@@ -121,7 +121,7 @@ public class JobController {
 
                 boolean applied = false;
                 if (candidateId != null) {
-                        applied = applicationService.existsApplicationsByJobIdAndCandidateId(id, candidateId);
+                        applied = applicationService.isApplicationReapplyBlocked(id, candidateId);
                 }
                 boolean idSaved = false;
                 if (candidateId != null) {

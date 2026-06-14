@@ -56,6 +56,12 @@ public class ApplicationServiceImpl implements ApplicationService {
     private final CompanyRecruitmentStageService companyRecruitmentStageService;
 
     private static final String SUBMISSION_NOTE = "Ứng viên đã nộp hồ sơ.";
+    private static final String REAPPLY_NOTE = "Ứng viên đã nộp lại hồ sơ.";
+    private static final String HR_MESSAGE_CONTACT_NOTE = "HR đã liên hệ với ứng viên qua tin nhắn.";
+    private static final Set<ApplicationStage> REAPPLY_ALLOWED_STAGES = EnumSet.of(
+            ApplicationStage.APPLIED,
+            ApplicationStage.REJECTED,
+            ApplicationStage.OFFBOARDED);
     private static final Map<ApplicationStage, Set<ApplicationStage>> BASE_TRANSITIONS = buildBaseTransitions();
 
     @Override
@@ -76,6 +82,16 @@ public class ApplicationServiceImpl implements ApplicationService {
         String appliedTimestamp = Optional.ofNullable(request.getAppliedDate())
                 .filter(StringUtils::hasText)
                 .orElse(now.format(DateTimeFormatter.ISO_LOCAL_DATE_TIME));
+
+        Optional<Application> existingApplication = findLatestApplication(request.getJobId(),
+                request.getCandidateId());
+        if (existingApplication.isPresent()) {
+            Application existing = existingApplication.get();
+            if (!REAPPLY_ALLOWED_STAGES.contains(existing.getCurrentStage())) {
+                throw new BadRequestException("You have already applied for this job");
+            }
+            return reapplyExistingApplication(existing, request, candidate, appliedTimestamp, now);
+        }
 
         // Create application entity
         Application application = Application.builder()
@@ -106,6 +122,47 @@ public class ApplicationServiceImpl implements ApplicationService {
         applicationEventPublisher.publishEvent(new ApplicationCreatedEvent(savedApplication.getId()));
 
         return savedApplication;
+    }
+
+    private Application reapplyExistingApplication(
+            Application application,
+            ApplicationRequest request,
+            Candidate candidate,
+            String appliedTimestamp,
+            LocalDateTime now) {
+        ApplicationStage previousStage = application.getCurrentStage();
+
+        application.setCoverLetter(request.getCoverLetter());
+        application.setResumeUrl(request.getResumeUrl());
+        application.setNotes(request.getNotes());
+        application.setAppliedDate(appliedTimestamp);
+
+        if (previousStage != ApplicationStage.APPLIED) {
+            application.setCurrentStage(ApplicationStage.APPLIED);
+            application.setStageChangedAt(now);
+            application.setCurrentStageNote(REAPPLY_NOTE);
+            application.addStageHistory(ApplicationStageHistory.builder()
+                    .fromStage(previousStage)
+                    .toStage(ApplicationStage.APPLIED)
+                    .note(REAPPLY_NOTE)
+                    .changedBy(resolveActorLabel(null, candidate))
+                    .changedAt(now)
+                    .build());
+        } else {
+            application.setCurrentStageNote(SUBMISSION_NOTE);
+            application.setStageChangedAt(now);
+        }
+
+        Application savedApplication = applicationRepository.save(application);
+        notificationService.onNewApplication(savedApplication);
+        dispatchStageEmail(savedApplication, ApplicationStage.APPLIED, REAPPLY_NOTE, null);
+        log.info("Application {} re-submitted successfully", savedApplication.getId());
+        applicationEventPublisher.publishEvent(new ApplicationCreatedEvent(savedApplication.getId()));
+        return savedApplication;
+    }
+
+    private Optional<Application> findLatestApplication(String jobId, String candidateId) {
+        return applicationRepository.findFirstByCandidateIdAndJobIdOrderByCreatedDateDesc(candidateId, jobId);
     }
 
     private void validateJobIsAcceptingApplications(Job job) {
@@ -205,6 +262,14 @@ public class ApplicationServiceImpl implements ApplicationService {
     @Override
     public boolean existsApplicationsByJobIdAndCandidateId(String jobId, String candidateId) {
         return applicationRepository.existsApplicationsByJobIdAndCandidateId(jobId, candidateId);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public boolean isApplicationReapplyBlocked(String jobId, String candidateId) {
+        return findLatestApplication(jobId, candidateId)
+                .map(application -> !REAPPLY_ALLOWED_STAGES.contains(application.getCurrentStage()))
+                .orElse(false);
     }
 
     @Override
@@ -309,6 +374,32 @@ public class ApplicationServiceImpl implements ApplicationService {
         return saved;
     }
 
+    @Override
+    public void promoteToHrContactedOnHrMessage(String applicationId, Account hrAccount) {
+        if (!StringUtils.hasText(applicationId)) {
+            return;
+        }
+
+        Application application = applicationRepository.findById(applicationId).orElse(null);
+        if (application == null) {
+            return;
+        }
+
+        ApplicationStage currentStage = application.getCurrentStage();
+        if (currentStage != ApplicationStage.APPLIED && currentStage != ApplicationStage.SCREENING) {
+            return;
+        }
+
+        ApplicationStageUpdateRequest request = new ApplicationStageUpdateRequest();
+        request.setStage(ApplicationStage.HR_CONTACTED);
+        request.setNote(HR_MESSAGE_CONTACT_NOTE);
+        if (hrAccount != null && hrAccount.getCompany() != null) {
+            request.setChangeBy(hrAccount.getCompany().getId());
+        }
+
+        updateApplicationStage(applicationId, request);
+    }
+
     private void validateStageTransition(
             Application application,
             ApplicationStage currentStage,
@@ -330,6 +421,11 @@ public class ApplicationServiceImpl implements ApplicationService {
                 .map(Application::getJob)
                 .map(Job::getCompany)
                 .orElse(null);
+
+        if (isHrMessagingPromotion(currentStage, targetStage)) {
+            validateHrContactedStageActive(company, targetStage);
+            return;
+        }
 
         if (company != null) {
             List<CompanyRecruitmentStage> stages = companyRecruitmentStageService.getCompanyStages(company.getId());
@@ -410,6 +506,21 @@ public class ApplicationServiceImpl implements ApplicationService {
         }
 
         return null;
+    }
+
+    private static boolean isHrMessagingPromotion(ApplicationStage currentStage, ApplicationStage targetStage) {
+        return targetStage == ApplicationStage.HR_CONTACTED
+                && (currentStage == ApplicationStage.APPLIED || currentStage == ApplicationStage.SCREENING);
+    }
+
+    private void validateHrContactedStageActive(Company company, ApplicationStage targetStage) {
+        if (company != null && ApplicationStage.isConfigurableStage(targetStage)) {
+            boolean activeStage = companyRecruitmentStageService
+                    .isStageActiveForCompany(company.getId(), targetStage);
+            if (!activeStage) {
+                throw new RuntimeException("Stage hiện đã bị tắt trong pipeline của công ty");
+            }
+        }
     }
 
     private static Map<ApplicationStage, Set<ApplicationStage>> buildBaseTransitions() {

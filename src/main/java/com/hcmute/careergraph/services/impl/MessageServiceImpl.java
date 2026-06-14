@@ -10,6 +10,7 @@ import com.hcmute.careergraph.persistence.dtos.request.MessagingRequests;
 import com.hcmute.careergraph.persistence.dtos.response.MessagingResponses;
 import com.hcmute.careergraph.persistence.models.*;
 import com.hcmute.careergraph.repositories.*;
+import com.hcmute.careergraph.services.ApplicationService;
 import com.hcmute.careergraph.services.MessageService;
 import com.hcmute.careergraph.services.NotificationService;
 import lombok.RequiredArgsConstructor;
@@ -59,6 +60,7 @@ public class MessageServiceImpl implements MessageService {
   private final ThreadDeletionRepository threadDeletionRepository;
   private final UserBlockRepository userBlockRepository;
   private final NotificationService notificationService;
+  private final ApplicationService applicationService;
   private final org.springframework.transaction.PlatformTransactionManager transactionManager;
 
   @Value("${app.messaging.unsend-window-seconds:60}")
@@ -283,6 +285,8 @@ public class MessageServiceImpl implements MessageService {
     messageReadRepository.save(senderRead);
 
     notificationService.onNewMessage(savedMessage, thread);
+
+    tryPromoteApplicationOnHrMessage(currentAccount, thread, jobContextId);
 
     LocalDateTime otherReadAt = resolveOtherAccount(currentAccount, thread)
         .flatMap(otherAccount -> messageReadRepository.findByThreadIdAndAccountId(threadId, otherAccount.getId()))
@@ -559,6 +563,38 @@ public class MessageServiceImpl implements MessageService {
     }
     return applicationRepository.findById(applicationId)
         .orElseThrow(() -> new NotFoundException("Application not found"));
+  }
+
+  private void tryPromoteApplicationOnHrMessage(Account currentAccount,
+      MessageThread thread,
+      String jobContextId) {
+    if (resolveRole(currentAccount) != Role.HR) {
+      return;
+    }
+
+    resolveApplicationForHrContact(thread, jobContextId).ifPresent(application -> {
+      try {
+        applicationService.promoteToHrContactedOnHrMessage(application.getId(), currentAccount);
+      } catch (Exception ex) {
+        log.warn("Failed to auto-promote application {} after HR message: {}",
+            application.getId(), ex.getMessage(), ex);
+      }
+    });
+  }
+
+  private Optional<Application> resolveApplicationForHrContact(MessageThread thread, String jobContextId) {
+    if (StringUtils.hasText(jobContextId)) {
+      return applicationRepository.findFirstByCandidateIdAndJobIdOrderByCreatedDateDesc(
+          thread.getCandidate().getId(),
+          jobContextId);
+    }
+
+    Application threadApplication = thread.getApplication();
+    if (threadApplication != null && StringUtils.hasText(threadApplication.getId())) {
+      return applicationRepository.findById(threadApplication.getId());
+    }
+
+    return Optional.empty();
   }
 
   private void validateThreadAccess(MessageThread thread, Account currentAccount) {
