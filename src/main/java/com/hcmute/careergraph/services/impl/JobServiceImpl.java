@@ -462,9 +462,10 @@ public class JobServiceImpl implements JobService {
 
     @Override
     public List<Job> getJobsForAnonymousUser() {
+        String currentDate = LocalDate.now().toString();
 
         // Get new job
-        List<Job> newJobs = jobRepository.findAllByOrderByCreatedDateDesc(PageRequest.of(0, 8));
+        List<Job> newJobs = jobRepository.findLatestActiveJobs(currentDate, PageRequest.of(0, 8));
         if (newJobs == null) {
             return new ArrayList<>();
         }
@@ -475,8 +476,9 @@ public class JobServiceImpl implements JobService {
     @Transactional(readOnly = true)
     @Override
     public List<Job> getJobsPopular() {
+        String currentDate = LocalDate.now().toString();
 
-        List<Job> jobsPopular = jobRepository.findPopularJob();
+        List<Job> jobsPopular = jobRepository.findPopularJob(currentDate);
         if (jobsPopular.isEmpty()) {
             return new ArrayList<>();
         }

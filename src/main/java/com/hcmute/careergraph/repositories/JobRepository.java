@@ -101,9 +101,10 @@ public interface JobRepository extends JpaRepository<Job, String> {
     @Query("""
                 SELECT j FROM Job j
                 WHERE j.status = 'ACTIVE'
+                    AND (j.expiryDate IS NULL OR j.expiryDate >= :currentDate)
                 ORDER BY j.views DESC, j.applicants DESC, j.liked DESC, j.shared DESC
             """)
-    List<Job> findPopularJob();
+    List<Job> findPopularJob(@Param("currentDate") String currentDate);
 
     @Query(value = """
                 SELECT DISTINCT j.*
@@ -144,14 +145,21 @@ public interface JobRepository extends JpaRepository<Job, String> {
                 SELECT j
                 FROM Job j
                 WHERE j.status = 'ACTIVE'
-                    AND j.expiryDate >= :currentDate
+                    AND (j.expiryDate IS NULL OR j.expiryDate >= :currentDate)
                     AND (:excludeIds IS NULL OR j.id NOT IN :excludeIds)
                 ORDER BY j.createdDate DESC
             """)
     List<Job> findLatestJobsExcluding(@Param("currentDate") String currentDate,
             @Param("excludeIds") Collection<String> excludeIds);
 
-    List<Job> findAllByOrderByCreatedDateDesc(Pageable pageable);
+    @Query("""
+                SELECT j
+                FROM Job j
+                WHERE j.status = 'ACTIVE'
+                    AND (j.expiryDate IS NULL OR j.expiryDate >= :currentDate)
+                ORDER BY j.createdDate DESC
+            """)
+    List<Job> findLatestActiveJobs(@Param("currentDate") String currentDate, Pageable pageable);
 
     @Query("""
                 SELECT COALESCE(SUM(j.numberOfPositions), 0)
