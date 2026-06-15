@@ -1,5 +1,7 @@
 package com.hcmute.careergraph.config.app;
 
+import com.hcmute.careergraph.config.properties.ElasticsearchSyncProperties;
+import com.hcmute.careergraph.config.properties.EmbeddingRuntimeProperties;
 import com.hcmute.careergraph.helper.VietnamProvinceUtils;
 import com.hcmute.careergraph.persistence.documents.JobES;
 import com.hcmute.careergraph.persistence.event.JobCreatedEvent;
@@ -16,7 +18,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.context.annotation.Profile;
 import org.springframework.context.ApplicationEventPublisher;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.annotation.Order;
 import org.springframework.data.elasticsearch.core.ElasticsearchOperations;
 import org.springframework.stereotype.Component;
@@ -50,21 +51,8 @@ public class ElasticsearchDataInitializer implements CommandLineRunner {
     private final JobNotificationQueueRepository queueRepo;
     private final NewlyPostedJobRepository newlyPostedJobRepo;
     private final EmbedService embeddingModel;
-
-    @Value("${APP_ES_SYNC_JOBS_ENABLED:false}")
-    private boolean syncJobsEnabled;
-
-    @Value("${APP_ES_FORCE_FULL_SYNC:false}")
-    private boolean forceFullSync;
-
-    @Value("${APP_ES_ALLOW_GEMINI_FALLBACK:false}")
-    private boolean allowGeminiFallback;
-
-    @Value("${APP_EMBED_USE_LOCAL_FIRST:true}")
-    private boolean useLocalFirst;
-
-    @Value("${APP_ES_MAX_EMBEDDINGS_PER_RUN:50}")
-    private int maxEmbeddingsPerRun;
+    private final ElasticsearchSyncProperties syncProperties;
+    private final EmbeddingRuntimeProperties embeddingRuntimeProperties;
 
     private static final List<String> KEYWORDS = List.of(
             "java",
@@ -90,7 +78,7 @@ public class ElasticsearchDataInitializer implements CommandLineRunner {
 
     @Override
     public void run(String... args) throws Exception {
-        if (!syncJobsEnabled) {
+        if (!syncProperties.getJobs().isSyncEnabled()) {
             log.info("Skip Job Elasticsearch synchronization because APP_ES_SYNC_JOBS_ENABLED=false");
             return;
         }
@@ -98,8 +86,8 @@ public class ElasticsearchDataInitializer implements CommandLineRunner {
     }
 
     public ElasticsearchSyncResult syncNow(Boolean forceOverride, Integer maxEmbeddingsOverride) {
-        boolean effectiveForce = forceOverride != null ? forceOverride : forceFullSync;
-        int effectiveMaxEmbeddings = maxEmbeddingsOverride != null ? maxEmbeddingsOverride : maxEmbeddingsPerRun;
+        boolean effectiveForce = forceOverride != null ? forceOverride : syncProperties.getJobs().isForceFullSync();
+        int effectiveMaxEmbeddings = maxEmbeddingsOverride != null ? maxEmbeddingsOverride : syncProperties.getJobs().getMaxEmbeddingsPerRun();
         boolean recreatedIndexAfterDimensionMismatch = false;
 
         final int MAX_RETRIES = 5;
@@ -326,11 +314,11 @@ public class ElasticsearchDataInitializer implements CommandLineRunner {
     }
 
     private List<float[]> embedBatch(List<String> batchTexts) {
-        if (useLocalFirst) {
+        if (embeddingRuntimeProperties.isUseLocalFirst()) {
             try {
                 return huggingFaceEmbeddingService.embed(batchTexts);
             } catch (Exception ex) {
-                if (!allowGeminiFallback) {
+                if (!embeddingRuntimeProperties.isAllowGeminiFallback()) {
                     throw new IllegalStateException(LOCAL_EMBEDDING_UNAVAILABLE_MESSAGE, ex);
                 }
                 log.warn("Local embedding service unavailable, falling back to configured Spring AI embedding model: {}",

@@ -1,5 +1,7 @@
 package com.hcmute.careergraph.config.app;
 
+import com.hcmute.careergraph.config.properties.ElasticsearchSyncProperties;
+import com.hcmute.careergraph.config.properties.EmbeddingRuntimeProperties;
 import com.hcmute.careergraph.persistence.documents.CandidateES;
 import com.hcmute.careergraph.persistence.models.Candidate;
 import com.hcmute.careergraph.persistence.models.File;
@@ -8,12 +10,10 @@ import com.hcmute.careergraph.enums.common.Status;
 import com.hcmute.careergraph.repositories.CandidateESRepository;
 import com.hcmute.careergraph.repositories.CandidateRepository;
 import com.hcmute.careergraph.repositories.FileRepository;
-import com.hcmute.careergraph.services.CandidateESService;
 import com.hcmute.careergraph.services.HuggingFaceEmbeddingService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.CommandLineRunner;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Profile;
 import org.springframework.core.annotation.Order;
 import org.springframework.data.elasticsearch.core.ElasticsearchOperations;
@@ -71,24 +71,10 @@ public class CandidateElasticsearchDataInitializer implements CommandLineRunner 
   private final CandidateESRepository candidateESRepository;
   private final ElasticsearchOperations elasticsearchOperations;
   private final FileRepository fileRepository;
-  private final CandidateESService candidateESService;
   private final HuggingFaceEmbeddingService huggingFaceEmbeddingService;
   private final EmbeddingModel embeddingModel;
-
-  @Value("${APP_ES_SYNC_CANDIDATES_ENABLED:false}")
-  private boolean syncCandidatesEnabled;
-
-  @Value("${APP_ES_FORCE_CANDIDATES_FULL_SYNC:false}")
-  private boolean forceFullSync;
-
-  @Value("${APP_ES_ALLOW_GEMINI_FALLBACK:false}")
-  private boolean allowGeminiFallback;
-
-  @Value("${APP_EMBED_USE_LOCAL_FIRST:true}")
-  private boolean useLocalFirst;
-
-  @Value("${APP_ES_MAX_CANDIDATE_EMBEDDINGS_PER_RUN:30}")
-  private int maxEmbeddingsPerRun;
+  private final ElasticsearchSyncProperties syncProperties;
+  private final EmbeddingRuntimeProperties embeddingRuntimeProperties;
 
   private static final int EMBEDDING_BATCH_SIZE = 100;
   private static final int MAX_RETRIES = 5;
@@ -96,7 +82,7 @@ public class CandidateElasticsearchDataInitializer implements CommandLineRunner 
 
   @Override
   public void run(String... args) throws Exception {
-    if (!syncCandidatesEnabled) {
+    if (!syncProperties.getCandidates().isSyncEnabled()) {
       log.info("Skip Candidate Elasticsearch synchronization because APP_ES_SYNC_CANDIDATES_ENABLED=false");
       return;
     }
@@ -104,36 +90,12 @@ public class CandidateElasticsearchDataInitializer implements CommandLineRunner 
   }
 
   public ElasticsearchSyncResult syncNow(Boolean forceOverride, Integer maxEmbeddingsOverride) {
-    boolean effectiveForce = forceOverride != null ? forceOverride : forceFullSync;
-    int effectiveMaxEmbeddings = maxEmbeddingsOverride != null ? maxEmbeddingsOverride : maxEmbeddingsPerRun;
-    try {
-      int synced = candidateESService.syncAllCandidates();
-      return new ElasticsearchSyncResult(
-          "candidates",
-          false,
-          effectiveForce,
-          effectiveMaxEmbeddings,
-          synced,
-          0,
-          0,
-          "Candidate Elasticsearch synchronization completed via CandidateESService.");
-    } catch (Exception e) {
-      log.error("Candidate Elasticsearch synchronization failed: {}", e.getMessage(), e);
-      return new ElasticsearchSyncResult(
-          "candidates",
-          true,
-          effectiveForce,
-          effectiveMaxEmbeddings,
-          0,
-          0,
-          0,
-          "Candidate Elasticsearch synchronization failed: " + e.getMessage());
-    }
+    return syncNowLegacy(forceOverride, maxEmbeddingsOverride);
   }
 
   public ElasticsearchSyncResult syncNowLegacy(Boolean forceOverride, Integer maxEmbeddingsOverride) {
-    boolean effectiveForce = forceOverride != null ? forceOverride : forceFullSync;
-    int effectiveMaxEmbeddings = maxEmbeddingsOverride != null ? maxEmbeddingsOverride : maxEmbeddingsPerRun;
+    boolean effectiveForce = forceOverride != null ? forceOverride : syncProperties.getCandidates().isForceFullSync();
+    int effectiveMaxEmbeddings = maxEmbeddingsOverride != null ? maxEmbeddingsOverride : syncProperties.getCandidates().getMaxEmbeddingsPerRun();
     boolean recreatedIndexAfterDimensionMismatch = false;
 
     for (int attempt = 1; attempt <= MAX_RETRIES; attempt++) {
@@ -432,11 +394,11 @@ public class CandidateElasticsearchDataInitializer implements CommandLineRunner 
   }
 
   private List<float[]> embedBatch(List<String> batchTexts) {
-    if (useLocalFirst) {
+    if (embeddingRuntimeProperties.isUseLocalFirst()) {
       try {
         return huggingFaceEmbeddingService.embed(batchTexts);
       } catch (Exception ex) {
-        if (!allowGeminiFallback) {
+        if (!embeddingRuntimeProperties.isAllowGeminiFallback()) {
           throw new IllegalStateException(LOCAL_EMBEDDING_UNAVAILABLE_MESSAGE, ex);
         }
         log.warn("Local candidate embedding service unavailable, falling back to configured Spring AI embedding model: {}",
