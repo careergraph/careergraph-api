@@ -170,6 +170,32 @@ management:
       show-details: never
 
 app:
+  embed:
+    # true: ưu tiên local FastAPI trước; false: ưu tiên Gemini trước.
+    use-local-first: ${APP_EMBED_USE_LOCAL_FIRST:true}
+    # Nếu local embedding lỗi thì cho phép fallback sang Gemini.
+    allow-gemini-fallback: ${APP_EMBED_ALLOW_GEMINI_FALLBACK:${APP_ES_ALLOW_GEMINI_FALLBACK:false}}
+  es:
+    jobs:
+      sync-enabled: ${APP_ES_SYNC_JOBS_ENABLED:false}
+      force-full-sync: ${APP_ES_FORCE_FULL_SYNC:false}
+      max-embeddings-per-run: ${APP_ES_MAX_EMBEDDINGS_PER_RUN:50}
+    candidates:
+      sync-enabled: ${APP_ES_SYNC_CANDIDATES_ENABLED:false}
+      force-full-sync: ${APP_ES_FORCE_CANDIDATES_FULL_SYNC:false}
+      max-embeddings-per-run: ${APP_ES_MAX_CANDIDATE_EMBEDDINGS_PER_RUN:30}
+    cron:
+      enabled: ${APP_ES_CRON_ENABLED:false}
+      jobs:
+        enabled: ${APP_ES_CRON_JOBS_ENABLED:true}
+        fixed-delay-ms: ${APP_ES_CRON_JOBS_FIXED_DELAY_MS:120000}
+        initial-delay-ms: ${APP_ES_CRON_JOBS_INITIAL_DELAY_MS:120000}
+        batch-size: ${APP_ES_CRON_JOBS_BATCH_SIZE:10}
+      candidates:
+        enabled: ${APP_ES_CRON_CANDIDATES_ENABLED:true}
+        fixed-delay-ms: ${APP_ES_CRON_CANDIDATES_FIXED_DELAY_MS:240000}
+        initial-delay-ms: ${APP_ES_CRON_CANDIDATES_INITIAL_DELAY_MS:240000}
+        batch-size: ${APP_ES_CRON_CANDIDATES_BATCH_SIZE:5}
   messaging:
     unsend-window-seconds: ${APP_MESSAGING_UNSEND_WINDOW_SECONDS:60}
   seed:

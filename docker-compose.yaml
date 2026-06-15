@@ -93,53 +93,54 @@ services:
   # =============================================
 
   # --- APP: Spring Boot API ---
-  # careergraph-api:
-  #   build:
-  #     context: .
-  #     dockerfile: Dockerfile
-  #   container_name: careergraph-api
-  #   restart: unless-stopped
-  #   ports:
-  #     - "${SERVER_PORT_EXPOSE:-8080}:${SERVER_PORT_CONTAINER:-8080}"
-  #   env_file:
-  #     - .env.dev
-  #   environment:
-  #     SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-dev}
-  #     SERVER_PORT: ${SERVER_PORT:-8080}
-  #     TZ: ${TZ:-Asia/Ho_Chi_Minh}
-  #     JAVA_TIME_ZONE: ${JAVA_TIME_ZONE:-Asia/Ho_Chi_Minh}
-  #     SPRING_DATASOURCE_URL: jdbc:postgresql://careergraph-db:5432/${POSTGRES_DB:-careergraph}
-  #     SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-postgres}
-  #     SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
-  #     SPRING_REDIS_HOST: careergraph-redis
-  #     SPRING_REDIS_PORT: 6379
-  #     SPRING_REDIS_PASSWORD: ${REDIS_PASSWORD:-careergraph@Redis2026}
-  #     SPRING_ELASTICSEARCH_URIS: http://careergraph-elasticsearch:9200
-  #     GEMINI_API_KEY: ${GEMINI_API_KEY:-}
-  #     GOOGLE_PROJECT_ID: ${GOOGLE_PROJECT_ID:-}
-  #   labels:
-  #     - "traefik.enable=true"
-  #     - "traefik.docker.network=proxy"
-  #     - "traefik.http.routers.api.rule=Host(`api.thinz.io.vn`)"
-  #     - "traefik.http.routers.api.entrypoints=websecure"
-  #     - "traefik.http.routers.api.tls.certresolver=le"
-  #     - "traefik.http.services.api.loadbalancer.server.port=8080"
-  #   depends_on:
-  #     careergraph-db:
-  #       condition: service_healthy
-  #     careergraph-redis:
-  #       condition: service_healthy
-  #     careergraph-elasticsearch:
-  #       condition: service_healthy
-  #   networks:
-  #     - careergraph-network
+  careergraph-api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: careergraph-api
+    restart: unless-stopped
+    ports:
+      - "${SERVER_PORT_EXPOSE:-8080}:${SERVER_PORT_CONTAINER:-8080}"
+    env_file:
+      - .env
+    environment:
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-dev}
+      SERVER_PORT: ${SERVER_PORT:-8080}
+      TZ: ${TZ:-Asia/Ho_Chi_Minh}
+      JAVA_TIME_ZONE: ${JAVA_TIME_ZONE:-Asia/Ho_Chi_Minh}
+      SPRING_DATASOURCE_URL: jdbc:postgresql://careergraph-db:5432/${POSTGRES_DB:-careergraph}
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-postgres}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      SPRING_REDIS_HOST: careergraph-redis
+      SPRING_REDIS_PORT: 6379
+      SPRING_REDIS_PASSWORD: ${REDIS_PASSWORD:-careergraph@Redis2026}
+      SPRING_ELASTICSEARCH_URIS: http://careergraph-elasticsearch:9200
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      GOOGLE_PROJECT_ID: ${GOOGLE_PROJECT_ID:-}
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=proxy"
+      - "traefik.http.routers.api.rule=Host(`api.thinz.io.vn`)"
+      - "traefik.http.routers.api.entrypoints=websecure"
+      - "traefik.http.routers.api.tls.certresolver=le"
+      - "traefik.http.services.api.loadbalancer.server.port=8080"
+    depends_on:
+      careergraph-db:
+        condition: service_healthy
+      careergraph-redis:
+        condition: service_healthy
+      careergraph-elasticsearch:
+        condition: service_healthy
+    networks:
+      - careergraph-network
 
 # =============================================
 # NETWORKS & VOLUMES
 # =============================================
 networks:
   careergraph-network:
-    driver: bridge
+    name: careergraph-network
+    external: true
   proxy:
     external: true
 

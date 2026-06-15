@@ -1,8 +1,8 @@
 package com.hcmute.careergraph.config.app;
 
+import com.hcmute.careergraph.config.properties.ElasticsearchSyncProperties;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Profile;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
@@ -17,33 +17,19 @@ public class ElasticsearchSyncScheduler {
 
   private final ElasticsearchDataInitializer jobSyncInitializer;
   private final CandidateElasticsearchDataInitializer candidateSyncInitializer;
+  private final ElasticsearchSyncProperties syncProperties;
 
   private final AtomicBoolean jobSyncRunning = new AtomicBoolean(false);
   private final AtomicBoolean candidateSyncRunning = new AtomicBoolean(false);
 
-  @Value("${APP_ES_CRON_ENABLED:false}")
-  private boolean cronEnabled;
-
-  @Value("${APP_ES_CRON_JOBS_ENABLED:true}")
-  private boolean jobCronEnabled;
-
-  @Value("${APP_ES_CRON_CANDIDATES_ENABLED:true}")
-  private boolean candidateCronEnabled;
-
-  @Value("${APP_ES_CRON_JOBS_BATCH_SIZE:10}")
-  private int jobCronBatchSize;
-
-  @Value("${APP_ES_CRON_CANDIDATES_BATCH_SIZE:5}")
-  private int candidateCronBatchSize;
-
   @Scheduled(
-    fixedDelayString = "${APP_ES_CRON_JOBS_FIXED_DELAY_MS:120000}",
-    initialDelayString = "${APP_ES_CRON_JOBS_INITIAL_DELAY_MS:120000}")
+    fixedDelayString = "${app.es.cron.jobs.fixed-delay-ms:120000}",
+    initialDelayString = "${app.es.cron.jobs.initial-delay-ms:120000}")
   public void syncJobsOnSchedule() {
-    if (!cronEnabled) {
+    if (!syncProperties.getCron().isEnabled()) {
       return;
     }
-    if (!jobCronEnabled) {
+    if (!syncProperties.getCron().getJobs().isEnabled()) {
       return;
     }
     if (!jobSyncRunning.compareAndSet(false, true)) {
@@ -52,7 +38,7 @@ public class ElasticsearchSyncScheduler {
     }
 
     try {
-      ElasticsearchSyncResult result = jobSyncInitializer.syncNow(null, jobCronBatchSize);
+      ElasticsearchSyncResult result = jobSyncInitializer.syncNow(null, syncProperties.getCron().getJobs().getBatchSize());
       log.info("Scheduled job Elasticsearch sync finished: batchSize={}, indexed={}, unchanged={}, pending={}, skipped={}, message={}",
         result.batchSize(),
         result.indexed(),
@@ -68,13 +54,13 @@ public class ElasticsearchSyncScheduler {
   }
 
   @Scheduled(
-    fixedDelayString = "${APP_ES_CRON_CANDIDATES_FIXED_DELAY_MS:240000}",
-    initialDelayString = "${APP_ES_CRON_CANDIDATES_INITIAL_DELAY_MS:240000}")
+    fixedDelayString = "${app.es.cron.candidates.fixed-delay-ms:240000}",
+    initialDelayString = "${app.es.cron.candidates.initial-delay-ms:240000}")
   public void syncCandidatesOnSchedule() {
-    if (!cronEnabled) {
+    if (!syncProperties.getCron().isEnabled()) {
       return;
     }
-    if (!candidateCronEnabled) {
+    if (!syncProperties.getCron().getCandidates().isEnabled()) {
       return;
     }
     if (!candidateSyncRunning.compareAndSet(false, true)) {
@@ -83,7 +69,7 @@ public class ElasticsearchSyncScheduler {
     }
 
     try {
-      ElasticsearchSyncResult result = candidateSyncInitializer.syncNow(null, candidateCronBatchSize);
+      ElasticsearchSyncResult result = candidateSyncInitializer.syncNow(null, syncProperties.getCron().getCandidates().getBatchSize());
       log.info("Scheduled candidate Elasticsearch sync finished: batchSize={}, indexed={}, unchanged={}, pending={}, skipped={}, message={}",
         result.batchSize(),
         result.indexed(),

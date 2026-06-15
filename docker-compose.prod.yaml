@@ -145,7 +145,8 @@ services:
 # =============================================
 networks:
   careergraph-network:
-    driver: bridge
+    name: careergraph-network
+    external: true
   proxy:
     external: true
 

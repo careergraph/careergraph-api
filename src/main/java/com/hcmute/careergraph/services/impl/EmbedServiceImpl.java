@@ -2,9 +2,9 @@ package com.hcmute.careergraph.services.impl;
 
 import com.hcmute.careergraph.services.EmbedService;
 import com.hcmute.careergraph.services.HuggingFaceEmbeddingService;
+import com.hcmute.careergraph.config.properties.EmbeddingRuntimeProperties;
 import lombok.RequiredArgsConstructor;
 
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.ai.embedding.EmbeddingModel;
 import org.springframework.stereotype.Service;
 
@@ -24,27 +24,23 @@ public class EmbedServiceImpl implements EmbedService {
 
     private final EmbeddingModel embeddingModel;
 
-    @Value("${APP_EMBED_ALLOW_GEMINI_FALLBACK:${APP_ES_ALLOW_GEMINI_FALLBACK:false}}")
-    private boolean allowGeminiFallback;
-
-    @Value("${APP_EMBED_USE_LOCAL_FIRST:true}")
-    private boolean useLocalFirst;
+    private final EmbeddingRuntimeProperties embeddingRuntimeProperties;
 
     @Override
     public float[] embed(String text) {
-        return useLocalFirst ? embedLocalFirst(text) : embedGeminiFirst(text);
+        return embeddingRuntimeProperties.isUseLocalFirst() ? embedLocalFirst(text) : embedGeminiFirst(text);
     }
 
     @Override
     public List<float[]> embedBatch(List<String> texts) {
-        return useLocalFirst ? embedBatchLocalFirst(texts) : embedBatchGeminiFirst(texts);
+        return embeddingRuntimeProperties.isUseLocalFirst() ? embedBatchLocalFirst(texts) : embedBatchGeminiFirst(texts);
     }
 
     private float[] embedLocalFirst(String text) {
         try {
             return huggingFaceEmbeddingService.embed(text);
         } catch (Exception ex) {
-            if (!allowGeminiFallback) {
+            if (!embeddingRuntimeProperties.isAllowGeminiFallback()) {
                 throw new IllegalStateException(LOCAL_EMBEDDING_UNAVAILABLE_MESSAGE, ex);
             }
             return embeddingModel.embed(text);
@@ -55,7 +51,7 @@ public class EmbedServiceImpl implements EmbedService {
         try {
             return huggingFaceEmbeddingService.embed(texts);
         } catch (Exception ex) {
-            if (!allowGeminiFallback) {
+            if (!embeddingRuntimeProperties.isAllowGeminiFallback()) {
                 throw new IllegalStateException(LOCAL_EMBEDDING_UNAVAILABLE_MESSAGE, ex);
             }
             return embeddingModel.embed(texts);
