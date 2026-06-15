@@ -43,6 +43,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
 import java.time.LocalDate;
+import java.time.format.DateTimeParseException;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -247,27 +248,42 @@ public class JobServiceImpl implements JobService {
     @Override
     @Transactional
     public Job updateJobSettings(String jobId, String companyId, JobSettingsUpdateRequest request) {
-        Job job = jobRepository.findById(jobId)
-                .orElseThrow(() -> new NotFoundException("Job not found with ID: " + jobId));
-
-        if (!job.getCompany().getId().equals(companyId)) {
-            throw new BadRequestException("Job does not belong to this company");
+        if (request == null || !request.hasUpdates()) {
+            throw new BadRequestException("At least one job setting must be provided");
         }
 
-        job.setAiScreeningEnabled(Boolean.TRUE.equals(request.aiScreeningEnabled()));
+        Job job = findOwnedJob(jobId, companyId);
+
+        if (request.aiScreeningEnabled() != null) {
+            job.setAiScreeningEnabled(request.aiScreeningEnabled());
+        }
+
+        if (StringUtils.hasText(request.expiryDate())) {
+            LocalDate parsedExpiryDate = parseExpiryDate(request.expiryDate());
+            job.setExpiryDate(parsedExpiryDate.toString());
+        }
+
+        if (request.status() != null) {
+            applyManagedStatus(job, request.status());
+        }
+
         return jobRepository.save(job);
     }
 
     @Transactional
     @Override
     public void activateJob(String jobId, String companyId) {
-
+        Job job = findOwnedJob(jobId, companyId);
+        applyManagedStatus(job, Status.ACTIVE);
+        jobRepository.save(job);
     }
 
     @Transactional
     @Override
     public void deactivateJob(String jobId, String companyId) {
-
+        Job job = findOwnedJob(jobId, companyId);
+        applyManagedStatus(job, Status.INACTIVE);
+        jobRepository.save(job);
     }
 
     @Transactional(readOnly = true)
@@ -688,6 +704,45 @@ public class JobServiceImpl implements JobService {
                 "}");
 
         return sb.toString();
+    }
+
+    private Job findOwnedJob(String jobId, String companyId) {
+        Job job = jobRepository.findById(jobId)
+                .orElseThrow(() -> new NotFoundException("Job not found with ID: " + jobId));
+
+        if (!job.getCompany().getId().equals(companyId)) {
+            throw new BadRequestException("Job does not belong to this company");
+        }
+
+        return job;
+    }
+
+    private LocalDate parseExpiryDate(String expiryDate) {
+        try {
+            return LocalDate.parse(expiryDate.trim());
+        } catch (DateTimeParseException exception) {
+            throw new BadRequestException("Expiry date must use format yyyy-MM-dd");
+        }
+    }
+
+    private void applyManagedStatus(Job job, Status nextStatus) {
+        Set<Status> allowedStatuses = EnumSet.of(Status.ACTIVE, Status.INACTIVE, Status.CLOSED);
+        if (!allowedStatuses.contains(nextStatus)) {
+            throw new BadRequestException("Unsupported job status update: " + nextStatus);
+        }
+
+        if (nextStatus == Status.ACTIVE) {
+            if (!StringUtils.hasText(job.getExpiryDate())) {
+                throw new BadRequestException("Active job must have an expiry date");
+            }
+
+            LocalDate expiryDate = parseExpiryDate(job.getExpiryDate());
+            if (expiryDate.isBefore(LocalDate.now())) {
+                throw new BadRequestException("Expiry date must be today or later to reopen job");
+            }
+        }
+
+        job.setStatus(nextStatus);
     }
 
 }

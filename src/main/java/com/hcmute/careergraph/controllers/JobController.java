@@ -311,8 +311,7 @@ public class JobController {
 
                 String companyId = securityUtils.extractCompanyId(authentication);
 
-                // TODO: Cần thêm method deactivateJob trong JobService
-                // jobService.deactivateJob(id, companyId);
+                jobService.deactivateJob(id, companyId);
 
                 return RestResponse.<Void>builder()
                                 .status(HttpStatus.OK)

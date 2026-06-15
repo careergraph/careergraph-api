@@ -1,10 +1,17 @@
 package com.hcmute.careergraph.persistence.dtos.request;
 
-import jakarta.validation.constraints.NotNull;
+import com.hcmute.careergraph.enums.common.Status;
 import lombok.Builder;
 
 @Builder
 public record JobSettingsUpdateRequest(
-        @NotNull(message = "aiScreeningEnabled is required")
-        Boolean aiScreeningEnabled) {
+        Boolean aiScreeningEnabled,
+        Status status,
+        String expiryDate) {
+
+    public boolean hasUpdates() {
+        return aiScreeningEnabled != null
+                || status != null
+                || (expiryDate != null && !expiryDate.isBlank());
+    }
 }
