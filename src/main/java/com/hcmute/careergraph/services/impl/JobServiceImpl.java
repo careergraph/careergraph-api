@@ -3,6 +3,8 @@ package com.hcmute.careergraph.services.impl;
 import co.elastic.clients.elasticsearch.core.SearchResponse;
 import co.elastic.clients.elasticsearch.core.search.Hit;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.hcmute.careergraph.enums.candidate.ContactType;
+import com.hcmute.careergraph.enums.common.FileType;
 import com.hcmute.careergraph.enums.common.PartyType;
 import com.hcmute.careergraph.enums.common.Status;
 import com.hcmute.careergraph.enums.job.EducationType;
@@ -22,9 +24,11 @@ import com.hcmute.careergraph.persistence.dtos.response.CvSuggestionResponse;
 import com.hcmute.careergraph.persistence.event.JobCreatedEvent;
 import com.hcmute.careergraph.persistence.models.Candidate;
 import com.hcmute.careergraph.persistence.models.Company;
+import com.hcmute.careergraph.persistence.models.File;
 import com.hcmute.careergraph.persistence.models.Job;
 import com.hcmute.careergraph.repositories.CandidateRepository;
 import com.hcmute.careergraph.repositories.CompanyRepository;
+import com.hcmute.careergraph.repositories.FileRepository;
 import com.hcmute.careergraph.repositories.JobESRepository;
 import com.hcmute.careergraph.repositories.JobRepository;
 import com.hcmute.careergraph.services.*;
@@ -64,6 +68,8 @@ public class JobServiceImpl implements JobService {
     private final JobESRepository jobESRepository;
     private final FastAPIClientService fastAPIClientService;
     private final CandidateSearchTextBuilder candidateSearchTextBuilder;
+    private final RedisService redisService;
+    private final FileRepository fileRepository;
 
     private final ApplicationEventPublisher publisher;
 
@@ -620,23 +626,185 @@ public class JobServiceImpl implements JobService {
                 .orElseThrow(() -> new ResourceNotFoundException("Candidate not found with id: " + candidateId));
 
         // 2. Xây dựng Prompt (Câu lệnh cho AI)
-        String prompt = buildCvGenerationPrompt(job, candidate);
+        validateCvSuggestionLimit(candidateId);
 
         // 3. Gọi AI
-        String jsonResponse = fastAPIClientService.cvSuggestion(prompt);
+        String cvText = fileRepository.findFirstByOwnerIdAndStatusAndFileTypeInOrderByCreatedDateDesc(
+                        candidateId, Status.ACTIVE, List.of(FileType.RESUME, FileType.CV))
+                .map(File::getResumeExtractedText)
+                .filter(StringUtils::hasText)
+                .orElseGet(() -> buildCandidateProfileText(candidate));
 
         // 4. Parse kết quả JSON từ AI thành Object
         try {
             // Đôi khi AI trả về markdown ```json ... ```, cần clean trước khi parse
+            String prompt = buildCvGenerationPrompt(job, cvText, candidate);
+            String jsonResponse = fastAPIClientService.cvSuggestion(prompt);
             String cleanJson = cleanJsonString(jsonResponse);
             return objectMapper.readValue(cleanJson, CvSuggestionResponse.class);
         } catch (Exception e) {
-            log.error("Error parsing AI response", e);
-            throw new RuntimeException("Failed to generate CV suggestion", e);
+            log.error("Error generating CV suggestion, returning profile fallback", e);
+            return buildFallbackCvSuggestion(candidate);
         }
     }
 
     // Helper để làm sạch chuỗi JSON nếu AI trả về dạng Markdown
+    private void validateCvSuggestionLimit(String candidateId) {
+        String key = "cv_suggestion_limit:" + candidateId;
+        Integer current = redisService.getObject(key, Integer.class);
+        if (current != null && current >= 10) {
+            throw new BadRequestException("Bạn đã vượt quá số lần tạo gợi ý CV cho phép trong ngày (tối đa 10 lần).");
+        }
+        redisService.setObject(key, current == null ? 1 : current + 1, 86400);
+    }
+
+    private String buildCandidateProfileText(Candidate candidate) {
+        StringBuilder sb = new StringBuilder();
+        append(sb, fullName(candidate));
+        append(sb, candidate.getCurrentJobTitle());
+        append(sb, candidate.getDesiredPosition());
+        append(sb, candidate.getSummary());
+        append(sb, candidate.getIndustry());
+        appendAll(sb, candidate.getIndustries());
+        appendAll(sb, candidate.getLocations());
+        appendAll(sb, candidate.getWorkTypes());
+
+        if (candidate.getSkills() != null) {
+            candidate.getSkills().stream()
+                    .map(skill -> skill.getSkill() != null ? skill.getSkill().getName() : null)
+                    .forEach(value -> append(sb, value));
+        }
+        if (candidate.getExperiences() != null) {
+            candidate.getExperiences().forEach(experience -> {
+                append(sb, experience.getJobTitle());
+                append(sb, experience.getDescription());
+                if (experience.getCompany() != null) {
+                    append(sb, experience.getCompany().getName());
+                }
+            });
+        }
+        if (candidate.getEducations() != null) {
+            candidate.getEducations().forEach(education -> {
+                append(sb, education.getDegreeTitle());
+                append(sb, education.getMajor());
+                if (education.getEducation() != null) {
+                    append(sb, education.getEducation().getOfficialName());
+                }
+            });
+        }
+        return sb.toString().replaceAll("\\s+", " ").trim();
+    }
+
+    private CvSuggestionResponse buildFallbackCvSuggestion(Candidate candidate) {
+        return CvSuggestionResponse.builder()
+                .personal(CvSuggestionResponse.PersonalInfo.builder()
+                        .fullName(fullName(candidate))
+                        .headline(firstText(candidate.getCurrentJobTitle(), candidate.getDesiredPosition()))
+                        .summary(candidate.getSummary())
+                        .location(candidateLocation(candidate))
+                        .build())
+                .contact(CvSuggestionResponse.ContactInfo.builder()
+                        .email(candidateContact(candidate, ContactType.EMAIL))
+                        .phone(candidateContact(candidate, ContactType.PHONE))
+                        .build())
+                .experience(fallbackExperiences(candidate))
+                .education(fallbackEducations(candidate))
+                .skills(fallbackSkills(candidate))
+                .matchedSkills(Collections.emptyList())
+                .missingSkills(Collections.emptyList())
+                .suggestions(List.of("AI service is temporarily unavailable. Please review and tailor this CV manually."))
+                .overallMatchScore(0)
+                .build();
+    }
+
+    private List<CvSuggestionResponse.Experience> fallbackExperiences(Candidate candidate) {
+        if (candidate.getExperiences() == null) {
+            return Collections.emptyList();
+        }
+        return candidate.getExperiences().stream()
+                .map(experience -> CvSuggestionResponse.Experience.builder()
+                        .id(experience.getId())
+                        .role(experience.getJobTitle())
+                        .company(experience.getCompany() != null ? experience.getCompany().getName() : null)
+                        .startDate(experience.getStartDate())
+                        .endDate(experience.getEndDate())
+                        .bulletPoints(StringUtils.hasText(experience.getDescription())
+                                ? List.of(experience.getDescription())
+                                : Collections.emptyList())
+                        .build())
+                .toList();
+    }
+
+    private List<CvSuggestionResponse.Education> fallbackEducations(Candidate candidate) {
+        if (candidate.getEducations() == null) {
+            return Collections.emptyList();
+        }
+        return candidate.getEducations().stream()
+                .map(education -> CvSuggestionResponse.Education.builder()
+                        .id(education.getId())
+                        .school(education.getEducation() != null ? education.getEducation().getOfficialName() : null)
+                        .degree(firstText(education.getDegreeTitle(), education.getMajor()))
+                        .startDate(education.getStartDate())
+                        .endDate(education.getEndDate())
+                        .build())
+                .toList();
+    }
+
+    private List<CvSuggestionResponse.Skill> fallbackSkills(Candidate candidate) {
+        if (candidate.getSkills() == null) {
+            return Collections.emptyList();
+        }
+        return candidate.getSkills().stream()
+                .filter(skill -> skill.getSkill() != null)
+                .map(skill -> CvSuggestionResponse.Skill.builder()
+                        .id(skill.getSkill().getId())
+                        .name(skill.getSkill().getName())
+                        .build())
+                .toList();
+    }
+
+    private String fullName(Candidate candidate) {
+        return (safe(candidate.getFirstName()) + " " + safe(candidate.getLastName())).trim();
+    }
+
+    private String candidateContact(Candidate candidate, ContactType type) {
+        if (candidate.getContacts() == null) {
+            return null;
+        }
+        return candidate.getContacts().stream()
+                .filter(contact -> contact.getContactType() == type)
+                .sorted(Comparator.comparing(contact -> !Boolean.TRUE.equals(contact.getIsPrimary())))
+                .map(contact -> safe(contact.getValue()))
+                .filter(StringUtils::hasText)
+                .findFirst()
+                .orElse(null);
+    }
+
+    private String candidateLocation(Candidate candidate) {
+        if (candidate.getAddresses() == null) {
+            return firstText(candidate.getWorkLocation(), joinList(candidate.getLocations()));
+        }
+        String address = candidate.getAddresses().stream()
+                .sorted(Comparator.comparing(addressItem -> !Boolean.TRUE.equals(addressItem.getIsPrimary())))
+                .map(addressItem -> joinList(List.of(addressItem.getProvince(), addressItem.getDistrict(), addressItem.getCountry())))
+                .filter(StringUtils::hasText)
+                .findFirst()
+                .orElse(null);
+        return firstText(candidate.getWorkLocation(), address, joinList(candidate.getLocations()));
+    }
+
+    private String firstText(String... values) {
+        if (values == null) {
+            return null;
+        }
+        for (String value : values) {
+            if (StringUtils.hasText(value)) {
+                return value.trim();
+            }
+        }
+        return null;
+    }
+
     private String cleanJsonString(String response) {
         if (response.contains("```json")) {
             return response.replace("```json", "").replace("```", "").trim();
@@ -647,7 +815,7 @@ public class JobServiceImpl implements JobService {
         return response;
     }
 
-    private String buildCvGenerationPrompt(Job job, Candidate candidate) {
+    private String buildCvGenerationPrompt(Job job, String cvText, Candidate candidate) {
         StringBuilder sb = new StringBuilder();
 
         sb.append("Đóng vai là một chuyên gia tư vấn nghề nghiệp và viết CV chuyên nghiệp (Top CV Writer). ");
@@ -656,33 +824,50 @@ public class JobServiceImpl implements JobService {
 
         // --- Input: Job Info ---
         sb.append("--- THÔNG TIN CÔNG VIỆC (TARGET JOB) ---\n");
-        sb.append("Vị trí: ").append(job.getTitle()).append("\n");
-        sb.append("Công ty: ").append(job.getCompany().getName()).append("\n");
-        sb.append("Mô tả công việc: ").append(job.getDescription()).append("\n");
-        sb.append("Yêu cầu kỹ năng: ").append(job.getQualifications()).append("\n\n");
+        sb.append("Vị trí: ").append(job.getTitle() != null ? job.getTitle() : "N/A").append("\n");
+        sb.append("Công ty: ").append(job.getCompany() != null ? job.getCompany().getName() : "N/A").append("\n");
+        sb.append("Mô tả công việc: ").append(job.getDescription() != null ? job.getDescription() : "N/A").append("\n");
+        sb.append("Yêu cầu kỹ năng: ").append(job.getQualifications() != null ? job.getQualifications() : "N/A").append("\n\n");
 
         // --- Input: Candidate Info ---
         sb.append("--- HỒ SƠ GỐC CỦA ỨNG VIÊN ---\n");
-        sb.append("Họ tên: ").append(candidate.getFirstName() + " " + candidate.getLastName()).append("\n");
-        List<String> skills = candidate.getSkills().stream()
-                .map(skill -> skill.getSkill().getName())
-                .toList();
+        sb.append("Họ tên: ").append(fullName(candidate)).append("\n");
+
+        List<String> skills = candidate.getSkills() != null
+                ? candidate.getSkills().stream()
+                        .filter(skill -> skill != null && skill.getSkill() != null)
+                        .map(skill -> skill.getSkill().getName())
+                        .toList()
+                : Collections.emptyList();
         sb.append("Kỹ năng hiện có: ").append(skills).append("\n");
 
-        List<String> experiences = candidate.getExperiences().stream()
-                .map(experience -> experience.getCompany().getName() + ": from " + experience.getStartDate()
-                        + " to " + experience.getEndDate())
-                .toList();
+        List<String> experiences = candidate.getExperiences() != null
+                ? candidate.getExperiences().stream()
+                        .filter(exp -> exp != null)
+                        .map(experience -> {
+                            String companyName = experience.getCompany() != null ? experience.getCompany().getName() : "Unknown Company";
+                            return companyName + ": from " + experience.getStartDate() + " to " + experience.getEndDate();
+                        })
+                        .toList()
+                : Collections.emptyList();
         sb.append("Kinh nghiệm làm việc: ").append(experiences).append("\n");
 
-        List<String> educations = candidate.getEducations().stream()
-                .map(experience -> experience.getEducation().getOfficialName() + ": from " + experience.getStartDate()
-                        + " to " + experience.getEndDate())
-                .toList();
+        List<String> educations = candidate.getEducations() != null
+                ? candidate.getEducations().stream()
+                        .filter(edu -> edu != null)
+                        .map(education -> {
+                            String schoolName = education.getEducation() != null ? education.getEducation().getOfficialName() : "Unknown School";
+                            return schoolName + ": from " + education.getStartDate() + " to " + education.getEndDate();
+                        })
+                        .toList()
+                : Collections.emptyList();
         sb.append("Học vấn: ").append(educations).append("\n\n");
 
+        sb.append("--- CV TEXT SOURCE ---\n");
+        sb.append(StringUtils.hasText(cvText) ? cvText : buildCandidateProfileText(candidate)).append("\n\n");
+        sb.append("Gap analysis required: compare TARGET JOB with CV TEXT SOURCE, then return matchedSkills, missingSkills, suggestions, and overallMatchScore from 0 to 100.\n\n");
+
         // --- Output Requirement ---
-        sb.append("--- YÊU CẦU ĐẦU RA ---\n");
         sb.append(
                 "1. Hãy viết lại phần 'summary' (tóm tắt) thật ấn tượng, thể hiện ứng viên là người phù hợp cho vị trí này.\n");
         sb.append(
@@ -700,7 +885,11 @@ public class JobServiceImpl implements JobService {
                 +
                 "  \"education\": [ { \"school\": \"...\", \"degree\": \"...\", \"startDate\": \"...\", \"endDate\": \"...\" } ],\n"
                 +
-                "  \"skills\": [ { \"name\": \"...\" } ]\n" +
+                "  \"skills\": [ { \"name\": \"...\" } ],\n" +
+                "  \"matchedSkills\": [\"...\"],\n" +
+                "  \"missingSkills\": [\"...\"],\n" +
+                "  \"suggestions\": [\"...\"],\n" +
+                "  \"overallMatchScore\": 0\n" +
                 "}");
 
         return sb.toString();

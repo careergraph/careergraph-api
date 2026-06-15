@@ -20,6 +20,10 @@ public class CvSuggestionResponse {
     private List<Skill> skills;
     private List<Language> languages;
     private List<Award> awards;
+    private List<String> matchedSkills;
+    private List<String> missingSkills;
+    private List<String> suggestions;
+    private Integer overallMatchScore;
 
     @Data
     @Builder

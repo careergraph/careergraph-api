@@ -4,6 +4,7 @@ import com.cloudinary.Cloudinary;
 import com.cloudinary.utils.ObjectUtils;
 import com.hcmute.careergraph.enums.common.FileType;
 import com.hcmute.careergraph.enums.common.PartyType;
+import com.hcmute.careergraph.helper.CvKeywordsHeuristicExtractor;
 import com.hcmute.careergraph.helper.ResumeDocumentTextExtractor;
 import com.hcmute.careergraph.mapper.CloudFileMapper;
 import com.hcmute.careergraph.mapper.FileMapper;
@@ -49,6 +50,7 @@ public class CloudinaryServiceImpl implements CloudinaryService {
     private final FileMapper fileMapper;
     private final ApplicationEventPublisher applicationEventPublisher;
     private final CvKeywordsExtractionService cvKeywordsExtractionService;
+    private final CvKeywordsHeuristicExtractor cvKeywordsHeuristicExtractor;
 
     @Value("${application.resume-extraction.max-stored-chars:50000}")
     private int maxStoredChars;
@@ -146,6 +148,13 @@ public class CloudinaryServiceImpl implements CloudinaryService {
                 entity.setResumeExtractedText(localExtraction.text());
                 entity.setResumeExtractionError(localExtraction.error());
                 entity.setResumeContentHash(localExtraction.contentHash());
+                if (StringUtils.isNotBlank(localExtraction.text())) {
+                    try {
+                        entity.setCvChunksJson(cvKeywordsHeuristicExtractor.extractChunks(localExtraction.text()));
+                    } catch (Exception e) {
+                        log.warn("Failed to extract CV chunks for file: {}", e.getMessage());
+                    }
+                }
                 fileRepository.save(entity);
                 if (StringUtils.isNotBlank(localExtraction.text())) {
                     cvKeywordsExtractionService.extractAndPersistKeywords(entity.getId(), localExtraction.text());

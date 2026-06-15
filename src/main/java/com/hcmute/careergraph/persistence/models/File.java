@@ -3,12 +3,11 @@ package com.hcmute.careergraph.persistence.models;
 
 import com.hcmute.careergraph.enums.common.FileType;
 import com.hcmute.careergraph.enums.common.PartyType;
-import com.hcmute.careergraph.enums.common.Status;
-import jakarta.mail.Folder;
 import jakarta.persistence.*;
-import lombok.*;
-import org.hibernate.type.EntityType;
-import java.util.Date;
+import lombok.EqualsAndHashCode;
+import lombok.Getter;
+import lombok.Setter;
+import lombok.ToString;
 
 @Getter
 @Setter
@@ -76,5 +75,8 @@ public class File extends BaseEntity {
      */
     @Column(name = "cv_keywords_json", columnDefinition = "TEXT")
     private String cvKeywordsJson;
+
+    @Column(name = "cv_chunks_json", columnDefinition = "TEXT")
+    private String cvChunksJson;
 
 }
