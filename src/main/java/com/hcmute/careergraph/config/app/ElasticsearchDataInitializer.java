@@ -2,6 +2,7 @@ package com.hcmute.careergraph.config.app;
 
 import com.hcmute.careergraph.config.properties.ElasticsearchSyncProperties;
 import com.hcmute.careergraph.config.properties.EmbeddingRuntimeProperties;
+import com.hcmute.careergraph.enums.common.Status;
 import com.hcmute.careergraph.helper.VietnamProvinceUtils;
 import com.hcmute.careergraph.persistence.documents.JobES;
 import com.hcmute.careergraph.persistence.event.JobCreatedEvent;
@@ -27,8 +28,10 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.IntStream;
 
@@ -116,11 +119,43 @@ public class ElasticsearchDataInitializer implements CommandLineRunner {
                             "No jobs found in database.");
                 }
 
+                List<Job> activeJobs = allJobs.stream()
+                        .filter(this::shouldIndexJob)
+                        .toList();
+
+                Set<String> activeJobIds = activeJobs.stream()
+                        .map(Job::getId)
+                        .collect(java.util.stream.Collectors.toCollection(HashSet::new));
+
+                List<String> staleDocumentIds = new ArrayList<>();
+                for (JobES indexedJob : jobESRepository.findAll()) {
+                    if (indexedJob.getId() != null && !activeJobIds.contains(indexedJob.getId())) {
+                        staleDocumentIds.add(indexedJob.getId());
+                    }
+                }
+
+                if (!staleDocumentIds.isEmpty()) {
+                    jobESRepository.deleteAllById(staleDocumentIds);
+                }
+
+                if (activeJobs.isEmpty()) {
+                    log.info("No active jobs found in database. Cleared stale Elasticsearch job documents.");
+                    return new ElasticsearchSyncResult(
+                            "jobs",
+                            true,
+                            effectiveForce,
+                            effectiveMaxEmbeddings,
+                            0,
+                            0,
+                            0,
+                            "No active jobs found in database.");
+                }
+
                 long indexedJobsCount = jobESRepository.count();
                 List<Job> jobsNeedingEmbedding = new ArrayList<>();
                 List<JobES> jobsWithoutEmbeddingChanges = new ArrayList<>();
 
-                for (Job job : allJobs) {
+                for (Job job : activeJobs) {
                     String searchText = buildSearchText(job);
                     String contentHash = hashText(searchText);
                     JobES existing = jobESRepository.findById(job.getId()).orElse(null);
@@ -133,7 +168,7 @@ public class ElasticsearchDataInitializer implements CommandLineRunner {
                     jobsNeedingEmbedding.add(job);
                 }
 
-                if (jobsNeedingEmbedding.isEmpty() && indexedJobsCount >= allJobs.size()) {
+                if (jobsNeedingEmbedding.isEmpty() && indexedJobsCount >= activeJobs.size()) {
                     log.info("Skip Job Elasticsearch synchronization because no jobs changed since the last index run.");
                     return new ElasticsearchSyncResult(
                             "jobs",
@@ -348,6 +383,10 @@ public class ElasticsearchDataInitializer implements CommandLineRunner {
                 job.getState());
     }
 
+    private boolean shouldIndexJob(Job job) {
+        return job != null && job.getStatus() == Status.ACTIVE;
+    }
+
     private JobES toJobDocument(Job job, float[] embedding) {
         String searchText = buildSearchText(job);
         String contentHash = hashText(searchText);
@@ -362,8 +401,8 @@ public class ElasticsearchDataInitializer implements CommandLineRunner {
                 .status(job.getStatus().name())
                 .jobCategory(job.getJobCategory().name())
                 .employmentType(job.getEmploymentType().name())
-                .experienceLevel(job.getExperienceLevel().name())
-                .education(job.getEducation().name())
+                .experienceLevel(toEnumName(job.getExperienceLevel()))
+                .education(toEnumName(job.getEducation()))
                 .state(job.getState())
                 .provinceSlug(VietnamProvinceUtils.slugFromStateName(job.getState()))
                 .provinceCode(VietnamProvinceUtils.codeFromStateName(job.getState()))
@@ -373,6 +412,10 @@ public class ElasticsearchDataInitializer implements CommandLineRunner {
                 .contentHash(contentHash)
                 .embedding(embedding)
                 .build();
+    }
+
+    private String toEnumName(Enum<?> value) {
+        return value != null ? value.name() : null;
     }
 
     private String hashText(String text) {

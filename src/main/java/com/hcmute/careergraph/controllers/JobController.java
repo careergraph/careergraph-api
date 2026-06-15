@@ -1,11 +1,14 @@
 package com.hcmute.careergraph.controllers;
 
 import com.hcmute.careergraph.enums.common.PartyType;
+import com.hcmute.careergraph.enums.common.Role;
+import com.hcmute.careergraph.enums.common.Status;
 import com.hcmute.careergraph.enums.job.EducationType;
 import com.hcmute.careergraph.enums.job.EmploymentType;
 import com.hcmute.careergraph.enums.job.ExperienceLevel;
 import com.hcmute.careergraph.enums.job.JobCategory;
 import com.hcmute.careergraph.exception.BadRequestException;
+import com.hcmute.careergraph.exception.ForbiddenException;
 import com.hcmute.careergraph.helper.RestResponse;
 import com.hcmute.careergraph.helper.SecurityUtils;
 import com.hcmute.careergraph.mapper.ApplicationMapper;
@@ -19,6 +22,7 @@ import com.hcmute.careergraph.persistence.dtos.response.ApplicationResponse;
 import com.hcmute.careergraph.persistence.dtos.response.CvSuggestionResponse;
 import com.hcmute.careergraph.persistence.dtos.response.JobEnumMetadataResponse;
 import com.hcmute.careergraph.persistence.dtos.response.JobResponse;
+import com.hcmute.careergraph.persistence.models.Account;
 import com.hcmute.careergraph.persistence.models.Application;
 import com.hcmute.careergraph.persistence.models.Job;
 import com.hcmute.careergraph.repositories.ApplicationRepository;
@@ -117,6 +121,7 @@ public class JobController {
                 log.info("GET /api/v1/jobs/{} - Fetching job", id);
 
                 Job job = jobService.getJobById(id);
+                validateJobAccess(job);
 
                 String candidateId = securityUtils.getCandidateId().orElse(null);
 
@@ -377,7 +382,7 @@ public class JobController {
                                 .stream()
                                 .map(item -> JobEnumMetadataResponse.EnumOption.builder()
                                                 .code(item.getCode())
-                                                .name(item.getEnglishLabel())
+                                                .name(item.getDisplayName())
                                                 .build())
                                 .toList();
 
@@ -663,5 +668,28 @@ public class JobController {
                                 .map(job -> jobMapper.toResponse(job))
                                 .toList();
                 return jobResponses;
+        }
+
+        private void validateJobAccess(Job job) {
+                if (job == null || job.getStatus() == Status.ACTIVE) {
+                        return;
+                }
+
+                Account currentAccount = securityUtils.getCurrentAccount().orElse(null);
+                if (currentAccount == null) {
+                        throw new ForbiddenException("You do not have permission to access this job");
+                }
+
+                if (currentAccount.getRole() == Role.ADMIN) {
+                        return;
+                }
+
+                if (currentAccount.getCompany() != null
+                                && job.getCompany() != null
+                                && job.getCompany().getId().equals(currentAccount.getCompany().getId())) {
+                        return;
+                }
+
+                throw new ForbiddenException("You do not have permission to access this job");
         }
 }

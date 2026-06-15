@@ -86,32 +86,16 @@ public class JobServiceImpl implements JobService {
 
         // 3. Map request -> entity
         Job job = jobMapper.toEntity(request, company);
-        JobES jobES = JobES.builder()
-                .id(job.getId())
-                .title(job.getTitle())
-                .description(job.getDescription())
-                .status(job.getStatus().name())
-                .jobCategory(job.getJobCategory().name())
-                .employmentType(job.getEmploymentType().name())
-                .experienceLevel(job.getExperienceLevel().name())
-                .education(job.getEducation().name())
-                .state(job.getState())
-                .provinceSlug(VietnamProvinceUtils.slugFromStateName(job.getState()))
-                .provinceCode(VietnamProvinceUtils.codeFromStateName(job.getState()))
-                .city(job.getCity())
-                .companyId(job.getCompany().getId())
-                .qualifications(job.getQualifications())
-                .minimumQualifications(job.getMinimumQualifications())
-                .responsibilities(job.getResponsibilities())
-                // .expiredDate(safeParseDate(job.getExpiryDate()))
-                .embedding(embedService.embed(buildJobSearchText(job)))
-                .build();
-        jobESRepository.save(jobES);
         // 4. Lưu vào database
         Job savedJob = jobRepository.save(job);
+        syncJobSearchDocument(savedJob);
         log.info("Job created successfully with ID: {}", savedJob.getId());
         publisher.publishEvent(new JobCreatedEvent(savedJob.getId()));
         return savedJob;
+    }
+
+    private String toEnumName(Enum<?> value) {
+        return value != null ? value.name() : null;
     }
 
     private LocalDate safeParseDate(String date) {
@@ -174,8 +158,41 @@ public class JobServiceImpl implements JobService {
     @Transactional
     @Override
     public Job updateJob(String jobId, JobCreationRequest request, String companyId) {
-        // TODO: Implement update logic
-        throw new UnsupportedOperationException("Update job not implemented yet");
+        log.info("Updating job with ID: {} for company ID: {}", jobId, companyId);
+
+        Job existingJob = findOwnedJob(jobId, companyId);
+
+        existingJob.setTitle(request.title());
+        existingJob.setDescription(request.description());
+        existingJob.setDepartment(request.department());
+        existingJob.setResponsibilities(
+                request.responsibilities() != null ? request.responsibilities() : Collections.emptyList());
+        existingJob.setQualifications(
+                request.qualifications() != null ? request.qualifications() : Collections.emptyList());
+        existingJob.setMinimumQualifications(
+                request.minimumQualifications() != null ? request.minimumQualifications() : Collections.emptyList());
+        existingJob.setBenefits(request.benefits() != null ? request.benefits() : Collections.emptyList());
+        existingJob.setMinExperience(request.minExperience());
+        existingJob.setMaxExperience(request.maxExperience());
+        existingJob.setExperienceLevel(request.experienceLevel());
+        existingJob.setEmploymentType(request.employmentType());
+        existingJob.setJobCategory(request.jobCategory());
+        existingJob.setEducation(request.education());
+        existingJob.setRemoteJob(Boolean.TRUE.equals(request.remoteJob()));
+        existingJob.setState(request.state());
+        existingJob.setCity(request.city());
+        existingJob.setDistrict(request.district());
+        existingJob.setAddress(request.address());
+        existingJob.setSalaryRange(request.salaryRange());
+        existingJob.setContactEmail(request.contactEmail());
+        existingJob.setContactPhone(request.contactPhone());
+        existingJob.setPromotionType(request.promotionType() != null ? request.promotionType() : "free");
+        existingJob.setNumberOfPositions(request.numberOfPositions() != null ? request.numberOfPositions() : 1);
+        existingJob.setExpiryDate(request.expiryDate());
+
+        Job savedJob = jobRepository.save(existingJob);
+        syncJobSearchDocument(savedJob);
+        return savedJob;
     }
 
     @Override
@@ -217,9 +234,10 @@ public class JobServiceImpl implements JobService {
 
         // Update job
         job.get().setStatus(Status.ACTIVE);
-        jobRepository.save(job.get());
+        Job savedJob = jobRepository.save(job.get());
+        syncJobSearchDocument(savedJob);
 
-        return job.get();
+        return savedJob;
     }
 
     /**
@@ -240,7 +258,8 @@ public class JobServiceImpl implements JobService {
 
         // Soft delete: chuyển status sang CLOSED
         job.setStatus(Status.CLOSED);
-        jobRepository.save(job);
+        Job savedJob = jobRepository.save(job);
+        syncJobSearchDocument(savedJob);
 
         log.info("Job deleted successfully with ID: {}", jobId);
     }
@@ -267,7 +286,9 @@ public class JobServiceImpl implements JobService {
             applyManagedStatus(job, request.status());
         }
 
-        return jobRepository.save(job);
+        Job savedJob = jobRepository.save(job);
+        syncJobSearchDocument(savedJob);
+        return savedJob;
     }
 
     @Transactional
@@ -275,7 +296,8 @@ public class JobServiceImpl implements JobService {
     public void activateJob(String jobId, String companyId) {
         Job job = findOwnedJob(jobId, companyId);
         applyManagedStatus(job, Status.ACTIVE);
-        jobRepository.save(job);
+        Job savedJob = jobRepository.save(job);
+        syncJobSearchDocument(savedJob);
     }
 
     @Transactional
@@ -283,7 +305,8 @@ public class JobServiceImpl implements JobService {
     public void deactivateJob(String jobId, String companyId) {
         Job job = findOwnedJob(jobId, companyId);
         applyManagedStatus(job, Status.INACTIVE);
-        jobRepository.save(job);
+        Job savedJob = jobRepository.save(job);
+        syncJobSearchDocument(savedJob);
     }
 
     @Transactional(readOnly = true)
@@ -715,6 +738,39 @@ public class JobServiceImpl implements JobService {
         }
 
         return job;
+    }
+
+    private void syncJobSearchDocument(Job job) {
+        if (job == null || job.getId() == null) {
+            return;
+        }
+
+        if (job.getStatus() != Status.ACTIVE) {
+            jobESRepository.deleteById(job.getId());
+            return;
+        }
+
+        JobES jobES = JobES.builder()
+                .id(job.getId())
+                .title(job.getTitle())
+                .description(job.getDescription())
+                .status(job.getStatus().name())
+                .jobCategory(job.getJobCategory().name())
+                .employmentType(job.getEmploymentType().name())
+                .experienceLevel(toEnumName(job.getExperienceLevel()))
+                .education(toEnumName(job.getEducation()))
+                .state(job.getState())
+                .provinceSlug(VietnamProvinceUtils.slugFromStateName(job.getState()))
+                .provinceCode(VietnamProvinceUtils.codeFromStateName(job.getState()))
+                .city(job.getCity())
+                .companyId(job.getCompany().getId())
+                .qualifications(job.getQualifications())
+                .minimumQualifications(job.getMinimumQualifications())
+                .responsibilities(job.getResponsibilities())
+                .createdAt(job.getCreatedDate() != null ? job.getCreatedDate().toLocalDate() : LocalDate.now())
+                .embedding(embedService.embed(buildJobSearchText(job)))
+                .build();
+        jobESRepository.save(jobES);
     }
 
     private LocalDate parseExpiryDate(String expiryDate) {

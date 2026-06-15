@@ -29,10 +29,8 @@ public record JobCreationRequest(
         List<String> benefits,
 
         // Experience Requirements
-        @NotNull(message = "Minimum experience is required")
         Integer minExperience,
 
-        @NotNull(message = "Maximum experience is required")
         Integer maxExperience,
 
         @NotNull(message = "Experience level is required")
