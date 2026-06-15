@@ -642,8 +642,8 @@ public class JobController {
         @PostMapping("/{jobId}/cv-suggestion")
         public RestResponse<CvSuggestionResponse> generateCv(@PathVariable String jobId,
                         Authentication authentication) {
-
                 String candidateId = securityUtils.extractCandidateId(authentication);
+                log.info("POST /api/v1/jobs/{}/cv-suggestion - Generating CV suggestion for candidateId: {}", jobId, candidateId);
 
                 CvSuggestionResponse result = jobService.generateCv(jobId, candidateId);
 

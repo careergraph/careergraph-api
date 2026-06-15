@@ -1,8 +1,10 @@
 package com.hcmute.careergraph.helper;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 
+import java.time.Instant;
 import java.util.*;
 import java.util.regex.Pattern;
 
@@ -10,6 +12,7 @@ import java.util.regex.Pattern;
 public class CvKeywordsHeuristicExtractor {
 
     private static final int DEFAULT_MAX_CHARS = 300;
+    private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
     private static final Pattern EMAIL_PATTERN = Pattern.compile("[\\w.-]+@[\\w.-]+\\.[a-zA-Z]{2,}");
     private static final Pattern PHONE_PATTERN = Pattern.compile(
@@ -17,16 +20,17 @@ public class CvKeywordsHeuristicExtractor {
     private static final Pattern URL_PATTERN = Pattern.compile(
             "https?://[^\\s]+|www\\.[^\\s]+|linkedin\\.com[^\\s]*|github\\.com[^\\s]*");
     private static final Pattern DATE_RANGE_PATTERN = Pattern.compile(
-            "\\d{1,2}/\\d{1,2}/\\d{2,4}|\\d{4}\\s*[-–]\\s*(\\d{4}|nay|present|hiện tại|now)",
+            "\\d{1,2}/\\d{1,2}/\\d{2,4}|\\d{4}\\s*[-\u2013]\\s*(\\d{4}|nay|present|hi\u1ec7n t\u1ea1i|now)",
             Pattern.CASE_INSENSITIVE);
     private static final Pattern PERSONAL_LINE = Pattern.compile(
-            "^\\s*(email|phone|điện thoại|sđt|số điện thoại|địa chỉ|address|ngày sinh|date of birth|giới tính|gender|linkedin|github|facebook|portfolio)\\s*[:：]",
+            "^\\s*(email|phone|\u0111i\u1ec7n tho\u1ea1i|s\u0111t|s\u1ed1 \u0111i\u1ec7n tho\u1ea1i|\u0111\u1ecba ch\u1ec9|address|ng\u00e0y sinh|date of birth|gi\u1edbi t\u00ednh|gender|linkedin|github|facebook|portfolio)\\s*[:\uff1a]",
             Pattern.CASE_INSENSITIVE | Pattern.MULTILINE);
 
     private static final List<SectionDef> PRIORITY_SECTIONS = List.of(
-            new SectionDef(Pattern.compile("(?i)(mục tiêu|objective|career\\s*objective|summary|tóm tắt|profile|giới thiệu)"), 1),
-            new SectionDef(Pattern.compile("(?i)(kỹ năng|skills|technical\\s*skills|competencies|năng lực|công nghệ)"), 2),
-            new SectionDef(Pattern.compile("(?i)(kinh nghiệm|experience|work\\s*experience|professional\\s*experience)"), 3)
+            new SectionDef(Pattern.compile("(?i)(m\u1ee5c ti\u00eau|objective|career\\s*objective|summary|t\u00f3m t\u1eaft|profile|gi\u1edbi thi\u1ec7u)"), 1),
+            new SectionDef(Pattern.compile("(?i)(k\u1ef9 n\u0103ng|skills|technical\\s*skills|competencies|n\u0103ng l\u1ef1c|c\u00f4ng ngh\u1ec7)"), 2),
+            new SectionDef(Pattern.compile("(?i)(kinh nghi\u1ec7m|experience|work\\s*experience|professional\\s*experience)"), 3),
+            new SectionDef(Pattern.compile("(?i)(h\u1ecdc v\u1ea5n|b\u1eb1ng c\u1ea5p|gi\u00e1o d\u1ee5c|education|h\u1ecdc t\u1eadp|\u0111\u1ea1i h\u1ecdc|tr\u01b0\u1eddng|school|university|degree)"), 4)
     );
 
     private static final Set<String> TECH_KEYWORDS = Set.of(
@@ -55,38 +59,70 @@ public class CvKeywordsHeuristicExtractor {
 
         StringBuilder result = new StringBuilder();
 
-        // Step 1: Get first meaningful line (usually job title)
         String firstLine = getFirstMeaningfulLine(lines);
         if (firstLine != null) {
             result.append(firstLine).append(' ');
         }
 
-        // Step 2: Extract by priority sections
         Map<Integer, String> sectionContents = extractSections(lines);
 
-        // Priority 1: Objective/Summary (max 120 chars)
         if (sectionContents.containsKey(1)) {
             appendWithLimit(result, sectionContents.get(1), 120, maxChars);
         }
 
-        // Priority 2: Skills (max 150 chars)
         if (sectionContents.containsKey(2)) {
             appendWithLimit(result, sectionContents.get(2), 150, maxChars);
         }
 
-        // Priority 3: Experience - only job titles (max 100 chars)
         if (sectionContents.containsKey(3)) {
             String titles = extractJobTitlesOnly(sectionContents.get(3));
             appendWithLimit(result, titles, 100, maxChars);
         }
 
-        // Step 3: Fallback if too little extracted
         String output = result.toString().trim();
         if (output.length() < 50) {
             output = getFallbackText(lines, maxChars);
         }
 
         return deduplicateWords(output, maxChars);
+    }
+
+    public String extractChunks(String resumeText) {
+        Map<String, Object> result = new LinkedHashMap<>();
+        List<Map<String, Object>> chunks = new ArrayList<>();
+
+        if (StringUtils.hasText(resumeText)) {
+            String cleaned = removeNoise(resumeText);
+            String[] lines = cleaned.split("\\n");
+            Map<Integer, String> sections = extractSections(lines);
+
+            addChunk(chunks, "summary", sections.get(1), 0.8);
+            addChunk(chunks, "skill", sections.get(2), 1.0);
+            addChunk(chunks, "experience", sections.get(3), 0.9);
+            addChunk(chunks, "education", sections.get(4), 0.6);
+        }
+
+        result.put("chunks", chunks);
+        result.put("extracted_at", Instant.now().toString());
+        result.put("chunk_version", 1);
+
+        try {
+            return OBJECT_MAPPER.writeValueAsString(result);
+        } catch (Exception e) {
+            return "{\"chunks\":[],\"extracted_at\":\"" + Instant.now() + "\",\"chunk_version\":1}";
+        }
+    }
+
+    private void addChunk(List<Map<String, Object>> chunks, String type, String content, double weight) {
+        if (!StringUtils.hasText(content)) {
+            return;
+        }
+
+        Map<String, Object> chunk = new LinkedHashMap<>();
+        chunk.put("type", type);
+        chunk.put("content", content.trim());
+        chunk.put("weight", weight);
+        chunks.add(chunk);
     }
 
     private String removeNoise(String text) {
@@ -102,7 +138,6 @@ public class CvKeywordsHeuristicExtractor {
         for (String line : lines) {
             String trimmed = line.trim();
             if (trimmed.isEmpty() || trimmed.length() < 3) continue;
-            // Skip pure name lines (short, all uppercase, no tech keyword)
             if (trimmed.length() < 30 && trimmed.equals(trimmed.toUpperCase())
                     && !containsTechKeyword(trimmed)) {
                 continue;
@@ -143,7 +178,7 @@ public class CvKeywordsHeuristicExtractor {
     }
 
     private int detectSectionPriority(String line) {
-        String lower = line.toLowerCase().replaceAll("[^a-zA-ZÀ-ỹ\\s]", "").trim();
+        String lower = line.toLowerCase().replaceAll("[^\\p{L}\\s]", "").trim();
         for (SectionDef sp : PRIORITY_SECTIONS) {
             if (sp.pattern.matcher(lower).find() && lower.length() < 40) {
                 return sp.priority;
