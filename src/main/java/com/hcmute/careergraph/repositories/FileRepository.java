@@ -32,6 +32,9 @@ public interface FileRepository extends JpaRepository<File,String> {
 
     List<File> findByOwnerIdAndStatusAndFileTypeIn(String ownerId, Status status, List<FileType> fileTypes);
 
+    List<File> findByOwnerIdAndStatusAndFileTypeInOrderByCreatedDateDesc(
+            String ownerId, Status status, List<FileType> fileTypes);
+
     @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query("""
             update File f

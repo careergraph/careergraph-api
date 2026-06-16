@@ -10,6 +10,7 @@ import com.hcmute.careergraph.persistence.models.Contact;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
+import java.time.LocalDate;
 import java.time.YearMonth;
 import java.time.format.DateTimeFormatter;
 import java.util.Comparator;
@@ -77,8 +78,7 @@ public class CandidateMapper {
                 .workTypes(
                         candidate.getWorkTypes() != null
                                 ? candidate.getWorkTypes()
-                                : List.of()
-                )
+                                : List.of())
                 .addresses(addressMaper.toResponses(candidate.getAddresses()))
                 .contacts(contactMapper.toResponses(candidate.getContacts()))
                 .skills(candidateSkillMapper.toResponseList(candidate.getSkills()))
@@ -86,15 +86,31 @@ public class CandidateMapper {
                 .educations(candidateEducationMapper.toResponses(candidate.getEducations()))
                 .build();
 
-
     }
-    private List<CandidateClientResponse.CandidateExperienceResponse> sort(Set<CandidateClientResponse.CandidateExperienceResponse> candidateExperiences) {
-        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM");
 
+    private YearMonth parseToYearMonth(String dateStr) {
+        if (dateStr == null || dateStr.isBlank()) {
+            return YearMonth.now();
+        }
+        try {
+            if (dateStr.length() == 7) {
+                return YearMonth.parse(dateStr);
+            }
+            if (dateStr.length() == 10) {
+                return YearMonth.from(LocalDate.parse(dateStr));
+            }
+            return YearMonth.from(LocalDate.parse(dateStr));
+        } catch (Exception e) {
+            return YearMonth.now();
+        }
+    }
+
+    private List<CandidateClientResponse.CandidateExperienceResponse> sort(
+            Set<CandidateClientResponse.CandidateExperienceResponse> candidateExperiences) {
         return candidateExperiences.stream()
                 .sorted(Comparator.comparing(
-                        (CandidateClientResponse.CandidateExperienceResponse exp) -> YearMonth.parse(exp.startDate(), formatter)
-                ).reversed())
+                        (CandidateClientResponse.CandidateExperienceResponse exp) -> parseToYearMonth(exp.startDate()))
+                        .reversed())
                 .collect(Collectors.toList());
     }
 
@@ -113,22 +129,20 @@ public class CandidateMapper {
                 .desiredPosition(candidate.getDesiredPosition())
                 .industries(
                         candidate.getIndustries() != null
-                        ? candidate.getIndustries()
-                        : List.of())
+                                ? candidate.getIndustries()
+                                : List.of())
                 .locations(
                         candidate.getLocations() != null
-                        ? candidate.getLocations()
-                        : List.of())
+                                ? candidate.getLocations()
+                                : List.of())
                 .salaryExpectationMax(candidate.getSalaryExpectationMax())
                 .salaryExpectationMin(candidate.getSalaryExpectationMin())
                 .workTypes(
                         candidate.getWorkTypes() != null
                                 ? candidate.getWorkTypes()
-                                : List.of()
-                )
+                                : List.of())
                 .build();
     }
-
 
     public CandidateClientResponse.GeneralInfoResponse toGeneralInfoResponse(Candidate candidate) {
         if (candidate == null) {
@@ -141,17 +155,14 @@ public class CandidateMapper {
                 .build();
     }
 
-
-
-
-
     // -------------------------------
     // Helpers
     // -------------------------------
 
     /**
      * Ưu tiên contact type PHONE và isPrimary = true.
-     * Nếu có nhiều, chọn verified=true trước. Nếu vẫn nhiều, lấy thằng tạo sớm nhất/ bất kỳ.
+     * Nếu có nhiều, chọn verified=true trước. Nếu vẫn nhiều, lấy thằng tạo sớm
+     * nhất/ bất kỳ.
      */
     private Optional<Contact> findPrimaryPhone(Candidate candidate) {
         Set<Contact> contacts = getContactsSafe(candidate);
@@ -161,10 +172,12 @@ public class CandidateMapper {
                 .sorted((a, b) -> {
                     // sort để ưu tiên primary trước, verified trước
                     int primaryCompare = boolDesc(a.getIsPrimary()).compareTo(boolDesc(b.getIsPrimary()));
-                    if (primaryCompare != 0) return primaryCompare;
+                    if (primaryCompare != 0)
+                        return primaryCompare;
 
                     int verifiedCompare = boolDesc(a.getVerified()).compareTo(boolDesc(b.getVerified()));
-                    if (verifiedCompare != 0) return verifiedCompare;
+                    if (verifiedCompare != 0)
+                        return verifiedCompare;
 
                     // fallback: có thể so sánh createdAt nếu BaseEntity có trường đó
                     // hoặc cứ return 0
@@ -183,10 +196,12 @@ public class CandidateMapper {
                 .filter(c -> c.getContactType() == ContactType.EMAIL)
                 .sorted((a, b) -> {
                     int primaryCompare = boolDesc(a.getIsPrimary()).compareTo(boolDesc(b.getIsPrimary()));
-                    if (primaryCompare != 0) return primaryCompare;
+                    if (primaryCompare != 0)
+                        return primaryCompare;
 
                     int verifiedCompare = boolDesc(a.getVerified()).compareTo(boolDesc(b.getVerified()));
-                    if (verifiedCompare != 0) return verifiedCompare;
+                    if (verifiedCompare != 0)
+                        return verifiedCompare;
 
                     return 0;
                 })
@@ -207,20 +222,23 @@ public class CandidateMapper {
         Optional<Address> homeAddress = addresses.stream()
                 .filter(a -> AddressType.HOME_ADDRESS.name().equalsIgnoreCase(a.getName()))
                 .findFirst();
-        if (homeAddress.isPresent()) return homeAddress;
+        if (homeAddress.isPresent())
+            return homeAddress;
 
         // 2. fallback: isPrimary == true
         Optional<Address> primaryAddr = addresses.stream()
                 .filter(a -> Boolean.TRUE.equals(a.getIsPrimary()))
                 .findFirst();
-        if (primaryAddr.isPresent()) return primaryAddr;
+        if (primaryAddr.isPresent())
+            return primaryAddr;
 
         // 3. fallback: first whatever
         return addresses.stream().findFirst();
     }
 
     private CandidateClientResponse.ContactDTO mapContactToDTO(Contact contact) {
-        if (contact == null) return null;
+        if (contact == null)
+            return null;
         return CandidateClientResponse.ContactDTO.builder()
                 .type(contact.getContactType() != null ? contact.getContactType().name() : null)
                 .value(contact.getValue())
@@ -230,7 +248,8 @@ public class CandidateMapper {
     }
 
     private CandidateClientResponse.AddressDTO mapAddressToDTO(Address address) {
-        if (address == null) return null;
+        if (address == null)
+            return null;
         return CandidateClientResponse.AddressDTO.builder()
                 .country(address.getCountry())
                 .province(address.getProvince())
@@ -273,7 +292,8 @@ public class CandidateMapper {
             return null;
         }
         // ----- lấy email -----
-        // Ưu tiên từ Account nếu có, fallback qua Contact type EMAIL primary (nếu bạn muốn)
+        // Ưu tiên từ Account nếu có, fallback qua Contact type EMAIL primary (nếu bạn
+        // muốn)
         String email = null;
         if (candidate.getAccount() != null && candidate.getAccount().getEmail() != null) {
             email = candidate.getAccount().getEmail();
@@ -292,7 +312,7 @@ public class CandidateMapper {
                 .orElse(null);
 
         return CandidateClientResponse.CandidateProfileResponse.builder()
-                .candidateId(candidate.getId())                 // giả sử Party/Candidate có getId()
+                .candidateId(candidate.getId()) // giả sử Party/Candidate có getId()
                 .firstName(candidate.getFirstName())
                 .lastName(candidate.getLastName())
                 .email(email)

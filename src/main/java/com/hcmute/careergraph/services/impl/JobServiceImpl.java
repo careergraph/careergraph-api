@@ -35,6 +35,7 @@ import com.hcmute.careergraph.services.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.embedding.EmbeddingModel;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
@@ -72,6 +73,9 @@ public class JobServiceImpl implements JobService {
     private final FileRepository fileRepository;
 
     private final ApplicationEventPublisher publisher;
+
+    @Value("${application.cv-suggestion.max-uploaded-context-chars:24000}")
+    private int maxUploadedCvContextChars;
 
     /**
      * Tạo job mới
@@ -654,16 +658,14 @@ public class JobServiceImpl implements JobService {
         validateCvSuggestionLimit(candidateId);
 
         // 3. Gọi AI
-        String cvText = fileRepository.findFirstByOwnerIdAndStatusAndFileTypeInOrderByCreatedDateDesc(
-                        candidateId, Status.ACTIVE, List.of(FileType.RESUME, FileType.CV))
-                .map(File::getResumeExtractedText)
-                .filter(StringUtils::hasText)
-                .orElseGet(() -> buildCandidateProfileText(candidate));
+        CvSourceContext cvSourceContext = buildCvSourceContext(candidateId, candidate);
+        log.info("Generating CV suggestion for candidateId={} jobId={} source={} uploadedCvCount={} chars={}",
+                candidateId, jobId, cvSourceContext.source(), cvSourceContext.uploadedCvCount(), cvSourceContext.text().length());
 
         // 4. Parse kết quả JSON từ AI thành Object
         try {
             // Đôi khi AI trả về markdown ```json ... ```, cần clean trước khi parse
-            String prompt = buildCvGenerationPrompt(job, cvText, candidate);
+            String prompt = buildCvGenerationPrompt(job, cvSourceContext.text(), candidate);
             String jsonResponse = fastAPIClientService.cvSuggestion(prompt);
             String cleanJson = cleanJsonString(jsonResponse);
             return objectMapper.readValue(cleanJson, CvSuggestionResponse.class);
@@ -718,6 +720,69 @@ public class JobServiceImpl implements JobService {
             });
         }
         return sb.toString().replaceAll("\\s+", " ").trim();
+    }
+
+    private CvSourceContext buildCvSourceContext(String candidateId, Candidate candidate) {
+        List<File> uploadedResumes = fileRepository.findByOwnerIdAndStatusAndFileTypeInOrderByCreatedDateDesc(
+                candidateId, Status.ACTIVE, List.of(FileType.RESUME, FileType.CV));
+
+        if (uploadedResumes == null || uploadedResumes.isEmpty()) {
+            return CvSourceContext.profile(buildCandidateProfileText(candidate));
+        }
+
+        StringBuilder sb = new StringBuilder();
+        Set<String> seenHashes = new HashSet<>();
+        int includedCount = 0;
+
+        for (File resume : uploadedResumes) {
+            String resumeText = normalizeResumeText(resume.getResumeExtractedText());
+            if (!StringUtils.hasText(resumeText)) {
+                continue;
+            }
+
+            String dedupeKey = StringUtils.hasText(resume.getResumeContentHash())
+                    ? resume.getResumeContentHash()
+                    : Integer.toHexString(resumeText.hashCode());
+            if (!seenHashes.add(dedupeKey)) {
+                continue;
+            }
+
+            String block = buildResumeContextHeader(resume, includedCount + 1) + "\n" + resumeText + "\n\n";
+            int remaining = maxUploadedCvContextChars - sb.length();
+            if (remaining <= 0) {
+                break;
+            }
+
+            if (block.length() <= remaining) {
+                sb.append(block);
+            } else {
+                sb.append(block, 0, remaining);
+            }
+
+            includedCount++;
+            if (sb.length() >= maxUploadedCvContextChars) {
+                break;
+            }
+        }
+
+        if (!StringUtils.hasText(sb.toString())) {
+            return CvSourceContext.profile(buildCandidateProfileText(candidate));
+        }
+
+        return CvSourceContext.uploaded(sb.toString().trim(), includedCount);
+    }
+
+    private String buildResumeContextHeader(File resume, int index) {
+        String fileName = firstText(resume.getFileName(), resume.getOriginalFileName(), "uploaded_cv_" + index);
+        String uploadedAt = resume.getCreatedDate() != null ? resume.getCreatedDate().toString() : "unknown_time";
+        return "[UPLOADED_CV_" + index + " | " + fileName + " | created_at=" + uploadedAt + "]";
+    }
+
+    private String normalizeResumeText(String text) {
+        if (!StringUtils.hasText(text)) {
+            return null;
+        }
+        return text.replace('\u0000', ' ').trim();
     }
 
     private CvSuggestionResponse buildFallbackCvSuggestion(Candidate candidate) {
@@ -888,7 +953,7 @@ public class JobServiceImpl implements JobService {
                 : Collections.emptyList();
         sb.append("Học vấn: ").append(educations).append("\n\n");
 
-        sb.append("--- CV TEXT SOURCE ---\n");
+        sb.append("--- CV TEXT SOURCE (ALL ACTIVE UPLOADED CVS IF AVAILABLE) ---\n");
         sb.append(StringUtils.hasText(cvText) ? cvText : buildCandidateProfileText(candidate)).append("\n\n");
         sb.append("Gap analysis required: compare TARGET JOB with CV TEXT SOURCE, then return matchedSkills, missingSkills, suggestions, and overallMatchScore from 0 to 100.\n\n");
 
@@ -918,6 +983,16 @@ public class JobServiceImpl implements JobService {
                 "}");
 
         return sb.toString();
+    }
+
+    private record CvSourceContext(String text, String source, int uploadedCvCount) {
+        private static CvSourceContext uploaded(String text, int uploadedCvCount) {
+            return new CvSourceContext(text, "uploaded_cvs", uploadedCvCount);
+        }
+
+        private static CvSourceContext profile(String text) {
+            return new CvSourceContext(text, "candidate_profile", 0);
+        }
     }
 
     private Job findOwnedJob(String jobId, String companyId) {

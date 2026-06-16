@@ -54,7 +54,8 @@ public class FastAPIClientServiceImpl implements FastAPIClientService {
     @Override
     public String cvSuggestion(String prompt) {
         try {
-            log.info("Calling FastAPI cv suggestion endpoint with prompt: {}", prompt);
+            log.info("Calling FastAPI cv suggestion endpoint with promptLength={}",
+                    prompt != null ? prompt.length() : 0);
 
             // WebClient POST request to FastAPI
             String response = webClient.post()
