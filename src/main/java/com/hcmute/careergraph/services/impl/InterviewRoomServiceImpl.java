@@ -76,12 +76,12 @@ public class InterviewRoomServiceImpl implements InterviewRoomService {
                 .orElseThrow(() -> new BadRequestException("Candidate not found"));
 
         RoomParticipant existing = participantRepository.findByRoomIdAndApplicationId(roomId, applicationId)
-            .orElse(null);
+                .orElse(null);
 
         if (existing != null) {
             if (existing.getAdmitStatus() == AdmitStatus.ADMITTED
-                || existing.getAdmitStatus() == AdmitStatus.COMPLETED) {
-            throw new BadRequestException("Candidate already has an active slot in this room");
+                    || existing.getAdmitStatus() == AdmitStatus.COMPLETED) {
+                throw new BadRequestException("Candidate already has an active slot in this room");
             }
 
             existing.setCandidate(candidate);
@@ -99,7 +99,7 @@ public class InterviewRoomServiceImpl implements InterviewRoomService {
 
             RoomParticipant saved = participantRepository.save(existing);
             log.info("Updated participant slot for candidate {} in room {} ({} - {})",
-                candidateId, room.getRoomCode(), slotStart, slotEnd);
+                    candidateId, room.getRoomCode(), slotStart, slotEnd);
             return saved;
         }
 
@@ -270,7 +270,8 @@ public class InterviewRoomServiceImpl implements InterviewRoomService {
                     i.setInterviewStatus(InterviewStatus.IN_PROGRESS);
                     interviewRepository.save(i);
                     log.info("Interview {} auto-transitioned to IN_PROGRESS when candidate {} admitted in room {}",
-                            i.getId(), participant.getCandidate() != null ? participant.getCandidate().getId() : "unknown",
+                            i.getId(),
+                            participant.getCandidate() != null ? participant.getCandidate().getId() : "unknown",
                             roomCode);
                 });
     }
