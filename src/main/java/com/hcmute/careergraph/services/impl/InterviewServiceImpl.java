@@ -174,24 +174,7 @@ public class InterviewServiceImpl implements InterviewService {
             }
         }
 
-        // Check candidate conflicts
-        List<Interview> conflicts = interviewRepository.findOverlappingByCandidate(
-                application.getCandidate().getId(), scheduledAt, endAt, ACTIVE_STATUSES);
-        if (!conflicts.isEmpty()) {
-            throw new AppException(ErrorType.BAD_REQUEST, "Ứng viên đang có lịch phỏng vấn trùng thời gian");
-        }
-
-        // Check interviewer conflicts
-        if (request.getInterviewerIds() != null) {
-            for (String interviewerId : request.getInterviewerIds()) {
-                List<Interview> interviewerConflicts = interviewRepository.findOverlappingByParticipant(
-                        interviewerId, scheduledAt, endAt, ACTIVE_STATUSES);
-                if (!interviewerConflicts.isEmpty()) {
-                    throw new AppException(ErrorType.BAD_REQUEST,
-                            "Người phỏng vấn " + interviewerId + " đang có lịch trùng thời gian");
-                }
-            }
-        }
+        validateInterviewerConflicts(request.getInterviewerIds(), scheduledAt, endAt);
 
         if (type == InterviewType.OFFLINE && !StringUtils.hasText(request.getLocation())) {
             throw new AppException(ErrorType.BAD_REQUEST, "Phỏng vấn offline bắt buộc phải có địa điểm");
@@ -416,13 +399,7 @@ public class InterviewServiceImpl implements InterviewService {
             throw new AppException(ErrorType.BAD_REQUEST, "Lịch phỏng vấn không thuộc công ty của bạn");
         }
 
-        // Cancel the original
-        original.setInterviewStatus(InterviewStatus.CANCELLED);
-        original.setCancellationReason("Rescheduled");
-        original.setHiddenFromCandidate(false);
-        interviewRepository.save(original);
-
-        // Create new interview
+        // Prepare new interview times first so we can validate conflicts before mutating the original record.
         LocalDate date = LocalDate.parse(request.getNewDate(), DateTimeFormatter.ISO_LOCAL_DATE);
         LocalTime startTime = LocalTime.parse(request.getNewStartTime(), DateTimeFormatter.ofPattern("HH:mm"));
         LocalDateTime scheduledAt = LocalDateTime.of(date, startTime);
@@ -430,6 +407,12 @@ public class InterviewServiceImpl implements InterviewService {
             throw new AppException(ErrorType.BAD_REQUEST, "Không thể dời lịch phỏng vấn vào thời điểm trong quá khứ");
         }
         LocalDateTime endAt = scheduledAt.plusMinutes(request.getDurationMinutes());
+
+        // Cancel the original only after the replacement slot is accepted by business rules.
+        original.setInterviewStatus(InterviewStatus.CANCELLED);
+        original.setCancellationReason("Rescheduled");
+        original.setHiddenFromCandidate(false);
+        interviewRepository.save(original);
 
         String meetingLink = null;
         if (original.getType() == InterviewType.ONLINE) {
@@ -491,12 +474,9 @@ public class InterviewServiceImpl implements InterviewService {
                     "Interview can only be completed from SCHEDULED, CONFIRMED, or IN_PROGRESS status");
         }
 
-        if (!hasInterviewStarted(interview)) {
-            throw new AppException(ErrorType.BAD_REQUEST,
-                    "Cannot complete interview before the scheduled start time");
-        }
-
-        validateCandidateJoinedForRoomInterview(interview,
+        validateInterviewReadyForHrAction(
+                interview,
+                "Cannot complete interview before the scheduled start time",
                 "Cannot complete interview because candidate has not joined this interview room yet");
 
         interview.setInterviewStatus(InterviewStatus.COMPLETED);
@@ -577,12 +557,9 @@ public class InterviewServiceImpl implements InterviewService {
                     "Feedback can only be added to SCHEDULED, CONFIRMED, IN_PROGRESS, or COMPLETED interviews");
         }
 
-        if (!hasInterviewStarted(interview)) {
-            throw new AppException(ErrorType.BAD_REQUEST,
-                    "Cannot add feedback before the scheduled start time");
-        }
-
-        validateCandidateJoinedForRoomInterview(interview,
+        validateInterviewReadyForHrAction(
+                interview,
+                "Cannot add feedback before the scheduled start time",
                 "Cannot add feedback because candidate has not joined this interview room yet");
 
         if (feedbackRepository.existsByInterviewIdAndReviewerId(interviewId, reviewerAccountId)) {
@@ -716,15 +693,15 @@ public class InterviewServiceImpl implements InterviewService {
         proposal.setProposalStatus(ProposalStatus.ACCEPTED);
         timeProposalRepository.save(proposal);
 
-        // Cancel the original interview
+        // Create new interview with proposed times
+        LocalDateTime scheduledAt = LocalDateTime.of(proposal.getProposedDate(), proposal.getProposedStartTime());
+        LocalDateTime endAt = scheduledAt.plusMinutes(proposal.getProposedDurationMinutes());
+
+        // Cancel the original interview only after the replacement time passes privacy checks.
         interview.setInterviewStatus(InterviewStatus.CANCELLED);
         interview.setCancellationReason("Rescheduled per candidate proposal");
         interview.setHiddenFromCandidate(false);
         interviewRepository.save(interview);
-
-        // Create new interview with proposed times
-        LocalDateTime scheduledAt = LocalDateTime.of(proposal.getProposedDate(), proposal.getProposedStartTime());
-        LocalDateTime endAt = scheduledAt.plusMinutes(proposal.getProposedDurationMinutes());
 
         // Daily Room Model: reuse room by job + date
         String meetingLink = null;
@@ -941,6 +918,28 @@ public class InterviewServiceImpl implements InterviewService {
         }
     }
 
+    private void validateInterviewReadyForHrAction(
+            Interview interview,
+            String beforeScheduledStartMessage,
+            String onlineRoomJoinMessage) {
+        if (interview == null) {
+            return;
+        }
+
+        boolean onlineWithRoomParticipation = interview.getType() == InterviewType.ONLINE
+                && StringUtils.hasText(interview.getMeetingLink())
+                && interview.getApplication() != null;
+
+        if (onlineWithRoomParticipation) {
+            validateCandidateJoinedForRoomInterview(interview, onlineRoomJoinMessage);
+            return;
+        }
+
+        if (!hasInterviewStarted(interview)) {
+            throw new AppException(ErrorType.BAD_REQUEST, beforeScheduledStartMessage);
+        }
+    }
+
     private boolean hasInterviewStarted(Interview interview) {
         if (interview == null || interview.getScheduledAt() == null) {
             return false;
@@ -1059,6 +1058,28 @@ public class InterviewServiceImpl implements InterviewService {
                 .mapToInt(this::resolveRoundNumber)
                 .max()
                 .orElse(0);
+    }
+
+    private void validateInterviewerConflicts(
+            List<String> interviewerIds,
+            LocalDateTime proposedStart,
+            LocalDateTime proposedEnd) {
+        if (interviewerIds == null) {
+            return;
+        }
+
+        for (String interviewerId : interviewerIds) {
+            List<Interview> interviewerConflicts = interviewRepository.findOverlappingByParticipant(
+                    interviewerId,
+                    proposedStart,
+                    proposedEnd,
+                    ACTIVE_STATUSES);
+            if (!interviewerConflicts.isEmpty()) {
+                throw new AppException(
+                        ErrorType.BAD_REQUEST,
+                        "Người phỏng vấn " + interviewerId + " đang có lịch trùng thời gian");
+            }
+        }
     }
 
     private List<Interview> normalizeActiveInterviews(List<Interview> activeInterviews, LocalDateTime now) {
