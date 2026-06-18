@@ -70,7 +70,8 @@ public class InterviewServiceImpl implements InterviewService {
             ApplicationStage.HR_CONTACTED,
             ApplicationStage.SCHEDULED,
             ApplicationStage.INTERVIEW,
-            ApplicationStage.INTERVIEW_SCHEDULED);
+            ApplicationStage.INTERVIEW_SCHEDULED,
+            ApplicationStage.INTERVIEW_COMPLETED);
 
     @Override
     public Interview createInterview(InterviewRequest request, String companyId) {
@@ -477,10 +478,16 @@ public class InterviewServiceImpl implements InterviewService {
         if (!interview.getCompany().getId().equals(companyId)) {
             throw new AppException(ErrorType.BAD_REQUEST, "Interview does not belong to your company");
         }
-        if (interview.getInterviewStatus() != InterviewStatus.CONFIRMED
+        if (interview.getInterviewStatus() != InterviewStatus.SCHEDULED
+                && interview.getInterviewStatus() != InterviewStatus.CONFIRMED
                 && interview.getInterviewStatus() != InterviewStatus.IN_PROGRESS) {
             throw new AppException(ErrorType.BAD_REQUEST,
-                    "Interview can only be completed from CONFIRMED or IN_PROGRESS status");
+                    "Interview can only be completed from SCHEDULED, CONFIRMED, or IN_PROGRESS status");
+        }
+
+        if (!hasInterviewStarted(interview)) {
+            throw new AppException(ErrorType.BAD_REQUEST,
+                    "Cannot complete interview before the scheduled start time");
         }
 
         validateCandidateJoinedForRoomInterview(interview,
@@ -556,15 +563,21 @@ public class InterviewServiceImpl implements InterviewService {
             String reviewerAccountId) {
         Interview interview = getInterviewById(interviewId);
 
-        validateCandidateJoinedForRoomInterview(interview,
-                "Cannot add feedback because candidate has not joined this interview room yet");
-
-        if (interview.getInterviewStatus() != InterviewStatus.CONFIRMED
+        if (interview.getInterviewStatus() != InterviewStatus.SCHEDULED
+                && interview.getInterviewStatus() != InterviewStatus.CONFIRMED
                 && interview.getInterviewStatus() != InterviewStatus.IN_PROGRESS
                 && interview.getInterviewStatus() != InterviewStatus.COMPLETED) {
             throw new AppException(ErrorType.BAD_REQUEST,
-                    "Feedback can only be added to CONFIRMED, IN_PROGRESS, or COMPLETED interviews");
+                    "Feedback can only be added to SCHEDULED, CONFIRMED, IN_PROGRESS, or COMPLETED interviews");
         }
+
+        if (!hasInterviewStarted(interview)) {
+            throw new AppException(ErrorType.BAD_REQUEST,
+                    "Cannot add feedback before the scheduled start time");
+        }
+
+        validateCandidateJoinedForRoomInterview(interview,
+                "Cannot add feedback because candidate has not joined this interview room yet");
 
         if (feedbackRepository.existsByInterviewIdAndReviewerId(interviewId, reviewerAccountId)) {
             throw new AppException(ErrorType.BAD_REQUEST, "You have already submitted feedback for this interview");
@@ -918,6 +931,13 @@ public class InterviewServiceImpl implements InterviewService {
         if (participant.getJoinedAt() == null) {
             throw new AppException(ErrorType.BAD_REQUEST, errorMessage);
         }
+    }
+
+    private boolean hasInterviewStarted(Interview interview) {
+        if (interview == null || interview.getScheduledAt() == null) {
+            return false;
+        }
+        return !LocalDateTime.now().isBefore(interview.getScheduledAt());
     }
 
     private void updateApplicationStageFromFeedback(Interview interview, FeedbackRecommendation recommendation) {
