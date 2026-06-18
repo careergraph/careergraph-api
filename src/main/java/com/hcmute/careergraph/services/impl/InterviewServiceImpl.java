@@ -369,7 +369,9 @@ public class InterviewServiceImpl implements InterviewService {
             throw new AppException(ErrorType.BAD_REQUEST, "Interview can only be confirmed when in SCHEDULED status");
         }
         interview.setInterviewStatus(InterviewStatus.CONFIRMED);
-        return interviewRepository.save(interview);
+        Interview saved = interviewRepository.save(interview);
+        notificationService.onInterviewConfirmedByCandidate(saved);
+        return saved;
     }
 
     @Override
@@ -384,7 +386,9 @@ public class InterviewServiceImpl implements InterviewService {
         }
         interview.setInterviewStatus(InterviewStatus.CANCELLED);
         interview.setCancellationReason(reason);
-        return interviewRepository.save(interview);
+        Interview saved = interviewRepository.save(interview);
+        notificationService.onInterviewDeclinedByCandidate(saved);
+        return saved;
     }
 
     @Override
@@ -400,7 +404,9 @@ public class InterviewServiceImpl implements InterviewService {
         interview.setInterviewStatus(InterviewStatus.CANCELLED);
         interview.setCancellationReason(reason);
         interview.setHiddenFromCandidate(false);
-        return interviewRepository.save(interview);
+        Interview saved = interviewRepository.save(interview);
+        notificationService.onInterviewCancelledByHr(saved);
+        return saved;
     }
 
     @Override
@@ -670,6 +676,7 @@ public class InterviewServiceImpl implements InterviewService {
         interviewRepository.save(interview);
 
         log.info("Candidate proposed {} alternative time(s) for interview {}", proposals.size(), interviewId);
+        notificationService.onInterviewRescheduleProposed(interview, proposals.size());
         return proposals;
     }
 
@@ -765,7 +772,7 @@ public class InterviewServiceImpl implements InterviewService {
 
         log.info("HR accepted proposal {} — rescheduled interview {} to {}", proposalId, interviewId, saved.getId());
         Interview reloaded = interviewRepository.findById(saved.getId()).orElse(saved);
-        notificationService.onInterviewScheduled(reloaded, true);
+        notificationService.onInterviewRescheduleAccepted(reloaded);
         return reloaded;
     }
 
@@ -794,6 +801,7 @@ public class InterviewServiceImpl implements InterviewService {
         }
 
         log.info("HR rejected proposal {} for interview {}", proposalId, interviewId);
+        notificationService.onInterviewRescheduleRejected(interview);
     }
 
     private Account findAccountByCandidate(Candidate candidate) {

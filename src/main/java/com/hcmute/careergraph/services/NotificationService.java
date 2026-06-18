@@ -37,6 +37,18 @@ public interface NotificationService {
 
   void onInterviewScheduled(Interview interview, boolean rescheduled);
 
+  void onInterviewConfirmedByCandidate(Interview interview);
+
+  void onInterviewDeclinedByCandidate(Interview interview);
+
+  void onInterviewCancelledByHr(Interview interview);
+
+  void onInterviewRescheduleProposed(Interview interview, int proposalCount);
+
+  void onInterviewRescheduleAccepted(Interview interview);
+
+  void onInterviewRescheduleRejected(Interview interview);
+
   void onNewApplication(Application application);
 
   /**

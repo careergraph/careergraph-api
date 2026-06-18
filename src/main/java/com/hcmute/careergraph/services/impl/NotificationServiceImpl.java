@@ -249,6 +249,97 @@ public class NotificationServiceImpl implements NotificationService {
   }
 
   @Override
+  public void onInterviewConfirmedByCandidate(Interview interview) {
+    notifyHrInterviewEvent(
+        interview,
+        NotificationType.INTERVIEW_CONFIRMED,
+        "Ứng viên đã xác nhận lịch phỏng vấn",
+        String.format("%s đã xác nhận tham gia phỏng vấn %s cho %s lúc %s.",
+            resolveInterviewCandidateName(interview),
+            resolveInterviewRoundLabel(interview),
+            resolveInterviewJobTitle(interview),
+            resolveInterviewScheduleText(interview)));
+  }
+
+  @Override
+  public void onInterviewDeclinedByCandidate(Interview interview) {
+    String reason = interview != null && StringUtils.hasText(interview.getCancellationReason())
+        ? " Lý do: " + interview.getCancellationReason().trim() + "."
+        : "";
+
+    notifyHrInterviewEvent(
+        interview,
+        NotificationType.INTERVIEW_DECLINED,
+        "Ứng viên đã từ chối phỏng vấn",
+        String.format("%s đã từ chối phỏng vấn %s cho %s lúc %s.%s",
+            resolveInterviewCandidateName(interview),
+            resolveInterviewRoundLabel(interview),
+            resolveInterviewJobTitle(interview),
+            resolveInterviewScheduleText(interview),
+            reason));
+  }
+
+  @Override
+  public void onInterviewCancelledByHr(Interview interview) {
+    String reason = interview != null && StringUtils.hasText(interview.getCancellationReason())
+        ? " Lý do: " + interview.getCancellationReason().trim() + "."
+        : "";
+
+    notifyCandidateInterviewEvent(
+        interview,
+        NotificationType.INTERVIEW_CANCELLED,
+        "Lịch phỏng vấn đã bị hủy",
+        String.format("%s đã hủy lịch phỏng vấn %s cho %s lúc %s.%s",
+            resolveInterviewCompanyName(interview),
+            resolveInterviewRoundLabel(interview),
+            resolveInterviewJobTitle(interview),
+            resolveInterviewScheduleText(interview),
+            reason));
+  }
+
+  @Override
+  public void onInterviewRescheduleProposed(Interview interview, int proposalCount) {
+    String proposalLabel = proposalCount > 1
+        ? proposalCount + " đề xuất thời gian mới"
+        : "một đề xuất thời gian mới";
+
+    notifyHrInterviewEvent(
+        interview,
+        NotificationType.INTERVIEW_RESCHEDULE_PROPOSED,
+        "Ứng viên đề xuất đổi lịch phỏng vấn",
+        String.format("%s đã gửi %s cho phỏng vấn %s của %s.",
+            resolveInterviewCandidateName(interview),
+            proposalLabel,
+            resolveInterviewRoundLabel(interview),
+            resolveInterviewJobTitle(interview)));
+  }
+
+  @Override
+  public void onInterviewRescheduleAccepted(Interview interview) {
+    notifyCandidateInterviewEvent(
+        interview,
+        NotificationType.INTERVIEW_RESCHEDULE_ACCEPTED,
+        "HR đã xác nhận lịch phỏng vấn mới",
+        String.format("%s đã xác nhận lịch phỏng vấn %s cho %s lúc %s.",
+            resolveInterviewCompanyName(interview),
+            resolveInterviewRoundLabel(interview),
+            resolveInterviewJobTitle(interview),
+            resolveInterviewScheduleText(interview)));
+  }
+
+  @Override
+  public void onInterviewRescheduleRejected(Interview interview) {
+    notifyCandidateInterviewEvent(
+        interview,
+        NotificationType.INTERVIEW_RESCHEDULE_REJECTED,
+        "Đề xuất đổi lịch chưa được chấp nhận",
+        String.format("%s đã từ chối đề xuất đổi lịch cho phỏng vấn %s của %s.",
+            resolveInterviewCompanyName(interview),
+            resolveInterviewRoundLabel(interview),
+            resolveInterviewJobTitle(interview)));
+  }
+
+  @Override
   public void onNewApplication(Application application) {
     if (application == null || application.getJob() == null || application.getJob().getCompany() == null) {
       return;
@@ -573,6 +664,93 @@ public class NotificationServiceImpl implements NotificationService {
   }
 
   private record NotificationContent(String title, String body) {
+  }
+
+  private void notifyHrInterviewEvent(Interview interview, NotificationType type, String title, String body) {
+    if (interview == null || interview.getCompany() == null) {
+      return;
+    }
+
+    Optional<Account> companyAccountOpt = accountRepository.findByCompanyId(interview.getCompany().getId());
+    if (companyAccountOpt.isEmpty()) {
+      log.warn("Company account not found for interview notification {}", interview.getId());
+      return;
+    }
+
+    createNotification(
+        companyAccountOpt.get().getId(),
+        type,
+        title,
+        body,
+        buildInterviewNotificationData(interview, true));
+  }
+
+  private void notifyCandidateInterviewEvent(Interview interview, NotificationType type, String title, String body) {
+    if (interview == null || interview.getCandidate() == null) {
+      return;
+    }
+
+    Optional<Account> candidateAccountOpt = accountRepository.findByCandidateId(interview.getCandidate().getId());
+    if (candidateAccountOpt.isEmpty()) {
+      log.warn("Candidate account not found for interview notification {}", interview.getId());
+      return;
+    }
+
+    createNotification(
+        candidateAccountOpt.get().getId(),
+        type,
+        title,
+        body,
+        buildInterviewNotificationData(interview, false));
+  }
+
+  private HashMap<String, Object> buildInterviewNotificationData(Interview interview, boolean hrView) {
+    HashMap<String, Object> data = new HashMap<>();
+    if (interview == null) {
+      return data;
+    }
+
+    data.put("interviewId", interview.getId());
+    data.put("applicationId", interview.getApplication() != null ? interview.getApplication().getId() : null);
+    data.put("jobId", interview.getJob() != null ? interview.getJob().getId() : null);
+    data.put("candidateId", interview.getCandidate() != null ? interview.getCandidate().getId() : null);
+    data.put("companyId", interview.getCompany() != null ? interview.getCompany().getId() : null);
+    data.put("scheduledAt", interview.getScheduledAt() != null ? interview.getScheduledAt().toString() : null);
+    data.put("interviewStatus", interview.getInterviewStatus() != null ? interview.getInterviewStatus().name() : null);
+    data.put("navigateTo", hrView
+        ? "/interviews/" + interview.getId()
+        : "/interviews?interviewId=" + interview.getId());
+    return data;
+  }
+
+  private String resolveInterviewCandidateName(Interview interview) {
+    return interview != null && interview.getCandidate() != null
+        ? resolveCandidateName(interview.getCandidate())
+        : "Ứng viên";
+  }
+
+  private String resolveInterviewCompanyName(Interview interview) {
+    return interview != null && interview.getCompany() != null
+        ? resolveCompanyName(interview.getCompany())
+        : "Công ty";
+  }
+
+  private String resolveInterviewJobTitle(Interview interview) {
+    return Optional.ofNullable(interview)
+        .map(Interview::getJob)
+        .map(Job::getTitle)
+        .orElse("vị trí ứng tuyển");
+  }
+
+  private String resolveInterviewRoundLabel(Interview interview) {
+    int roundNumber = resolveRoundNumber(interview);
+    return roundNumber > 1 ? "vòng " + roundNumber : "vòng 1";
+  }
+
+  private String resolveInterviewScheduleText(Interview interview) {
+    return interview != null && interview.getScheduledAt() != null
+        ? interview.getScheduledAt().format(INTERVIEW_TIME_FORMATTER)
+        : "thời gian đã hẹn";
   }
 
   private String resolveAccountDisplayName(Account account) {
