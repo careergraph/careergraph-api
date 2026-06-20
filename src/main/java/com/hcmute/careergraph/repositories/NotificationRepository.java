@@ -20,6 +20,13 @@ public interface NotificationRepository extends JpaRepository<Notification, Stri
 
   long countByRecipientIdAndReadFalse(String recipientId);
 
+  Page<Notification> findByRecipientIdAndTypeNotOrderByCreatedDateDesc(
+      String recipientId,
+      NotificationType type,
+      Pageable pageable);
+
+  long countByRecipientIdAndReadFalseAndTypeNot(String recipientId, NotificationType type);
+
   Page<Notification> findByRecipientIdAndTypeAndCreatedDateGreaterThanEqualOrderByCreatedDateDesc(
       String recipientId,
       NotificationType type,
@@ -35,6 +42,19 @@ public interface NotificationRepository extends JpaRepository<Notification, Stri
   @Modifying
   @Query("UPDATE Notification n SET n.read = true, n.readAt = :now WHERE n.recipient.id = :accountId AND n.read = false")
   int markAllAsRead(@Param("accountId") String accountId, @Param("now") LocalDateTime now);
+
+  @Modifying
+  @Query("""
+      UPDATE Notification n
+      SET n.read = true, n.readAt = :now
+      WHERE n.recipient.id = :accountId
+        AND n.read = false
+        AND n.type <> :excludedType
+      """)
+  int markAllAsReadExcludingType(
+      @Param("accountId") String accountId,
+      @Param("excludedType") NotificationType excludedType,
+      @Param("now") LocalDateTime now);
 
   @Modifying
   @Query("DELETE FROM Notification n WHERE n.createdDate < :cutoff")
