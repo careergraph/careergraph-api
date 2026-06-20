@@ -1,7 +1,6 @@
-Bạn hãy đóng vai trò là senior dev 15 + năm kinh nghiệm và nhà thiết kê hệ thống chuẩn production hãy thực hiện. 
+Bạn hãy đóng vai trò là senior dev 15 + năm kinh nghiệm và nhà thiết kê hệ thống chuẩn production hãy thực hiện. Bạn hãy đọc src để đúng ngữ cảnh. 
 
-- Kiểm tra là phỏng vấn online khi ứng viên đã phòng mà không thể hoàn thành phỏng vấ báo là phải chờ đến thời điểm bắt đầu cuộc họp bắt đầu( mà điều kiện này chỉ dành cho phỏng vấn online ) - Hiện tại phỏng vấn online không cần check là tới thơi điểm họp hay chưa cái này chỉ dành cho phỏng vấn offline thôi. ( là có thể tham gia sớm 15 thì có thể không phỏng vấn đã xong ở cuộn họp ngày.) Quy định ứng viên có thể vào phòng sớm 15p là giữ nguyên không được sửa
-- Kiểm tra là không thể tạo lịch phỏng vấn cho ứng viên khi ở ứng viên đã trung lịch phỏng vấn là cùng công ty hay khác công, hiện tại tôi muốn trong cùng 1 cty lên lịch cho 2 job khác nhau thì oke, chứ mà nếu khác công ty thì bị lộ quyền riêng tư là ứng viên này cũng apply và phỏng vấn công ty khác
+- Tôi đang bị lỗi socket trên môi trường thực, hãy nghiên cứu sửa lỗi. deploy trên chuyển qua dùng socket pooling có được không  có chuẩn production. (ở môi trường local hoạt động bình thường). TÔi dùng VPS để host API, RTC, Traefik ( dùng reverse proxy). Dùng cloudfront để trỏ tới. 
 
 Bạn hãy đóng vai trò là senior test để kiểm tra lại các chức năng đã hoạt động đúng chủân chưa. 
 Và đóng vai trò là khách hàng khó tính kiểm tra lại UI UX thuận tiện chưa production chaư

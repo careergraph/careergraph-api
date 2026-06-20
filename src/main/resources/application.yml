@@ -211,6 +211,14 @@ socket:
   # Shared key for backend -> RTC internal API authentication.
   internal:
     api-key: ${SOCKET_INTERNAL_API_KEY:dev-secret-change-in-prod}
+  http:
+    connect-timeout-ms: ${SOCKET_HTTP_CONNECT_TIMEOUT_MS:5000}
+    response-timeout-ms: ${SOCKET_HTTP_RESPONSE_TIMEOUT_MS:10000}
+    pool:
+      max-connections: ${SOCKET_HTTP_POOL_MAX_CONNECTIONS:50}
+      pending-acquire-timeout-ms: ${SOCKET_HTTP_POOL_PENDING_ACQUIRE_TIMEOUT_MS:10000}
+      max-idle-time-ms: ${SOCKET_HTTP_POOL_MAX_IDLE_TIME_MS:20000}
+      max-life-time-ms: ${SOCKET_HTTP_POOL_MAX_LIFE_TIME_MS:120000}
 
 notification:
   # Skip creating another NEW_MESSAGE notification in the same thread
