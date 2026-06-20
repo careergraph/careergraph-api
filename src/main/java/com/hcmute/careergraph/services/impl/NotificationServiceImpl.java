@@ -42,6 +42,7 @@ public class NotificationServiceImpl implements NotificationService {
   private static final int SEARCH_PAGE_SIZE = 10;
   private static final ZoneId VIETNAM_TIME_ZONE = ZoneId.of("Asia/Ho_Chi_Minh");
   private static final DateTimeFormatter INTERVIEW_TIME_FORMATTER = DateTimeFormatter.ofPattern("HH:mm dd/MM/yyyy");
+  private static final NotificationType BELL_EXCLUDED_TYPE = NotificationType.NEW_MESSAGE;
 
   private final NotificationRepository notificationRepository;
   private final AccountRepository accountRepository;
@@ -108,9 +109,11 @@ public class NotificationServiceImpl implements NotificationService {
     Pageable pageable = PageRequest.of(safePage, safeSize, Sort.by(Sort.Direction.DESC, "createdDate"));
 
     Page<Notification> notificationsPage = notificationRepository
-        .findByRecipientIdOrderByCreatedDateDesc(currentAccount.getId(), pageable);
+        .findByRecipientIdAndTypeNotOrderByCreatedDateDesc(currentAccount.getId(), BELL_EXCLUDED_TYPE, pageable);
 
-    long totalUnread = notificationRepository.countByRecipientIdAndReadFalse(currentAccount.getId());
+    long totalUnread = notificationRepository.countByRecipientIdAndReadFalseAndTypeNot(
+        currentAccount.getId(),
+        BELL_EXCLUDED_TYPE);
 
     return MessagingResponses.NotificationPageDto.builder()
         .notifications(notificationsPage.getContent().stream().map(this::toDto).toList())
@@ -137,13 +140,18 @@ public class NotificationServiceImpl implements NotificationService {
 
   @Override
   public void markAllAsRead(Account currentAccount) {
-    notificationRepository.markAllAsRead(currentAccount.getId(), LocalDateTime.now());
+    notificationRepository.markAllAsReadExcludingType(
+        currentAccount.getId(),
+        BELL_EXCLUDED_TYPE,
+        LocalDateTime.now());
   }
 
   @Override
   @Transactional(readOnly = true)
   public long getUnreadCount(Account currentAccount) {
-    return notificationRepository.countByRecipientIdAndReadFalse(currentAccount.getId());
+    return notificationRepository.countByRecipientIdAndReadFalseAndTypeNot(
+        currentAccount.getId(),
+        BELL_EXCLUDED_TYPE);
   }
 
   @Override
@@ -612,7 +620,9 @@ public class NotificationServiceImpl implements NotificationService {
       return;
     }
 
-    long unreadNotifications = notificationRepository.countByRecipientIdAndReadFalse(recipientId);
+    long unreadNotifications = notificationRepository.countByRecipientIdAndReadFalseAndTypeNot(
+        recipientId,
+        BELL_EXCLUDED_TYPE);
     long unreadMessages = messageRepository.countTotalUnread(recipientId, LocalDateTime.of(1970, 1, 1, 0, 0));
     socketNotificationPusher.pushUnreadCounts(UUID.fromString(recipientId), unreadMessages, unreadNotifications);
   }

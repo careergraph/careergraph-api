@@ -41,7 +41,11 @@ public class SocketNotificationPusher {
         .bodyValue(payload)
         .retrieve()
         .toBodilessEntity()
-        .doOnSuccess(response -> log.info("Pushed notification {} to user {}", notification.getType(), userId))
+        .doOnSuccess(response -> log.info(
+            "Pushed notification type={} id={} to user={}",
+            notification.getType(),
+            notification.getId(),
+            userId))
         .doOnError(error -> log.warn("Failed to push notification {} to user {}: {}",
             notification.getType(),
             userId,
@@ -66,7 +70,11 @@ public class SocketNotificationPusher {
         .bodyValue(payload)
         .retrieve()
         .toBodilessEntity()
-        .doOnSuccess(response -> log.info("Pushed unread counts to user {}", userId))
+        .doOnSuccess(response -> log.info(
+            "Pushed unread counts to user={} notifications={} messages={}",
+            userId,
+            notifications,
+            messages))
         .doOnError(error -> log.warn("Failed to push unread counts to user {}: {}",
             userId,
             error.getMessage()))
