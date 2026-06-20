@@ -669,7 +669,31 @@ public class NotificationServiceImpl implements NotificationService {
           "Cập nhật hồ sơ ứng tuyển",
           String.format("Hồ sơ của bạn tại %s đã được cập nhật sang trạng thái %s.",
               companyName,
-              newStage.getLabel()));
+              getVietnameseApplicationStageLabel(newStage)));
+    };
+  }
+
+  private String getVietnameseApplicationStageLabel(ApplicationStage stage) {
+    if (stage == null) {
+      return "";
+    }
+
+    return switch (stage) {
+      case APPLIED -> "Đã nộp đơn";
+      case SCREENING -> "Đang sàng lọc hồ sơ";
+      case INTERVIEW -> "Phỏng vấn";
+      case HR_CONTACTED -> "Đã liên hệ HR";
+      case SCHEDULED -> "Hẹn phỏng vấn";
+      case INTERVIEW_SCHEDULED -> "Lịch phỏng vấn đã được sắp xếp";
+      case INTERVIEW_COMPLETED -> "Phỏng vấn hoàn tất";
+      case TRIAL -> "Thử việc";
+      case OFFER_EXTENDED -> "Đề nghị làm việc đã gửi";
+      case OFFER_ACCEPTED -> "Đã chấp nhận đề nghị";
+      case OFFER_DECLINED -> "Đã từ chối đề nghị";
+      case HIRED -> "Chính thức nhận việc";
+      case OFFBOARDED -> "Nghỉ việc";
+      case REJECTED -> "Ứng tuyển bị từ chối";
+      case WITHDRAWN -> "Đã rút hồ sơ";
     };
   }
 
