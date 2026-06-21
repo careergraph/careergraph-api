@@ -58,4 +58,14 @@ public interface NotificationService {
       String summarySnippet);
 
   void onNewMessage(Message message, MessageThread thread);
+
+  void onCompanyVerificationApproved(Company company, CompanyVerificationRequest request);
+
+  void onCompanyVerificationRejected(Company company, CompanyVerificationRequest request, String reason);
+
+  void onCompanyVerificationNeedsInfo(Company company, CompanyVerificationRequest request, String reason);
+
+  void onCompanyBlocked(Company company, String reason);
+
+  void onCompanyUnblocked(Company company, String note);
 }

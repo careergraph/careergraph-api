@@ -481,6 +481,56 @@ public class NotificationServiceImpl implements NotificationService {
         data);
   }
 
+  @Override
+  public void onCompanyVerificationApproved(Company company, CompanyVerificationRequest request) {
+    notifyCompanyAccount(
+        company,
+        NotificationType.COMPANY_VERIFICATION_APPROVED,
+        "Thông tin công ty đã được phê duyệt",
+        "Công ty của bạn đã được xác thực và có thể đăng tải công việc.",
+        buildCompanyVerificationData(company, request, null, "/company/verification"));
+  }
+
+  @Override
+  public void onCompanyVerificationRejected(Company company, CompanyVerificationRequest request, String reason) {
+    notifyCompanyAccount(
+        company,
+        NotificationType.COMPANY_VERIFICATION_REJECTED,
+        "Yêu cầu xác thực công ty bị từ chối",
+        "Yêu cầu xác thực công ty cần được cập nhật. " + safeNotificationSuffix(reason),
+        buildCompanyVerificationData(company, request, reason, "/company/verification"));
+  }
+
+  @Override
+  public void onCompanyVerificationNeedsInfo(Company company, CompanyVerificationRequest request, String reason) {
+    notifyCompanyAccount(
+        company,
+        NotificationType.COMPANY_VERIFICATION_NEEDS_INFO,
+        "Cần bổ sung thông tin xác thực công ty",
+        "Quản trị viên đã yêu cầu bổ sung thêm thông tin. " + safeNotificationSuffix(reason),
+        buildCompanyVerificationData(company, request, reason, "/company/verification"));
+  }
+
+  @Override
+  public void onCompanyBlocked(Company company, String reason) {
+    notifyCompanyAccount(
+        company,
+        NotificationType.COMPANY_BLOCKED,
+        "Công ty đã bị khóa",
+        "Công ty của bạn đang bị khóa. " + safeNotificationSuffix(reason),
+        buildCompanyVerificationData(company, null, reason, "/dashboard?companyStatus=blocked"));
+  }
+
+  @Override
+  public void onCompanyUnblocked(Company company, String note) {
+    notifyCompanyAccount(
+        company,
+        NotificationType.COMPANY_UNBLOCKED,
+        "Công ty đã được mở khóa",
+        "Công ty của bạn đã được mở khóa và có thể tiếp tục hoạt động. " + safeNotificationSuffix(note),
+        buildCompanyVerificationData(company, null, note, "/company/verification"));
+  }
+
   private MessagingResponses.NotificationDto toDto(Notification notification) {
     return MessagingResponses.NotificationDto.builder()
         .id(notification.getId())
@@ -844,6 +894,49 @@ public class NotificationServiceImpl implements NotificationService {
       return company.getTagname().trim();
     }
     return "Company";
+  }
+
+  private void notifyCompanyAccount(
+      Company company,
+      NotificationType type,
+      String title,
+      String body,
+      HashMap<String, Object> data) {
+    if (company == null) {
+      return;
+    }
+
+    Optional<Account> companyAccountOpt = accountRepository.findByCompanyId(company.getId());
+    if (companyAccountOpt.isEmpty()) {
+      log.warn("Company account not found for company notification {}", company.getId());
+      return;
+    }
+
+    createNotification(companyAccountOpt.get().getId(), type, title, body, data);
+  }
+
+  private HashMap<String, Object> buildCompanyVerificationData(
+      Company company,
+      CompanyVerificationRequest request,
+      String reason,
+      String navigateTo) {
+    HashMap<String, Object> data = new HashMap<>();
+    if (company != null) {
+      data.put("companyId", company.getId());
+      data.put("verificationStatus", company.getVerificationStatus() != null ? company.getVerificationStatus().name() : null);
+      data.put("operationalStatus", company.getOperationalStatus() != null ? company.getOperationalStatus().name() : null);
+    }
+    data.put("verificationRequestId", request != null ? request.getId() : null);
+    data.put("reason", reason);
+    data.put("navigateTo", navigateTo);
+    return data;
+  }
+
+  private String safeNotificationSuffix(String reason) {
+    if (!StringUtils.hasText(reason)) {
+      return "";
+    }
+    return "Lý do: " + reason.trim();
   }
 
   private String truncate(String value, int maxLength) {

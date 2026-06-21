@@ -1,5 +1,7 @@
 package com.hcmute.careergraph.services.impl;
 
+import com.hcmute.careergraph.enums.company.CompanyOperationalStatus;
+import com.hcmute.careergraph.enums.company.CompanyVerificationStatus;
 import com.hcmute.careergraph.enums.common.ErrorType;
 import com.hcmute.careergraph.enums.common.Role;
 import com.hcmute.careergraph.exception.AppException;
@@ -88,6 +90,9 @@ public class AuthServiceImpl implements AuthService {
     @Value("${jwt.refreshable-duration}")
     private Integer refreshTtl;
 
+    @Value("${support.email:support@careergraph.vn}")
+    private String supportEmail;
+
     @Override
     public void register(AuthRequests.RegisterRequest request, boolean isHR) {
         String normalizedEmail = normalizeEmail(request.getEmail());
@@ -116,7 +121,8 @@ public class AuthServiceImpl implements AuthService {
             // Create company - for HR
             Company company = Company.builder()
                     .account(account)
-
+                    .verificationStatus(CompanyVerificationStatus.NOT_SUBMITTED)
+                    .operationalStatus(CompanyOperationalStatus.ACTIVE)
                     .build();
             account.setCompany(company);
 
@@ -201,6 +207,8 @@ public class AuthServiceImpl implements AuthService {
             meta.put("expiredIn", String.valueOf(TIME_OTP_EXPIRED));
             throw new AppException(ErrorType.UNVERIFIED, "Email not verified", meta);
         }
+
+        assertAccountCanLogin(account);
 
         // Generate RT with family, then AT with familyId embedded
         String refreshToken = jwtTokenService.generateRefreshTokenWithFamily(account);
@@ -445,7 +453,8 @@ public class AuthServiceImpl implements AuthService {
                 if (isHR) {
                     Company company = Company.builder().account(account).build();
                     account.setCompany(company);
-                    companyRepository.save(company);
+                    Company savedCompany = companyRepository.save(company);
+                    companyRecruitmentStageService.initializeDefaultStages(savedCompany);
                 } else {
                     Candidate candidate = Candidate.builder()
                             .account(account)
@@ -465,6 +474,8 @@ public class AuthServiceImpl implements AuthService {
                             "You do not have permission to log in to this account");
                 }
             }
+
+            assertAccountCanLogin(account);
 
             // Generate family-based tokens
             String refreshToken = jwtTokenService.generateRefreshTokenWithFamily(account);
@@ -526,6 +537,8 @@ public class AuthServiceImpl implements AuthService {
                     "Your role has been changed from " + tokenRole + " to " + account.getRole().name()
                             + ". Please login again.");
         }
+
+        assertAccountCanLogin(account);
 
         // 3) Check Redis for token metadata
         var meta = redisService.getObject("rt:jti:" + jti, Map.class);
@@ -611,5 +624,41 @@ public class AuthServiceImpl implements AuthService {
         SecureRandom random = new SecureRandom();
         int value = 100000 + random.nextInt(900000);
         return String.valueOf(value);
+    }
+
+    private void assertAccountCanLogin(Account account) {
+        if (account == null) {
+            throw new AppException(ErrorType.NOT_FOUND, "Account not found");
+        }
+
+        if (Role.HR.equals(account.getRole())) {
+            Company company = account.getCompany();
+            if (company != null && company.getOperationalStatus() != CompanyOperationalStatus.ACTIVE) {
+                throw buildBlockedLoginException(company);
+            }
+        }
+    }
+
+    private AppException buildBlockedLoginException(Company company) {
+        String reason = company.getBlockReason();
+        Map<String, Object> data = new HashMap<>();
+        data.put("code", "ACCOUNT_BLOCKED");
+        data.put("supportEmail", supportEmail);
+
+        if (reason != null && !reason.trim().isEmpty()) {
+            data.put("reason", reason.trim());
+        }
+
+        if (reason != null && !reason.trim().isEmpty()) {
+            return new AppException(ErrorType.FORBIDDEN, "Tài khoản HR/doanh nghiệp của bạn đang bị tạm khóa. Lý do: "
+                    + reason.trim()
+                    + ". Vui lòng liên hệ "
+                    + supportEmail
+                    + " để được hỗ trợ.", data);
+        }
+
+        return new AppException(ErrorType.FORBIDDEN, "Tài khoản HR/doanh nghiệp của bạn đang bị tạm khóa. Vui lòng liên hệ "
+                + supportEmail
+                + " để được hỗ trợ.", data);
     }
 }
