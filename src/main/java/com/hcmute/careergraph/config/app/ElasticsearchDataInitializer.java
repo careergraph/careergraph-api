@@ -2,6 +2,8 @@ package com.hcmute.careergraph.config.app;
 
 import com.hcmute.careergraph.config.properties.ElasticsearchSyncProperties;
 import com.hcmute.careergraph.config.properties.EmbeddingRuntimeProperties;
+import com.hcmute.careergraph.enums.company.CompanyOperationalStatus;
+import com.hcmute.careergraph.enums.company.CompanyVerificationStatus;
 import com.hcmute.careergraph.enums.common.Status;
 import com.hcmute.careergraph.helper.VietnamProvinceUtils;
 import com.hcmute.careergraph.persistence.documents.JobES;
@@ -384,7 +386,9 @@ public class ElasticsearchDataInitializer implements CommandLineRunner {
     }
 
     private boolean shouldIndexJob(Job job) {
-        return job != null && job.getStatus() == Status.ACTIVE;
+        return job != null
+                && job.getStatus() == Status.ACTIVE
+                && job.getCompany() != null;
     }
 
     private JobES toJobDocument(Job job, float[] embedding) {
@@ -408,6 +412,15 @@ public class ElasticsearchDataInitializer implements CommandLineRunner {
                 .provinceCode(VietnamProvinceUtils.codeFromStateName(job.getState()))
                 .city(job.getCity())
                 .companyId(job.getCompany().getId())
+                .companyVerificationStatus(job.getCompany().getVerificationStatus() != null
+                        ? job.getCompany().getVerificationStatus().name()
+                        : CompanyVerificationStatus.NOT_SUBMITTED.name())
+                .companyOperationalStatus(job.getCompany().getOperationalStatus() != null
+                        ? job.getCompany().getOperationalStatus().name()
+                        : CompanyOperationalStatus.ACTIVE.name())
+                .companyBlocked(job.getCompany().getOperationalStatus() == CompanyOperationalStatus.BLOCKED)
+                .jobSearchable(job.getCompany().getVerificationStatus() == CompanyVerificationStatus.APPROVED
+                        && job.getCompany().getOperationalStatus() == CompanyOperationalStatus.ACTIVE)
                 .createdAt(job.getCreatedDate() != null ? job.getCreatedDate().toLocalDate() : LocalDate.now())
                 .contentHash(contentHash)
                 .embedding(embedding)

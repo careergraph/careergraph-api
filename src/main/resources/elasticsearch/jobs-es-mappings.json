@@ -80,6 +80,19 @@
       "dims": 3072,
       "index": true,
       "similarity": "cosine"
+    },
+
+    "companyVerificationStatus": {
+      "type": "keyword"
+    },
+    "companyOperationalStatus": {
+      "type": "keyword"
+    },
+    "companyBlocked": {
+      "type": "boolean"
+    },
+    "jobSearchable": {
+      "type": "boolean"
     }
   }
 }
