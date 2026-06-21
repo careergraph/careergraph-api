@@ -1,5 +1,7 @@
 package com.hcmute.careergraph.persistence.dtos.response;
 
+import com.hcmute.careergraph.enums.company.CompanyOperationalStatus;
+import com.hcmute.careergraph.enums.company.CompanyVerificationStatus;
 import lombok.Builder;
 
 import java.util.Set;
@@ -28,6 +30,14 @@ public record CompanyResponse(
         Integer yearFounded,
         Boolean offerBeforeTrial,
         Boolean enableOffboardedStage,
+        CompanyVerificationStatus verificationStatus,
+        CompanyOperationalStatus operationalStatus,
+        String taxCode,
+        String legalRepresentativeName,
+        String verificationBusinessEmail,
+        String verificationWebsite,
+        String verificationAdminNote,
+        String blockReason,
 
         // Shared contact & address
         Set<ContactResponse> contacts,

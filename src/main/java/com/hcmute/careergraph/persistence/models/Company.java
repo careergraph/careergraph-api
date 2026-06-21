@@ -1,6 +1,8 @@
 package com.hcmute.careergraph.persistence.models;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.hcmute.careergraph.enums.company.CompanyOperationalStatus;
+import com.hcmute.careergraph.enums.company.CompanyVerificationStatus;
 import jakarta.persistence.*;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
@@ -11,6 +13,8 @@ import lombok.Builder;
 import lombok.experimental.SuperBuilder;
 import com.hcmute.careergraph.enums.common.ConstDefault;
 
+import java.time.LocalDateTime;
+import java.util.LinkedHashSet;
 import java.util.Set;
 
 @Entity
@@ -58,6 +62,58 @@ public class Company extends Party {
     @Builder.Default
     private Boolean enableOffboardedStage = false;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "verification_status", nullable = false, length = 50)
+    @Builder.Default
+    private CompanyVerificationStatus verificationStatus = CompanyVerificationStatus.NOT_SUBMITTED;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "operational_status", nullable = false, length = 50)
+    @Builder.Default
+    private CompanyOperationalStatus operationalStatus = CompanyOperationalStatus.ACTIVE;
+
+    @Column(name = "tax_code", length = 50)
+    private String taxCode;
+
+    @Column(name = "legal_representative_name", length = 255)
+    private String legalRepresentativeName;
+
+    @Column(name = "verification_business_email", length = 255)
+    private String verificationBusinessEmail;
+
+    @Column(name = "verification_website", length = 500)
+    private String verificationWebsite;
+
+    @Column(name = "verification_submitted_at")
+    private LocalDateTime verificationSubmittedAt;
+
+    @Column(name = "verification_reviewed_at")
+    private LocalDateTime verificationReviewedAt;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "verification_reviewed_by_account_id")
+    private Account verificationReviewedByAccount;
+
+    @Column(name = "verification_admin_note", columnDefinition = "TEXT")
+    private String verificationAdminNote;
+
+    @Column(name = "block_reason", columnDefinition = "TEXT")
+    private String blockReason;
+
+    @Column(name = "blocked_at")
+    private LocalDateTime blockedAt;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "blocked_by_account_id")
+    private Account blockedByAccount;
+
+    @Column(name = "unblocked_at")
+    private LocalDateTime unblockedAt;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "unblocked_by_account_id")
+    private Account unblockedByAccount;
+
     // Account
     @OneToOne(mappedBy = "company", cascade = CascadeType.ALL, orphanRemoval = true)
     private Account account;
@@ -73,4 +129,8 @@ public class Company extends Party {
 
     @OneToMany(mappedBy = "company", cascade = CascadeType.ALL, orphanRemoval = true)
     private Set<CompanyRecruitmentStage> recruitmentStages;
+
+    @OneToMany(mappedBy = "company", cascade = CascadeType.ALL, orphanRemoval = true)
+    @Builder.Default
+    private Set<CompanyVerificationRequest> verificationRequests = new LinkedHashSet<>();
 }
