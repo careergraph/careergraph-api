@@ -1,6 +1,8 @@
 package com.hcmute.careergraph.repositories;
 
 import com.hcmute.careergraph.enums.common.Status;
+import com.hcmute.careergraph.enums.company.CompanyOperationalStatus;
+import com.hcmute.careergraph.enums.company.CompanyVerificationStatus;
 import com.hcmute.careergraph.enums.job.EducationType;
 import com.hcmute.careergraph.enums.job.EmploymentType;
 import com.hcmute.careergraph.enums.job.ExperienceLevel;
@@ -28,6 +30,35 @@ public interface JobRepository extends JpaRepository<Job, String> {
     Page<Job> findByCompanyId(String companyId, Pageable pageable);
 
     @Query("""
+                SELECT j
+                FROM Job j
+                WHERE j.company.id = :companyId
+                  AND j.status = 'ACTIVE'
+                  AND j.company.verificationStatus = :verificationStatus
+                  AND j.company.operationalStatus = :operationalStatus
+                  AND (j.expiryDate IS NULL OR j.expiryDate >= :currentDate)
+            """)
+    Page<Job> findPublicJobsByCompanyId(@Param("companyId") String companyId,
+                                        @Param("verificationStatus") CompanyVerificationStatus verificationStatus,
+                                        @Param("operationalStatus") CompanyOperationalStatus operationalStatus,
+                                        @Param("currentDate") String currentDate,
+                                        Pageable pageable);
+
+    @Query("""
+                SELECT j
+                FROM Job j
+                WHERE j.status = 'ACTIVE'
+                  AND j.company.verificationStatus = :verificationStatus
+                  AND j.company.operationalStatus = :operationalStatus
+                  AND (j.expiryDate IS NULL OR j.expiryDate >= :currentDate)
+                ORDER BY j.createdDate DESC, j.id DESC
+            """)
+    Page<Job> findPublicJobs(@Param("verificationStatus") CompanyVerificationStatus verificationStatus,
+                             @Param("operationalStatus") CompanyOperationalStatus operationalStatus,
+                             @Param("currentDate") String currentDate,
+                             Pageable pageable);
+
+    @Query("""
         SELECT j
         FROM Job j
         WHERE j.company.id = :companyId
@@ -38,7 +69,22 @@ public interface JobRepository extends JpaRepository<Job, String> {
                                         @Param("currentDate") String currentDate,
                                         Pageable pageable);
 
-    Page<Job> findByJobCategory(JobCategory jobCategory, Pageable pageable);
+    @Query("""
+                SELECT j
+                FROM Job j
+                WHERE j.jobCategory = :jobCategory
+                    AND j.status = 'ACTIVE'
+                    AND j.company.verificationStatus = :verificationStatus
+                    AND j.company.operationalStatus = :operationalStatus
+                    AND (j.expiryDate IS NULL OR j.expiryDate >= :currentDate)
+                ORDER BY j.createdDate DESC, j.id DESC
+            """)
+    Page<Job> findByJobCategory(
+            @Param("jobCategory") JobCategory jobCategory,
+            @Param("verificationStatus") CompanyVerificationStatus verificationStatus,
+            @Param("operationalStatus") CompanyOperationalStatus operationalStatus,
+            @Param("currentDate") String currentDate,
+            Pageable pageable);
 
     @Query("""
                 SELECT j.id, j.title
@@ -76,7 +122,11 @@ public interface JobRepository extends JpaRepository<Job, String> {
     @Query("""
                 SELECT j
                 FROM Job j
-                WHERE (NULLIF(TRIM(:city), '') IS NULL
+                WHERE j.status = 'ACTIVE'
+                    AND j.company.verificationStatus = :verificationStatus
+                    AND j.company.operationalStatus = :operationalStatus
+                    AND (j.expiryDate IS NULL OR j.expiryDate >= :currentDate)
+                    AND (NULLIF(TRIM(:city), '') IS NULL
                         OR lower(j.city) LIKE lower(concat('%', :city, '%'))
                         OR lower(j.state) LIKE lower(concat('%', :city, '%')))
                     AND (:jobCategories IS NULL OR j.jobCategory IN :jobCategories)
@@ -96,15 +146,23 @@ public interface JobRepository extends JpaRepository<Job, String> {
             @Param("experienceLevels") List<ExperienceLevel> experienceLevels,
             @Param("educationTypes") List<EducationType> educationTypes,
             @Param("query") String query,
+            @Param("verificationStatus") CompanyVerificationStatus verificationStatus,
+            @Param("operationalStatus") CompanyOperationalStatus operationalStatus,
+            @Param("currentDate") String currentDate,
             Pageable pageable);
 
     @Query("""
                 SELECT j FROM Job j
                 WHERE j.status = 'ACTIVE'
+                    AND j.company.verificationStatus = :verificationStatus
+                    AND j.company.operationalStatus = :operationalStatus
                     AND (j.expiryDate IS NULL OR j.expiryDate >= :currentDate)
                 ORDER BY j.views DESC, j.applicants DESC, j.liked DESC, j.shared DESC
             """)
-    List<Job> findPopularJob(@Param("currentDate") String currentDate);
+    List<Job> findPopularJob(
+            @Param("verificationStatus") CompanyVerificationStatus verificationStatus,
+            @Param("operationalStatus") CompanyOperationalStatus operationalStatus,
+            @Param("currentDate") String currentDate);
 
     @Query(value = """
                 SELECT DISTINCT j.*
@@ -134,32 +192,51 @@ public interface JobRepository extends JpaRepository<Job, String> {
                 JOIN Job target ON target.id = :jobId
                 WHERE j.id <> :jobId
                     AND j.status = 'ACTIVE'
+                    AND j.company.verificationStatus = :verificationStatus
+                    AND j.company.operationalStatus = :operationalStatus
+                    AND (j.expiryDate IS NULL OR j.expiryDate >= :currentDate)
                     AND j.jobCategory = target.jobCategory
                     AND (j.experienceLevel = target.experienceLevel
                         OR (j.minExperience <= target.maxExperience AND j.maxExperience >= target.minExperience))
                 ORDER BY function('RANDOM')
             """)
-    Page<Job> findSimilarJob(@Param("jobId") String jobId, Pageable pageable);
+    Page<Job> findSimilarJob(
+            @Param("jobId") String jobId,
+            @Param("verificationStatus") CompanyVerificationStatus verificationStatus,
+            @Param("operationalStatus") CompanyOperationalStatus operationalStatus,
+            @Param("currentDate") String currentDate,
+            Pageable pageable);
 
     @Query("""
                 SELECT j
                 FROM Job j
                 WHERE j.status = 'ACTIVE'
+                    AND j.company.verificationStatus = :verificationStatus
+                    AND j.company.operationalStatus = :operationalStatus
                     AND (j.expiryDate IS NULL OR j.expiryDate >= :currentDate)
                     AND (:excludeIds IS NULL OR j.id NOT IN :excludeIds)
                 ORDER BY j.createdDate DESC
             """)
-    List<Job> findLatestJobsExcluding(@Param("currentDate") String currentDate,
-            @Param("excludeIds") Collection<String> excludeIds);
+    List<Job> findLatestJobsExcluding(
+            @Param("currentDate") String currentDate,
+            @Param("excludeIds") Collection<String> excludeIds,
+            @Param("verificationStatus") CompanyVerificationStatus verificationStatus,
+            @Param("operationalStatus") CompanyOperationalStatus operationalStatus);
 
     @Query("""
                 SELECT j
                 FROM Job j
                 WHERE j.status = 'ACTIVE'
+                    AND j.company.verificationStatus = :verificationStatus
+                    AND j.company.operationalStatus = :operationalStatus
                     AND (j.expiryDate IS NULL OR j.expiryDate >= :currentDate)
                 ORDER BY j.createdDate DESC
             """)
-    List<Job> findLatestActiveJobs(@Param("currentDate") String currentDate, Pageable pageable);
+    List<Job> findLatestActiveJobs(
+            @Param("currentDate") String currentDate,
+            @Param("verificationStatus") CompanyVerificationStatus verificationStatus,
+            @Param("operationalStatus") CompanyOperationalStatus operationalStatus,
+            Pageable pageable);
 
     @Query("""
                 SELECT COALESCE(SUM(j.numberOfPositions), 0)

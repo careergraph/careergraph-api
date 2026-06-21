@@ -4,6 +4,8 @@ import co.elastic.clients.elasticsearch.core.SearchResponse;
 import co.elastic.clients.elasticsearch.core.search.Hit;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.hcmute.careergraph.enums.candidate.ContactType;
+import com.hcmute.careergraph.enums.company.CompanyOperationalStatus;
+import com.hcmute.careergraph.enums.company.CompanyVerificationStatus;
 import com.hcmute.careergraph.enums.common.FileType;
 import com.hcmute.careergraph.enums.common.PartyType;
 import com.hcmute.careergraph.enums.common.Status;
@@ -71,6 +73,7 @@ public class JobServiceImpl implements JobService {
     private final CandidateSearchTextBuilder candidateSearchTextBuilder;
     private final RedisService redisService;
     private final FileRepository fileRepository;
+    private final CompanyAccessPolicyService companyAccessPolicyService;
 
     private final ApplicationEventPublisher publisher;
 
@@ -93,8 +96,8 @@ public class JobServiceImpl implements JobService {
         // 1. Validate và lấy Company
         Company company = companyRepository.findById(companyId)
                 .orElseThrow(() -> new NotFoundException("Company not found with ID: " + companyId));
+        companyAccessPolicyService.assertCompanyCanManageJobs(company);
 
-        // 3. Map request -> entity
         Job job = jobMapper.toEntity(request, company);
         // 4. Lưu vào database
         Job savedJob = jobRepository.save(job);
@@ -155,10 +158,25 @@ public class JobServiceImpl implements JobService {
 
     @Transactional(readOnly = true)
     @Override
+    public Page<Job> getPublicJobsByCompany(String companyId, Pageable pageable) {
+        return jobRepository.findPublicJobsByCompanyId(
+                companyId,
+                CompanyVerificationStatus.APPROVED,
+                CompanyOperationalStatus.ACTIVE,
+                LocalDate.now().toString(),
+                pageable);
+    }
+
+    @Transactional(readOnly = true)
+    @Override
     public Page<Job> getAllJobs(Pageable pageable) {
         log.info("Fetching all jobs");
 
-        Page<Job> jobs = jobRepository.findAll(pageable);
+        Page<Job> jobs = jobRepository.findPublicJobs(
+                CompanyVerificationStatus.APPROVED,
+                CompanyOperationalStatus.ACTIVE,
+                LocalDate.now().toString(),
+                pageable);
         return jobs;
     }
 
@@ -242,6 +260,7 @@ public class JobServiceImpl implements JobService {
             throw new NotFoundException("Job not found with ID: " + jobId);
         }
 
+        companyAccessPolicyService.assertCompanyCanManageJobs(job.get().getCompany());
         // Update job
         job.get().setStatus(Status.ACTIVE);
         Job savedJob = jobRepository.save(job.get());
@@ -293,6 +312,9 @@ public class JobServiceImpl implements JobService {
         }
 
         if (request.status() != null) {
+            if (request.status() == Status.ACTIVE) {
+                companyAccessPolicyService.assertCompanyCanManageJobs(job.getCompany());
+            }
             applyManagedStatus(job, request.status());
         }
 
@@ -305,6 +327,7 @@ public class JobServiceImpl implements JobService {
     @Override
     public void activateJob(String jobId, String companyId) {
         Job job = findOwnedJob(jobId, companyId);
+        companyAccessPolicyService.assertCompanyCanManageJobs(job.getCompany());
         applyManagedStatus(job, Status.ACTIVE);
         Job savedJob = jobRepository.save(job);
         syncJobSearchDocument(savedJob);
@@ -327,7 +350,9 @@ public class JobServiceImpl implements JobService {
             return Page.empty();
         }
 
-        return jobRepository.findByJobCategory(jobCategory, pageable);
+        String currentDate = LocalDate.now().toString();
+        return jobRepository.findByJobCategory(jobCategory,
+                CompanyVerificationStatus.APPROVED, CompanyOperationalStatus.ACTIVE, currentDate, pageable);
     }
 
     @Transactional(readOnly = true)
@@ -347,7 +372,9 @@ public class JobServiceImpl implements JobService {
         String currentDate = LocalDate.now().toString();
 
         // Fetch and return personalized jobs from repository
-        List<Job> personalJobs = jobRepository.findJobByPersonalized(userId, currentDate);
+        List<Job> personalJobs = jobRepository.findJobByPersonalized(userId, currentDate).stream()
+                .filter(this::isJobPubliclyAvailable)
+                .toList();
         if (personalJobs.size() >= PAGE_SIZE_PERSONAL_JOB) {
             return personalJobs.subList(0, PAGE_SIZE_PERSONAL_JOB);
         }
@@ -355,7 +382,10 @@ public class JobServiceImpl implements JobService {
         int remaining = PAGE_SIZE_PERSONAL_JOB - personalJobs.size();
         List<String> excludeIds = personalJobs.stream().map(Job::getId).toList();
         List<Job> extraJobs = jobRepository.findLatestJobsExcluding(currentDate,
-                excludeIds.isEmpty() ? null : excludeIds);
+                excludeIds.isEmpty() ? null : excludeIds,
+                CompanyVerificationStatus.APPROVED, CompanyOperationalStatus.ACTIVE).stream()
+                .limit(remaining)
+                .toList();
 
         List<Job> result = new ArrayList<>(personalJobs);
         result.addAll(extraJobs);
@@ -407,6 +437,7 @@ public class JobServiceImpl implements JobService {
                 .toList();
         return jobRepository.findAllById(esIds)
                 .stream()
+                .filter(this::isJobPubliclyAvailable)
                 .sorted(Comparator.comparingInt(p -> esIds.indexOf(p.getId())))
                 .toList();
 
@@ -469,12 +500,13 @@ public class JobServiceImpl implements JobService {
         String currentDate = LocalDate.now().toString();
 
         // Get new job
-        List<Job> newJobs = jobRepository.findLatestActiveJobs(currentDate, PageRequest.of(0, 8));
+        List<Job> newJobs = jobRepository.findLatestActiveJobs(currentDate,
+                CompanyVerificationStatus.APPROVED, CompanyOperationalStatus.ACTIVE, PageRequest.of(0, 8));
         if (newJobs == null) {
             return new ArrayList<>();
         }
 
-        return newJobs;
+        return newJobs.stream().filter(this::isJobPubliclyAvailable).toList();
     }
 
     @Transactional(readOnly = true)
@@ -482,23 +514,26 @@ public class JobServiceImpl implements JobService {
     public List<Job> getJobsPopular() {
         String currentDate = LocalDate.now().toString();
 
-        List<Job> jobsPopular = jobRepository.findPopularJob(currentDate);
+        List<Job> jobsPopular = jobRepository.findPopularJob(
+                CompanyVerificationStatus.APPROVED, CompanyOperationalStatus.ACTIVE, currentDate);
         if (jobsPopular.isEmpty()) {
             return new ArrayList<>();
         }
 
-        return jobsPopular;
+        return jobsPopular.stream().filter(this::isJobPubliclyAvailable).toList();
     }
 
     @Override
     public Page<Job> getSimilarJob(String jobId, Pageable pageable) {
 
-        Page<Job> jobsSimilar = jobRepository.findSimilarJob(jobId, pageable);
+        String currentDate = LocalDate.now().toString();
+        Page<Job> jobsSimilar = jobRepository.findSimilarJob(jobId,
+                CompanyVerificationStatus.APPROVED, CompanyOperationalStatus.ACTIVE, currentDate, pageable);
         if (jobsSimilar == null) {
             return new PageImpl<>(null);
         }
 
-        return jobsSimilar;
+        return filterPublicPage(jobsSimilar, pageable);
     }
 
     /**
@@ -561,7 +596,9 @@ public class JobServiceImpl implements JobService {
              */
 
             jobs = jobRepository.searchJobForCandidate(partyId, location, jobCategories, employmentTypes,
-                    experienceLevels, educationTypes, query, pageable);
+                    experienceLevels, educationTypes, query,
+                    CompanyVerificationStatus.APPROVED, CompanyOperationalStatus.ACTIVE, LocalDate.now().toString(),
+                    pageable);
         }
         return jobs;
     }
@@ -634,13 +671,14 @@ public class JobServiceImpl implements JobService {
 
             List<Job> ljobs = jobRepository.findAllById(ids)
                     .stream()
+                    .filter(this::isJobPubliclyAvailable)
                     .sorted(Comparator.comparingInt(j -> ids.indexOf(j.getId())))
                     .toList();
 
             assert esResponse.hits().total() != null;
             long total = esResponse.hits().total().value();
 
-            return new PageImpl<>(ljobs, pageable, total);
+            return new PageImpl<>(ljobs, pageable, ljobs.size());
         }
         return jobs;
     }
@@ -673,6 +711,28 @@ public class JobServiceImpl implements JobService {
             log.error("Error generating CV suggestion, returning profile fallback", e);
             return buildFallbackCvSuggestion(candidate);
         }
+    }
+
+    @Override
+    @Transactional
+    public void syncCompanyJobsSearchDocuments(String companyId) {
+        if (!StringUtils.hasText(companyId)) {
+            return;
+        }
+        jobRepository.findByCompanyId(companyId, Pageable.unpaged())
+                .getContent()
+                .forEach(this::syncJobSearchDocument);
+    }
+
+    @Override
+    public boolean isJobPubliclyAvailable(Job job) {
+        if (job == null || job.getStatus() != Status.ACTIVE) {
+            return false;
+        }
+        if (isDeadlinePassed(job.getExpiryDate())) {
+            return false;
+        }
+        return companyAccessPolicyService.isJobPubliclyAvailable(job);
     }
 
     // Helper để làm sạch chuỗi JSON nếu AI trả về dạng Markdown
@@ -1030,6 +1090,10 @@ public class JobServiceImpl implements JobService {
                 .provinceCode(VietnamProvinceUtils.codeFromStateName(job.getState()))
                 .city(job.getCity())
                 .companyId(job.getCompany().getId())
+                .companyVerificationStatus(job.getCompany().getVerificationStatus().name())
+                .companyOperationalStatus(job.getCompany().getOperationalStatus().name())
+                .companyBlocked(job.getCompany().getOperationalStatus() == CompanyOperationalStatus.BLOCKED)
+                .jobSearchable(isJobPubliclyAvailable(job))
                 .qualifications(job.getQualifications())
                 .minimumQualifications(job.getMinimumQualifications())
                 .responsibilities(job.getResponsibilities())
@@ -1065,6 +1129,27 @@ public class JobServiceImpl implements JobService {
         }
 
         job.setStatus(nextStatus);
+    }
+
+    private Page<Job> filterPublicPage(Page<Job> jobs, Pageable pageable) {
+        if (jobs == null || jobs.isEmpty()) {
+            return new PageImpl<>(new ArrayList<>(), pageable, 0);
+        }
+        List<Job> filtered = jobs.getContent().stream()
+                .filter(this::isJobPubliclyAvailable)
+                .toList();
+        return new PageImpl<>(filtered, pageable, filtered.size());
+    }
+
+    private boolean isDeadlinePassed(String expiryDate) {
+        if (!StringUtils.hasText(expiryDate)) {
+            return false;
+        }
+        try {
+            return LocalDate.now().isAfter(LocalDate.parse(expiryDate.trim()));
+        } catch (DateTimeParseException ignored) {
+            return false;
+        }
     }
 
 }

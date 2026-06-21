@@ -44,6 +44,8 @@ public interface JobService {
 
     Page<Job> getJobsByCompany(String companyId, Pageable pageable);
 
+    Page<Job> getPublicJobsByCompany(String companyId, Pageable pageable);
+
     List<Job> getJobsPersonalized(String userId);
 
     List<Job> getJobsPersonalizedES(String userId);
@@ -60,4 +62,8 @@ public interface JobService {
     Page<Job> searchEmbed(JobFilterRequest filter, String partyId, String query, Pageable pageable, PartyType type);
 
     CvSuggestionResponse generateCv(String jobId, String candidateId);
+
+    void syncCompanyJobsSearchDocuments(String companyId);
+
+    boolean isJobPubliclyAvailable(Job job);
 }
