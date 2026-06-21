@@ -160,7 +160,38 @@ public class JobMapper {
                 // Timeline - null for now, có thể implement sau
                 .timeline(null)
 
+                // Job availability
+                .isExpired(isJobExpired(job))
+
                 .build();
+    }
+
+    private boolean isJobExpired(Job job) {
+        if (job == null) {
+            return false;
+        }
+
+        if (job.getStatus() != null && (job.getStatus() == Status.EXPIRED ||
+            job.getStatus() == Status.CLOSED ||
+            job.getStatus() == Status.CANCELED ||
+            job.getStatus() == Status.INACTIVE ||
+            job.getStatus() == Status.SUSPENDED ||
+            job.getStatus() == Status.DELETED ||
+            job.getStatus() == Status.ARCHIVED ||
+            job.getStatus() == Status.STOPPED)) {
+            return true;
+        }
+
+        if (job.getExpiryDate() != null && !job.getExpiryDate().isEmpty()) {
+            try {
+                LocalDate expiryDate = LocalDate.parse(job.getExpiryDate());
+                return expiryDate.isBefore(LocalDate.now());
+            } catch (Exception e) {
+                return false;
+            }
+        }
+
+        return false;
     }
 
     public JobResponse toResponseWithStatusAppliedAndLiked(Job job, boolean isApplied, boolean isSaved) {
@@ -235,6 +266,9 @@ public class JobMapper {
                 .timeline(null)
                 .isApplied(isApplied)
                 .isSaved(isSaved)
+
+                // Job availability
+                .isExpired(isJobExpired(job))
 
                 .build();
     }

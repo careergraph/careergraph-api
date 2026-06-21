@@ -23,6 +23,8 @@ import com.hcmute.careergraph.persistence.dtos.request.JobSettingsUpdateRequest;
 import com.hcmute.careergraph.persistence.dtos.response.CvSuggestionResponse;
 import com.hcmute.careergraph.persistence.event.JobCreatedEvent;
 import com.hcmute.careergraph.persistence.models.Candidate;
+import com.hcmute.careergraph.persistence.models.CandidateEducation;
+import com.hcmute.careergraph.persistence.models.CandidateExperience;
 import com.hcmute.careergraph.persistence.models.Company;
 import com.hcmute.careergraph.persistence.models.File;
 import com.hcmute.careergraph.persistence.models.Job;
@@ -363,6 +365,58 @@ public class JobServiceImpl implements JobService {
         return result;
     }
 
+    private String buildStructuredCandidateContext(Candidate candidate) {
+        StringBuilder sb = new StringBuilder();
+
+        sb.append("=== EXPERIENCE (DB) ===\n");
+        if (candidate.getExperiences() != null && !candidate.getExperiences().isEmpty()) {
+            candidate.getExperiences().forEach(exp -> {
+                sb.append("{\n");
+                sb.append("  id: ").append(exp.getId()).append("\n");
+                sb.append("  jobTitle: ").append(safe(exp.getJobTitle())).append("\n");
+                sb.append("  companyName: ").append(safe(exp.getCompany() != null ? exp.getCompany().getName() : "")).append("\n");
+                sb.append("  startDate: ").append(safe(exp.getStartDate())).append("\n");
+                sb.append("  endDate: ").append(safe(exp.getEndDate())).append("\n");
+                sb.append("  isCurrent: ").append(exp.getIsCurrent()).append("\n");
+                sb.append("  description: ").append(safe(exp.getDescription())).append("\n");
+                sb.append("}\n");
+            });
+        } else {
+            sb.append("(No experiences in DB)\n");
+        }
+
+        sb.append("\n=== EDUCATION (DB) ===\n");
+        if (candidate.getEducations() != null && !candidate.getEducations().isEmpty()) {
+            candidate.getEducations().forEach(edu -> {
+                sb.append("{\n");
+                sb.append("  id: ").append(edu.getId()).append("\n");
+                sb.append("  schoolName: ").append(safe(edu.getEducation() != null ? edu.getEducation().getOfficialName() : "")).append("\n");
+                sb.append("  degreeTitle: ").append(safe(edu.getDegreeTitle())).append("\n");
+                sb.append("  major: ").append(safe(edu.getMajor())).append("\n");
+                sb.append("  startDate: ").append(safe(edu.getStartDate())).append("\n");
+                sb.append("  endDate: ").append(safe(edu.getEndDate())).append("\n");
+                sb.append("  isCurrent: ").append(edu.getIsCurrent()).append("\n");
+                sb.append("  description: ").append(safe(edu.getDescription())).append("\n");
+                sb.append("}\n");
+            });
+        } else {
+            sb.append("(No educations in DB)\n");
+        }
+
+        sb.append("\n=== SKILLS (DB) ===\n");
+        if (candidate.getSkills() != null && !candidate.getSkills().isEmpty()) {
+            candidate.getSkills().forEach(skill -> {
+                if (skill.getSkill() != null) {
+                    sb.append("- ").append(skill.getSkill().getName()).append("\n");
+                }
+            });
+        } else {
+            sb.append("(No skills in DB)\n");
+        }
+
+        return sb.toString();
+    }
+
     @Transactional(readOnly = true)
     @Override
     public List<Job> getJobsPersonalizedES(String userId) {
@@ -492,8 +546,9 @@ public class JobServiceImpl implements JobService {
 
     @Override
     public Page<Job> getSimilarJob(String jobId, Pageable pageable) {
+        String currentDate = LocalDate.now().toString();
 
-        Page<Job> jobsSimilar = jobRepository.findSimilarJob(jobId, pageable);
+        Page<Job> jobsSimilar = jobRepository.findSimilarJob(jobId, currentDate, pageable);
         if (jobsSimilar == null) {
             return new PageImpl<>(null);
         }
@@ -530,6 +585,8 @@ public class JobServiceImpl implements JobService {
             throw new BadRequestException("Company ID is required");
         }
 
+        String currentDate = LocalDate.now().toString();
+
         // Get params from filter
         List<Status> statuses = filter.getStatuses() == null || filter.getStatuses().isEmpty() ? null
                 : filter.getStatuses();
@@ -546,7 +603,7 @@ public class JobServiceImpl implements JobService {
 
         if (type == PartyType.COMPANY) {
             jobs = jobRepository.searchJobForCompany(partyId, statuses, jobCategories, employmentTypes, query,
-                    pageable);
+                    currentDate, pageable);
         } else {
 
             /**
@@ -561,7 +618,7 @@ public class JobServiceImpl implements JobService {
              */
 
             jobs = jobRepository.searchJobForCandidate(partyId, location, jobCategories, employmentTypes,
-                    experienceLevels, educationTypes, query, pageable);
+                    experienceLevels, educationTypes, query, currentDate, pageable);
         }
         return jobs;
     }
@@ -573,6 +630,9 @@ public class JobServiceImpl implements JobService {
         if (type == PartyType.COMPANY && partyId == null) {
             throw new BadRequestException("Company ID is required");
         }
+
+        String currentDate = LocalDate.now().toString();
+
         // Get params from filter
         List<Status> statuses = filter.getStatuses() == null || filter.getStatuses().isEmpty() ? null
                 : filter.getStatuses();
@@ -592,7 +652,7 @@ public class JobServiceImpl implements JobService {
 
         if (type == PartyType.COMPANY) {
             jobs = jobRepository.searchJobForCompany(partyId, statuses, jobCategories, employmentTypes, query,
-                    pageable);
+                    currentDate, pageable);
         } else {
             String keyword = "";
 
@@ -645,41 +705,77 @@ public class JobServiceImpl implements JobService {
         return jobs;
     }
 
+    @Transactional(readOnly = true)
     @Override
     public CvSuggestionResponse generateCv(String jobId, String candidateId) {
 
         Job job = jobRepository.findById(jobId)
                 .orElseThrow(() -> new ResourceNotFoundException("Job not found with id: " + jobId));
 
+        if (isJobExpired(job)) {
+            throw new BadRequestException("Không thể tạo gợi ý CV cho công việc đã hết hạn ứng tuyển.");
+        }
+
         Candidate candidate = candidateRepository.findById(candidateId)
                 .orElseThrow(() -> new ResourceNotFoundException("Candidate not found with id: " + candidateId));
 
-        // 2. Xây dựng Prompt (Câu lệnh cho AI)
+        // Ensure experiences/educations/skills are loaded (Hibernate.initialize equivalent via eager loading)
+        if (candidate.getExperiences() != null) {
+            candidate.getExperiences().size();
+        }
+        if (candidate.getEducations() != null) {
+            candidate.getEducations().size();
+        }
+        if (candidate.getSkills() != null) {
+            candidate.getSkills().size();
+        }
+
         validateCvSuggestionLimit(candidateId);
 
-        // 3. Gọi AI
         CvSourceContext cvSourceContext = buildCvSourceContext(candidateId, candidate);
         log.info("Generating CV suggestion for candidateId={} jobId={} source={} uploadedCvCount={} chars={}",
                 candidateId, jobId, cvSourceContext.source(), cvSourceContext.uploadedCvCount(), cvSourceContext.text().length());
 
-        // 4. Parse kết quả JSON từ AI thành Object
+        String suggestionId = java.util.UUID.randomUUID().toString();
         try {
-            // Đôi khi AI trả về markdown ```json ... ```, cần clean trước khi parse
             String prompt = buildCvGenerationPrompt(job, cvSourceContext.text(), candidate);
             String jsonResponse = fastAPIClientService.cvSuggestion(prompt);
             String cleanJson = cleanJsonString(jsonResponse);
-            return objectMapper.readValue(cleanJson, CvSuggestionResponse.class);
+            CvSuggestionResponse aiResponse = objectMapper.readValue(cleanJson, CvSuggestionResponse.class);
+
+            // Phase 1: Post-process AI response to ensure only DB data is used
+            CvSuggestionResponse response = mergeAiCvSuggestion(aiResponse, candidate);
+            response.setSuggestionId(suggestionId);
+
+            // Store in Redis with 24h TTL
+            redisService.setObject("cv_suggestion:" + suggestionId + ":" + candidateId, response, 86400);
+
+            return response;
         } catch (Exception e) {
-            log.error("Error generating CV suggestion, returning profile fallback", e);
-            return buildFallbackCvSuggestion(candidate);
+            log.error("Error generating CV suggestion, returning profile fallback for job context", e);
+            CvSuggestionResponse fallback = buildFallbackCvSuggestionForJob(candidate, job);
+            fallback.setSuggestionId(suggestionId);
+            redisService.setObject("cv_suggestion:" + suggestionId + ":" + candidateId, fallback, 86400);
+            return fallback;
         }
+    }
+
+    public CvSuggestionResponse getCvSuggestion(String suggestionId, String candidateId) {
+        String key = "cv_suggestion:" + suggestionId + ":" + candidateId;
+        CvSuggestionResponse cached = redisService.getObject(key, CvSuggestionResponse.class);
+
+        if (cached == null) {
+            throw new ResourceNotFoundException("CV suggestion not found or has expired. suggestionId: " + suggestionId);
+        }
+
+        return cached;
     }
 
     // Helper để làm sạch chuỗi JSON nếu AI trả về dạng Markdown
     private void validateCvSuggestionLimit(String candidateId) {
         String key = "cv_suggestion_limit:" + candidateId;
         Integer current = redisService.getObject(key, Integer.class);
-        if (current != null && current >= 10) {
+        if (current != null && current >= 100) {
             throw new BadRequestException("Bạn đã vượt quá số lần tạo gợi ý CV cho phép trong ngày (tối đa 10 lần).");
         }
         redisService.setObject(key, current == null ? 1 : current + 1, 86400);
@@ -786,6 +882,8 @@ public class JobServiceImpl implements JobService {
     }
 
     private CvSuggestionResponse buildFallbackCvSuggestion(Candidate candidate) {
+        List<CvSuggestionResponse.Experience> allExperiences = fallbackExperiences(candidate);
+
         return CvSuggestionResponse.builder()
                 .personal(CvSuggestionResponse.PersonalInfo.builder()
                         .fullName(fullName(candidate))
@@ -797,13 +895,39 @@ public class JobServiceImpl implements JobService {
                         .email(candidateContact(candidate, ContactType.EMAIL))
                         .phone(candidateContact(candidate, ContactType.PHONE))
                         .build())
-                .experience(fallbackExperiences(candidate))
+                .experience(allExperiences)
                 .education(fallbackEducations(candidate))
                 .skills(fallbackSkills(candidate))
                 .matchedSkills(Collections.emptyList())
                 .missingSkills(Collections.emptyList())
                 .suggestions(List.of("AI service is temporarily unavailable. Please review and tailor this CV manually."))
                 .overallMatchScore(0)
+                .allExperiences(allExperiences)
+                .build();
+    }
+
+    private CvSuggestionResponse buildFallbackCvSuggestionForJob(Candidate candidate, Job job) {
+        List<CvSuggestionResponse.Experience> allExperiences = filterExperiencesByJobContext(candidate, job);
+
+        return CvSuggestionResponse.builder()
+                .personal(CvSuggestionResponse.PersonalInfo.builder()
+                        .fullName(fullName(candidate))
+                        .headline(job.getTitle() != null ? job.getTitle() : firstText(candidate.getCurrentJobTitle(), candidate.getDesiredPosition()))
+                        .summary(candidate.getSummary())
+                        .location(candidateLocation(candidate))
+                        .build())
+                .contact(CvSuggestionResponse.ContactInfo.builder()
+                        .email(candidateContact(candidate, ContactType.EMAIL))
+                        .phone(candidateContact(candidate, ContactType.PHONE))
+                        .build())
+                .experience(allExperiences)
+                .education(fallbackEducations(candidate))
+                .skills(fallbackSkills(candidate))
+                .matchedSkills(Collections.emptyList())
+                .missingSkills(Collections.emptyList())
+                .suggestions(List.of("AI service is temporarily unavailable. Please review and tailor this CV manually."))
+                .overallMatchScore(0)
+                .allExperiences(allExperiences)
                 .build();
     }
 
@@ -816,6 +940,7 @@ public class JobServiceImpl implements JobService {
                         .id(experience.getId())
                         .role(experience.getJobTitle())
                         .company(experience.getCompany() != null ? experience.getCompany().getName() : null)
+                        .location("")
                         .startDate(experience.getStartDate())
                         .endDate(experience.getEndDate())
                         .bulletPoints(StringUtils.hasText(experience.getDescription())
@@ -823,6 +948,52 @@ public class JobServiceImpl implements JobService {
                                 : Collections.emptyList())
                         .build())
                 .toList();
+    }
+
+    private List<CvSuggestionResponse.Experience> filterExperiencesByJobContext(Candidate candidate, Job job) {
+        if (candidate.getExperiences() == null || candidate.getExperiences().isEmpty()) {
+            return Collections.emptyList();
+        }
+
+        String jobTitle = StringUtils.hasText(job.getTitle()) ? job.getTitle().toLowerCase() : "";
+        String jobDescription = StringUtils.hasText(job.getDescription()) ? job.getDescription().toLowerCase() : "";
+        String searchKeywords = jobTitle + " " + jobDescription;
+
+        return candidate.getExperiences().stream()
+                .filter(experience -> {
+                    String expTitle = StringUtils.hasText(experience.getJobTitle()) ? experience.getJobTitle().toLowerCase() : "";
+                    String expDescription = StringUtils.hasText(experience.getDescription()) ? experience.getDescription().toLowerCase() : "";
+
+                    boolean titleMatches = expTitle.length() > 0 && isRelevantMatch(jobTitle, expTitle);
+                    boolean keywordMatches = searchKeywords.length() > 0 && isRelevantMatch(searchKeywords, expDescription);
+
+                    return titleMatches || keywordMatches;
+                })
+                .map(experience -> CvSuggestionResponse.Experience.builder()
+                        .id(experience.getId())
+                        .role(experience.getJobTitle())
+                        .company(experience.getCompany() != null ? experience.getCompany().getName() : null)
+                        .location("")
+                        .startDate(experience.getStartDate())
+                        .endDate(experience.getEndDate())
+                        .bulletPoints(StringUtils.hasText(experience.getDescription())
+                                ? List.of(experience.getDescription())
+                                : Collections.emptyList())
+                        .build())
+                .toList();
+    }
+
+    private boolean isRelevantMatch(String keywords, String text) {
+        if (!StringUtils.hasText(keywords) || !StringUtils.hasText(text)) {
+            return false;
+        }
+        String[] keywordArray = keywords.split("\\s+");
+        for (String keyword : keywordArray) {
+            if (keyword.length() > 2 && text.contains(keyword)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private List<CvSuggestionResponse.Education> fallbackEducations(Candidate candidate) {
@@ -851,6 +1022,85 @@ public class JobServiceImpl implements JobService {
                         .name(skill.getSkill().getName())
                         .build())
                 .toList();
+    }
+
+    private String constrainHeadlineLength(String headline) {
+        int minLength = 40;
+        int maxLength = 120;
+
+        if (!StringUtils.hasText(headline)) {
+            return headline;
+        }
+
+        String trimmed = headline.trim();
+
+        if (trimmed.length() > maxLength) {
+            trimmed = trimmed.substring(0, maxLength).trim();
+            if (!trimmed.endsWith(".") && !trimmed.endsWith("...")) {
+                trimmed = trimmed + "...";
+            }
+        }
+
+        return trimmed;
+    }
+
+    private boolean isJobExpired(Job job) {
+        if (job == null) {
+            return false;
+        }
+
+        if (job.getStatus() != null && (job.getStatus() == Status.EXPIRED ||
+            job.getStatus() == Status.CLOSED ||
+            job.getStatus() == Status.CANCELED ||
+            job.getStatus() == Status.INACTIVE ||
+            job.getStatus() == Status.SUSPENDED ||
+            job.getStatus() == Status.DELETED ||
+            job.getStatus() == Status.ARCHIVED ||
+            job.getStatus() == Status.STOPPED)) {
+            return true;
+        }
+
+        if (job.getExpiryDate() != null && !job.getExpiryDate().isEmpty()) {
+            try {
+                LocalDate expiryDate = LocalDate.parse(job.getExpiryDate());
+                return expiryDate.isBefore(LocalDate.now());
+            } catch (Exception e) {
+                return false;
+            }
+        }
+
+        return false;
+    }
+
+    private String detectLanguage(Job job) {
+        if (job == null) {
+            return "Vietnamese";
+        }
+
+        String textToAnalyze = (job.getTitle() != null ? job.getTitle() : "")
+                + " " + (job.getDescription() != null ? job.getDescription() : "")
+                + " " + (job.getQualifications() != null ? job.getQualifications() : "");
+
+        if (!StringUtils.hasText(textToAnalyze)) {
+            return "Vietnamese";
+        }
+
+        int vietnameseDiacriticCount = 0;
+        int totalCharacterCount = textToAnalyze.length();
+
+        for (char c : textToAnalyze.toCharArray()) {
+            if ((c >= 'À' && c <= 'ÿ') || (c >= 'Ā' && c <= 'ſ') || (c >= 'Ḁ' && c <= 'ỿ')) {
+                vietnameseDiacriticCount++;
+            }
+        }
+
+        double vietneseseRatio = (double) vietnameseDiacriticCount / totalCharacterCount;
+
+        if (vietneseseRatio > 0.1) {
+            return "Vietnamese";
+        } else {
+            return "English";
+        }
     }
 
     private String fullName(Candidate candidate) {
@@ -908,9 +1158,19 @@ public class JobServiceImpl implements JobService {
     private String buildCvGenerationPrompt(Job job, String cvText, Candidate candidate) {
         StringBuilder sb = new StringBuilder();
 
-        sb.append("Đóng vai là một chuyên gia tư vấn nghề nghiệp và viết CV chuyên nghiệp (Top CV Writer). ");
-        sb.append(
-                "Nhiệm vụ của bạn là viết lại nội dung CV cho ứng viên để phù hợp nhất với công việc đang ứng tuyển.\n\n");
+        String detectedLanguage = detectLanguage(job);
+
+        if ("English".equals(detectedLanguage)) {
+            sb.append("Act as a professional career counselor and CV writing expert (Top CV Writer). ");
+            sb.append("Your task is to rewrite the candidate's CV content to be the best fit for the job being applied for.\n\n");
+        } else {
+            sb.append("Đóng vai là một chuyên gia tư vấn nghề nghiệp và viết CV chuyên nghiệp (Top CV Writer). ");
+            sb.append("Nhiệm vụ của bạn là viết lại nội dung CV cho ứng viên để phù hợp nhất với công việc đang ứng tuyển.\n\n");
+        }
+
+        // --- Input: Structured Candidate Context (DB as source of truth) ---
+        sb.append("--- DỮ LIỆU CẤU TRÚC CỦA ỨNG VIÊN TỪ DB (NGUỒN SỰ THẬT) ---\n");
+        sb.append(buildStructuredCandidateContext(candidate)).append("\n");
 
         // --- Input: Job Info ---
         sb.append("--- THÔNG TIN CÔNG VIỆC (TARGET JOB) ---\n");
@@ -919,70 +1179,204 @@ public class JobServiceImpl implements JobService {
         sb.append("Mô tả công việc: ").append(job.getDescription() != null ? job.getDescription() : "N/A").append("\n");
         sb.append("Yêu cầu kỹ năng: ").append(job.getQualifications() != null ? job.getQualifications() : "N/A").append("\n\n");
 
-        // --- Input: Candidate Info ---
-        sb.append("--- HỒ SƠ GỐC CỦA ỨNG VIÊN ---\n");
-        sb.append("Họ tên: ").append(fullName(candidate)).append("\n");
-
-        List<String> skills = candidate.getSkills() != null
-                ? candidate.getSkills().stream()
-                        .filter(skill -> skill != null && skill.getSkill() != null)
-                        .map(skill -> skill.getSkill().getName())
-                        .toList()
-                : Collections.emptyList();
-        sb.append("Kỹ năng hiện có: ").append(skills).append("\n");
-
-        List<String> experiences = candidate.getExperiences() != null
-                ? candidate.getExperiences().stream()
-                        .filter(exp -> exp != null)
-                        .map(experience -> {
-                            String companyName = experience.getCompany() != null ? experience.getCompany().getName() : "Unknown Company";
-                            return companyName + ": from " + experience.getStartDate() + " to " + experience.getEndDate();
-                        })
-                        .toList()
-                : Collections.emptyList();
-        sb.append("Kinh nghiệm làm việc: ").append(experiences).append("\n");
-
-        List<String> educations = candidate.getEducations() != null
-                ? candidate.getEducations().stream()
-                        .filter(edu -> edu != null)
-                        .map(education -> {
-                            String schoolName = education.getEducation() != null ? education.getEducation().getOfficialName() : "Unknown School";
-                            return schoolName + ": from " + education.getStartDate() + " to " + education.getEndDate();
-                        })
-                        .toList()
-                : Collections.emptyList();
-        sb.append("Học vấn: ").append(educations).append("\n\n");
-
-        sb.append("--- CV TEXT SOURCE (ALL ACTIVE UPLOADED CVS IF AVAILABLE) ---\n");
-        sb.append(StringUtils.hasText(cvText) ? cvText : buildCandidateProfileText(candidate)).append("\n\n");
-        sb.append("Gap analysis required: compare TARGET JOB with CV TEXT SOURCE, then return matchedSkills, missingSkills, suggestions, and overallMatchScore from 0 to 100.\n\n");
+        // --- Input: CV upload text (supplementary only) ---
+        sb.append("--- TÀI LIỆU BỔ SUNG (CV UPLOAD - chỉ dùng để viết lại summary/headline/văn phong) ---\n");
+        sb.append("⚠️ QUAN TRỌNG: Tài liệu này CHỈ được dùng để cải thiện tông điệu, clarity, và content của summary/headline/bulletPoints.\n");
+        sb.append("   KHÔNG được dùng để thêm hoặc tạo mới experience/education ngoài danh sách DB ở trên.\n");
+        sb.append(StringUtils.hasText(cvText) ? cvText : "(Không có CV upload)\n").append("\n\n");
 
         // --- Output Requirement ---
-        sb.append(
-                "1. Hãy viết lại phần 'summary' (tóm tắt) thật ấn tượng, thể hiện ứng viên là người phù hợp cho vị trí này.\n");
-        sb.append(
-                "2. Trong phần 'experience', hãy viết lại các 'bulletPoints' sao cho làm nổi bật các từ khóa (keywords) có trong mô tả công việc (Job Description).\n");
-        sb.append("3. Chỉ giữ lại hoặc sắp xếp các kỹ năng (skills) liên quan lên đầu.\n");
-        sb.append(
-                "4. Trả về kết quả DUY NHẤT là một chuỗi JSON hợp lệ khớp với cấu trúc sau (không giải thích thêm):\n");
+        sb.append("--- YÊU CẦU ĐẦU RA ---\n");
+        sb.append("NGUYÊN TẮC CỨNG (Hard Rules):\n");
+        sb.append("1. experience[] CHỈ chứa các mục có trong EXPERIENCE (DB) ở trên.\n");
+        sb.append("2. education[] CHỈ chứa các mục có trong EDUCATION (DB) ở trên.\n");
+        sb.append("3. KHÔNG được tạo thêm mục kinh nghiệm/học vấn mới từ tài liệu CV upload.\n");
+        sb.append("4. Hãy trả về kèm 'id' gốc từ DB cho mỗi experience/education để Java có thể reconcile.\n");
+        sb.append("5. Chỉ viết lại bulletPoints, summary, headline sao cho phù hợp với job description.\n");
+        sb.append("6. ĐÁnh giá mỗi experience: có liên quan đến job không? QUAN TRỌNG: 'relevant' = true CHỈ khi:\n");
+        sb.append("   - Job title/specialty của experience MATCH với target job title/specialty (VD: Front-end dev job → chỉ lấy front-end experiences)\n");
+        sb.append("   - HOẶC experience chứa các skills/technologies được yêu cầu trong job requirements\n");
+        sb.append("   - Nếu experience là specialty KHÁC (VD: Backend, UX/UI, QA khi job là Frontend) → relevant = false\n");
+        sb.append("   Trả về 'relevant' (boolean) và 'relevanceReason' (text ngắn giải thích lý do).\n");
 
-        // Cung cấp mẫu JSON để AI điền vào
-        sb.append("{\n" +
-                "  \"personal\": { \"fullName\": \"...\", \"headline\": \"...\", \"summary\": \"...\", \"location\": \"...\" },\n"
-                +
-                "  \"contact\": { \"email\": \"...\", \"phone\": \"...\", \"linkedin\": \"...\" },\n" +
-                "  \"experience\": [ { \"role\": \"...\", \"company\": \"...\", \"startDate\": \"...\", \"endDate\": \"...\", \"bulletPoints\": [\"...\"] } ],\n"
-                +
-                "  \"education\": [ { \"school\": \"...\", \"degree\": \"...\", \"startDate\": \"...\", \"endDate\": \"...\" } ],\n"
-                +
-                "  \"skills\": [ { \"name\": \"...\" } ],\n" +
-                "  \"matchedSkills\": [\"...\"],\n" +
-                "  \"missingSkills\": [\"...\"],\n" +
-                "  \"suggestions\": [\"...\"],\n" +
-                "  \"overallMatchScore\": 0\n" +
-                "}");
+        if ("English".equals(detectedLanguage)) {
+            sb.append("7. EXPERIENCE RELEVANCE: Only include experiences where 'relevant' = true. CRITICAL: Mark 'relevant' = true ONLY when:\n");
+            sb.append("   - Experience job title/specialty MATCHES the target job title/specialty (e.g., Frontend job → only Frontend experiences)\n");
+            sb.append("   - OR the experience contains skills/technologies required in job qualifications\n");
+            sb.append("   - If experience is DIFFERENT specialty (e.g., Backend, UX/UI, QA when job is Frontend) → relevant = false\n");
+            sb.append("   Return 'relevanceReason' with brief explanation of why relevant or not.\n");
+            sb.append("8. HEADLINE LENGTH: The 'headline' field MUST be between 40-120 characters. Keep it concise, professional, and impactful.\n");
+            sb.append("9. LANGUAGE: The job description is in English. ALL generated content (headline, summary, bulletPoints, suggestions) MUST be in English ONLY. Do NOT mix Vietnamese and English.\n\n");
+            sb.append("OUTPUT FORMAT: A single valid JSON (no markdown, no explanation):\n");
+            sb.append("{\n" +
+                    "  \"personal\": { \"fullName\": \"...\", \"headline\": \"...\", \"summary\": \"...\", \"location\": \"...\" },\n"
+                    +
+                    "  \"contact\": { \"email\": \"...\", \"phone\": \"...\", \"linkedin\": \"...\", \"website\": \"...\" },\n" +
+                    "  \"experience\": [\n" +
+                    "    {\n" +
+                    "      \"id\": \"<id from DB>\",\n" +
+                    "      \"role\": \"...\",\n" +
+                    "      \"company\": \"...\",\n" +
+                    "      \"location\": \"...\",\n" +
+                    "      \"startDate\": \"...\",\n" +
+                    "      \"endDate\": \"...\",\n" +
+                    "      \"bulletPoints\": [\"...\"],\n" +
+                    "      \"relevant\": true/false,\n" +
+                    "      \"relevanceReason\": \"<reason why this experience is relevant or not>\"\n" +
+                    "    }\n" +
+                    "  ],\n" +
+                    "  \"education\": [ { \"id\": \"<id from DB>\", \"school\": \"...\", \"degree\": \"...\", \"startDate\": \"...\", \"endDate\": \"...\" } ],\n"
+                    +
+                    "  \"skills\": [ { \"id\": \"<id from DB if available>\", \"name\": \"...\" } ],\n" +
+                    "  \"languages\": [ { \"id\": \"<id>\", \"language\": \"...\", \"proficiency\": \"...\" } ],\n" +
+                    "  \"awards\": [ { \"id\": \"<id>\", \"title\": \"...\", \"issuer\": \"...\", \"year\": \"...\" } ],\n" +
+                    "  \"matchedSkills\": [\"...\"],\n" +
+                    "  \"missingSkills\": [\"...\"],\n" +
+                    "  \"suggestions\": [\"...\"],\n" +
+                    "  \"overallMatchScore\": <0-100>\n" +
+                    "}");
+        } else {
+            sb.append("7. CHỈ LỌC EXPERIENCES LIÊN QUAN: Chỉ trả về những experiences có 'relevant' = true. KHÔNG trả về experiences không liên quan.\n");
+            sb.append("8. HEADLINE LENGTH: Field 'headline' PHẢI có độ dài 40-120 ký tự. Giữ ngắn gọn, chuyên nghiệp và ấn tượng.\n");
+            sb.append("9. NGÔN NGỮ: Công việc này sử dụng tiếng Việt. TẤT CẢ nội dung bạn viết (headline, summary, bulletPoints, suggestions) PHẢI là tiếng Việt HOÀN TOÀN. KHÔNG được trộn lẫn tiếng Anh và tiếng Việt.\n\n");
+            sb.append("ĐỊNH DẠNG ĐẦU RA: DUY NHẤT một JSON hợp lệ (không markdown, không giải thích):\n");
+            sb.append("{\n" +
+                    "  \"personal\": { \"fullName\": \"...\", \"headline\": \"...\", \"summary\": \"...\", \"location\": \"...\" },\n"
+                    +
+                    "  \"contact\": { \"email\": \"...\", \"phone\": \"...\", \"linkedin\": \"...\", \"website\": \"...\" },\n" +
+                    "  \"experience\": [\n" +
+                    "    {\n" +
+                    "      \"id\": \"<id từ DB>\",\n" +
+                    "      \"role\": \"...\",\n" +
+                    "      \"company\": \"...\",\n" +
+                    "      \"location\": \"...\",\n" +
+                    "      \"startDate\": \"...\",\n" +
+                    "      \"endDate\": \"...\",\n" +
+                    "      \"bulletPoints\": [\"...\"],\n" +
+                    "      \"relevant\": true/false,\n" +
+                    "      \"relevanceReason\": \"<lý do tại sao liên quan hay không liên quan>\"\n" +
+                    "    }\n" +
+                    "  ],\n" +
+                    "  \"education\": [ { \"id\": \"<id từ DB>\", \"school\": \"...\", \"degree\": \"...\", \"startDate\": \"...\", \"endDate\": \"...\" } ],\n"
+                    +
+                    "  \"skills\": [ { \"id\": \"<id từ DB nếu có>\", \"name\": \"...\" } ],\n" +
+                    "  \"languages\": [ { \"id\": \"<id>\", \"language\": \"...\", \"proficiency\": \"...\" } ],\n" +
+                    "  \"awards\": [ { \"id\": \"<id>\", \"title\": \"...\", \"issuer\": \"...\", \"year\": \"...\" } ],\n" +
+                    "  \"matchedSkills\": [\"...\"],\n" +
+                    "  \"missingSkills\": [\"...\"],\n" +
+                    "  \"suggestions\": [\"...\"],\n" +
+                    "  \"overallMatchScore\": <0-100>\n" +
+                    "}");
+        }
 
         return sb.toString();
+    }
+
+    private CvSuggestionResponse mergeAiCvSuggestion(CvSuggestionResponse aiResponse, Candidate dbCandidate) {
+        if (aiResponse == null) {
+            return buildFallbackCvSuggestion(dbCandidate);
+        }
+
+        // Create a map of DB experiences and educations by ID for lookup
+        Map<String, CandidateExperience> dbExperienceMap = new HashMap<>();
+        if (dbCandidate.getExperiences() != null) {
+            dbCandidate.getExperiences().forEach(exp -> dbExperienceMap.put(exp.getId(), exp));
+        }
+
+        Map<String, CandidateEducation> dbEducationMap = new HashMap<>();
+        if (dbCandidate.getEducations() != null) {
+            dbCandidate.getEducations().forEach(edu -> dbEducationMap.put(edu.getId(), edu));
+        }
+
+        // Process experiences: keep only those with IDs in DB, merge with AI content
+        // Separate into relevant (for main list) and all (for dropdown)
+        List<CvSuggestionResponse.Experience> mergedExperiences = new ArrayList<>();
+        List<CvSuggestionResponse.Experience> allExperiences = new ArrayList<>();
+
+        if (aiResponse.getExperience() != null) {
+            for (CvSuggestionResponse.Experience aiExp : aiResponse.getExperience()) {
+                String expId = aiExp.getId();
+                CandidateExperience dbExp = dbExperienceMap.get(expId);
+                if (dbExp != null) {
+                    // Keep DB structure, merge with AI-generated bulletPoints
+                    CvSuggestionResponse.Experience merged = CvSuggestionResponse.Experience.builder()
+                            .id(expId)
+                            .role(StringUtils.hasText(aiExp.getRole()) ? aiExp.getRole() : dbExp.getJobTitle())
+                            .company(dbExp.getCompany() != null ? dbExp.getCompany().getName() : null)
+                            .location(aiExp.getLocation())
+                            .startDate(dbExp.getStartDate())
+                            .endDate(dbExp.getEndDate())
+                            .bulletPoints(aiExp.getBulletPoints() != null && !aiExp.getBulletPoints().isEmpty()
+                                    ? aiExp.getBulletPoints()
+                                    : (StringUtils.hasText(dbExp.getDescription())
+                                            ? List.of(dbExp.getDescription())
+                                            : Collections.emptyList()))
+                            .relevant(aiExp.getRelevant())
+                            .relevanceReason(aiExp.getRelevanceReason())
+                            .build();
+
+                    allExperiences.add(merged);
+
+                    // Only add to main experience list if relevant
+                    if (Boolean.TRUE.equals(aiExp.getRelevant())) {
+                        mergedExperiences.add(merged);
+                    }
+                } else {
+                    log.warn("AI returned experience with unknown ID: {}. Skipping.", expId);
+                }
+            }
+        }
+
+        // Process educations: keep only those with IDs in DB, merge with AI content
+        List<CvSuggestionResponse.Education> mergedEducations = new ArrayList<>();
+        if (aiResponse.getEducation() != null) {
+            for (CvSuggestionResponse.Education aiEdu : aiResponse.getEducation()) {
+                String eduId = aiEdu.getId();
+                CandidateEducation dbEdu = dbEducationMap.get(eduId);
+                if (dbEdu != null) {
+                    // Keep DB structure, merge with AI-generated degree/school
+                    CvSuggestionResponse.Education merged = CvSuggestionResponse.Education.builder()
+                            .id(eduId)
+                            .school(dbEdu.getEducation() != null ? dbEdu.getEducation().getOfficialName() : null)
+                            .degree(StringUtils.hasText(aiEdu.getDegree()) ? aiEdu.getDegree()
+                                    : firstText(dbEdu.getDegreeTitle(), dbEdu.getMajor()))
+                            .startDate(dbEdu.getStartDate())
+                            .endDate(dbEdu.getEndDate())
+                            .build();
+                    mergedEducations.add(merged);
+                } else {
+                    log.warn("AI returned education with unknown ID: {}. Skipping.", eduId);
+                }
+            }
+        }
+
+        // Validate and constrain headline length
+        CvSuggestionResponse.PersonalInfo validatedPersonal = aiResponse.getPersonal();
+        if (validatedPersonal != null && StringUtils.hasText(validatedPersonal.getHeadline())) {
+            String truncatedHeadline = constrainHeadlineLength(validatedPersonal.getHeadline());
+            validatedPersonal = CvSuggestionResponse.PersonalInfo.builder()
+                    .fullName(validatedPersonal.getFullName())
+                    .headline(truncatedHeadline)
+                    .summary(validatedPersonal.getSummary())
+                    .location(validatedPersonal.getLocation())
+                    .build();
+        }
+
+        // Return merged response with both filtered and all experiences
+        return CvSuggestionResponse.builder()
+                .personal(validatedPersonal)
+                .contact(aiResponse.getContact())
+                .experience(mergedExperiences)
+                .education(mergedEducations)
+                .skills(aiResponse.getSkills())
+                .languages(aiResponse.getLanguages())
+                .awards(aiResponse.getAwards())
+                .matchedSkills(aiResponse.getMatchedSkills())
+                .missingSkills(aiResponse.getMissingSkills())
+                .suggestions(aiResponse.getSuggestions())
+                .overallMatchScore(aiResponse.getOverallMatchScore())
+                .allExperiences(allExperiences)
+                .build();
     }
 
     private record CvSourceContext(String text, String source, int uploadedCvCount) {

@@ -60,4 +60,6 @@ public interface JobService {
     Page<Job> searchEmbed(JobFilterRequest filter, String partyId, String query, Pageable pageable, PartyType type);
 
     CvSuggestionResponse generateCv(String jobId, String candidateId);
+
+    CvSuggestionResponse getCvSuggestion(String suggestionId, String candidateId);
 }

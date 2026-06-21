@@ -13,6 +13,7 @@ import java.util.List;
 @AllArgsConstructor
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public class CvSuggestionResponse {
+    private String suggestionId;
     private PersonalInfo personal;
     private ContactInfo contact;
     private List<Experience> experience;
@@ -24,6 +25,7 @@ public class CvSuggestionResponse {
     private List<String> missingSkills;
     private List<String> suggestions;
     private Integer overallMatchScore;
+    private List<Experience> allExperiences;
 
     @Data
     @Builder
@@ -59,6 +61,8 @@ public class CvSuggestionResponse {
         private String startDate;
         private String endDate;
         private List<String> bulletPoints;
+        private Boolean relevant;
+        private String relevanceReason;
     }
 
     @Data
@@ -89,6 +93,7 @@ public class CvSuggestionResponse {
     public static class Language {
         private String id;
         private String language;
+        private String name;
         private String proficiency;
     }
 

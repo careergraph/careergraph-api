@@ -57,6 +57,7 @@ public interface JobRepository extends JpaRepository<Job, String> {
                 SELECT j
                 FROM Job j
                 WHERE j.company.id = :companyId
+                    AND (j.expiryDate IS NULL OR j.expiryDate >= :currentDate)
                     AND (:statuses IS NULL OR j.status IN :statuses)
                     AND (:categories IS NULL OR j.jobCategory IN :categories)
                     AND (:types IS NULL OR j.employmentType IN :types)
@@ -71,12 +72,15 @@ public interface JobRepository extends JpaRepository<Job, String> {
             @Param("categories") List<JobCategory> categories,
             @Param("types") List<EmploymentType> types,
             @Param("query") String query,
+            @Param("currentDate") String currentDate,
             Pageable pageable);
 
     @Query("""
                 SELECT j
                 FROM Job j
-                WHERE (NULLIF(TRIM(:city), '') IS NULL
+                WHERE j.status = 'ACTIVE'
+                    AND (j.expiryDate IS NULL OR j.expiryDate >= :currentDate)
+                    AND (NULLIF(TRIM(:city), '') IS NULL
                         OR lower(j.city) LIKE lower(concat('%', :city, '%'))
                         OR lower(j.state) LIKE lower(concat('%', :city, '%')))
                     AND (:jobCategories IS NULL OR j.jobCategory IN :jobCategories)
@@ -96,6 +100,7 @@ public interface JobRepository extends JpaRepository<Job, String> {
             @Param("experienceLevels") List<ExperienceLevel> experienceLevels,
             @Param("educationTypes") List<EducationType> educationTypes,
             @Param("query") String query,
+            @Param("currentDate") String currentDate,
             Pageable pageable);
 
     @Query("""
@@ -134,12 +139,13 @@ public interface JobRepository extends JpaRepository<Job, String> {
                 JOIN Job target ON target.id = :jobId
                 WHERE j.id <> :jobId
                     AND j.status = 'ACTIVE'
+                    AND (j.expiryDate IS NULL OR j.expiryDate >= :currentDate)
                     AND j.jobCategory = target.jobCategory
                     AND (j.experienceLevel = target.experienceLevel
                         OR (j.minExperience <= target.maxExperience AND j.maxExperience >= target.minExperience))
                 ORDER BY function('RANDOM')
             """)
-    Page<Job> findSimilarJob(@Param("jobId") String jobId, Pageable pageable);
+    Page<Job> findSimilarJob(@Param("jobId") String jobId, @Param("currentDate") String currentDate, Pageable pageable);
 
     @Query("""
                 SELECT j
