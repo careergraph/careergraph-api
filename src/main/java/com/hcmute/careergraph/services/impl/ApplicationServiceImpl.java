@@ -12,6 +12,7 @@ import com.hcmute.careergraph.repositories.CandidateRepository;
 import com.hcmute.careergraph.repositories.AccountRepository;
 import com.hcmute.careergraph.repositories.JobRepository;
 import com.hcmute.careergraph.services.ApplicationService;
+import com.hcmute.careergraph.services.CompanyAccessPolicyService;
 import com.hcmute.careergraph.services.MailService;
 import com.hcmute.careergraph.services.CompanyRecruitmentStageService;
 import com.hcmute.careergraph.services.NotificationService;
@@ -54,6 +55,7 @@ public class ApplicationServiceImpl implements ApplicationService {
     private final NotificationService notificationService;
     private final ApplicationEventPublisher applicationEventPublisher;
     private final CompanyRecruitmentStageService companyRecruitmentStageService;
+    private final CompanyAccessPolicyService companyAccessPolicyService;
 
     private static final String SUBMISSION_NOTE = "Ứng viên đã nộp hồ sơ.";
     private static final String REAPPLY_NOTE = "Ứng viên đã nộp lại hồ sơ.";
@@ -173,6 +175,8 @@ public class ApplicationServiceImpl implements ApplicationService {
         if (job.getStatus() != Status.ACTIVE) {
             throw new BadRequestException("Job is not accepting applications");
         }
+
+        companyAccessPolicyService.assertJobAcceptingCandidateApplications(job);
 
         if (isDeadlinePassed(job.getExpiryDate())) {
             throw new BadRequestException("Job application deadline has passed");

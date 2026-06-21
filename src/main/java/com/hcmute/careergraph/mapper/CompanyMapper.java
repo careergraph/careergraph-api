@@ -73,6 +73,14 @@ public class CompanyMapper {
                 .yearFounded(company.getYearFounded())
                 .offerBeforeTrial(company.getOfferBeforeTrial())
                 .enableOffboardedStage(company.getEnableOffboardedStage())
+                .verificationStatus(company.getVerificationStatus())
+                .operationalStatus(company.getOperationalStatus())
+                .taxCode(company.getTaxCode())
+                .legalRepresentativeName(company.getLegalRepresentativeName())
+                .verificationBusinessEmail(company.getVerificationBusinessEmail())
+                .verificationWebsite(company.getVerificationWebsite())
+                .verificationAdminNote(company.getVerificationAdminNote())
+                .blockReason(company.getBlockReason())
 
                 // Nested objects mapping
                 .contacts(contacts)

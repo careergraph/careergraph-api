@@ -484,7 +484,18 @@ public class MessageServiceImpl implements MessageService {
   @Override
   @Transactional(readOnly = true)
   public long getTotalUnread(Account currentAccount) {
-    Role role = resolveRole(currentAccount);
+    if (currentAccount == null || currentAccount.getRole() == null) {
+      return 0L;
+    }
+
+    if (currentAccount.getRole() != Role.HR && currentAccount.getRole() != Role.USER) {
+      log.debug("Skipping messaging unread count for unsupported role {} on account {}",
+          currentAccount.getRole(),
+          currentAccount.getId());
+      return 0L;
+    }
+
+    Role role = currentAccount.getRole();
 
     var threadIds = role == Role.HR
         ? messageThreadRepository.findVisibleIdsByCompanyId(currentAccount.getCompany().getId(), currentAccount.getId())

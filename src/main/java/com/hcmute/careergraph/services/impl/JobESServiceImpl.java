@@ -60,6 +60,7 @@ public class JobESServiceImpl implements JobESService {
                                                                                                 }
                                                                                                 return mm;
                                                                                         }))
+                                                                        .filter(f -> f.term(t -> t.field("jobSearchable").value(true)))
 
                                                         ))
                                         .from((int) pageable.getOffset())
@@ -173,6 +174,12 @@ public class JobESServiceImpl implements JobESService {
 
                                                                 JobLocationFilterSupport.applyLocationFilter(b, filter);
 
+                                                                if (type != PartyType.COMPANY) {
+                                                                        b.filter(fq -> fq.term(t -> t
+                                                                                        .field("jobSearchable")
+                                                                                        .value(true)));
+                                                                }
+
                                                                 if (type == PartyType.COMPANY && partyId != null) {
                                                                         b.filter(fq -> fq.term(t -> t
                                                                                         .field("companyId")
@@ -275,6 +282,12 @@ public class JobESServiceImpl implements JobESService {
 
                                                                 /* ===== LOCATION ===== */
                                                                 JobLocationFilterSupport.applyLocationFilter(b, filter);
+
+                                                                if (type != PartyType.COMPANY) {
+                                                                        b.filter(q -> q.term(t -> t
+                                                                                        .field("jobSearchable")
+                                                                                        .value(true)));
+                                                                }
 
                                                                 /* ===== COMPANY ===== */
                                                                 if (type == PartyType.COMPANY && partyId != null) {
@@ -499,6 +512,12 @@ public class JobESServiceImpl implements JobESService {
                                                                                         .value(partyId)));
                                                                 }
 
+                                                                if (type != PartyType.COMPANY) {
+                                                                        b.filter(fq -> fq.term(t -> t
+                                                                                        .field("jobSearchable")
+                                                                                        .value(true)));
+                                                                }
+
                                                                 return b;
                                                         })),
                                         JobES.class);
@@ -586,6 +605,10 @@ public class JobESServiceImpl implements JobESService {
                                                                                                                 .term(t -> t
                                                                                                                                 .field("status")
                                                                                                                                 .value("ACTIVE")));
+                                                                                                b.filter(f -> f
+                                                                                                                .term(t -> t
+                                                                                                                                .field("jobSearchable")
+                                                                                                                                .value(true)));
 
                                                                                                 // Exclude job IDs đã
                                                                                                 // // gửi
