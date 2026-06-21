@@ -13,6 +13,7 @@ import com.hcmute.careergraph.repositories.FileRepository;
 import com.hcmute.careergraph.repositories.JobESRepository;
 import com.hcmute.careergraph.repositories.JobRepository;
 import com.hcmute.careergraph.services.CandidateSearchTextBuilder;
+import com.hcmute.careergraph.services.CompanyAccessPolicyService;
 import com.hcmute.careergraph.services.EmbedService;
 import com.hcmute.careergraph.services.FastAPIClientService;
 import com.hcmute.careergraph.services.JobESService;
@@ -34,9 +35,11 @@ import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -66,6 +69,8 @@ class JobServiceImplTest {
     @Mock
     private FileRepository fileRepository;
     @Mock
+    private CompanyAccessPolicyService companyAccessPolicyService;
+    @Mock
     private ApplicationEventPublisher publisher;
 
     private JobServiceImpl jobService;
@@ -85,6 +90,7 @@ class JobServiceImplTest {
                 candidateSearchTextBuilder,
                 redisService,
                 fileRepository,
+                companyAccessPolicyService,
                 publisher
         );
         ReflectionTestUtils.setField(jobService, "maxUploadedCvContextChars", 24_000);
@@ -187,6 +193,26 @@ class JobServiceImplTest {
         assertThat(prompt).contains("Senior Backend Developer");
         assertThat(prompt).contains("Build scalable hiring products");
         assertThat(prompt).doesNotContain("[UPLOADED_CV_1 | resume-empty.pdf");
+    }
+
+    @Test
+    void createJob_shouldRejectUnverifiedCompany() {
+        Company company = new Company();
+        company.setId("company-1");
+        var request = com.hcmute.careergraph.persistence.dtos.request.JobCreationRequest.builder()
+                .title("Backend Engineer")
+                .description("Build systems")
+                .state("HCM")
+                .city("Thu Duc")
+                .build();
+        when(companyRepository.findById("company-1")).thenReturn(Optional.of(company));
+        doThrow(new com.hcmute.careergraph.exception.BadRequestException("blocked"))
+                .when(companyAccessPolicyService)
+                .assertCompanyCanManageJobs(company);
+
+        assertThatThrownBy(() -> jobService.createJob(request, "company-1"))
+                .isInstanceOf(com.hcmute.careergraph.exception.BadRequestException.class)
+                .hasMessage("blocked");
     }
 
     private Job createJob() {
