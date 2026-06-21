@@ -39,10 +39,10 @@ public interface JobRepository extends JpaRepository<Job, String> {
                   AND (j.expiryDate IS NULL OR j.expiryDate >= :currentDate)
             """)
     Page<Job> findPublicJobsByCompanyId(@Param("companyId") String companyId,
-                                        @Param("verificationStatus") CompanyVerificationStatus verificationStatus,
-                                        @Param("operationalStatus") CompanyOperationalStatus operationalStatus,
-                                        @Param("currentDate") String currentDate,
-                                        Pageable pageable);
+            @Param("verificationStatus") CompanyVerificationStatus verificationStatus,
+            @Param("operationalStatus") CompanyOperationalStatus operationalStatus,
+            @Param("currentDate") String currentDate,
+            Pageable pageable);
 
     @Query("""
                 SELECT j
@@ -54,20 +54,20 @@ public interface JobRepository extends JpaRepository<Job, String> {
                 ORDER BY j.createdDate DESC, j.id DESC
             """)
     Page<Job> findPublicJobs(@Param("verificationStatus") CompanyVerificationStatus verificationStatus,
-                             @Param("operationalStatus") CompanyOperationalStatus operationalStatus,
-                             @Param("currentDate") String currentDate,
-                             Pageable pageable);
+            @Param("operationalStatus") CompanyOperationalStatus operationalStatus,
+            @Param("currentDate") String currentDate,
+            Pageable pageable);
 
     @Query("""
-        SELECT j
-        FROM Job j
-        WHERE j.company.id = :companyId
-            AND j.status = 'ACTIVE'
-            AND (j.expiryDate IS NULL OR j.expiryDate >= :currentDate)
-    """)
+                SELECT j
+                FROM Job j
+                WHERE j.company.id = :companyId
+                    AND j.status = 'ACTIVE'
+                    AND (j.expiryDate IS NULL OR j.expiryDate >= :currentDate)
+            """)
     Page<Job> findActiveJobsByCompanyId(@Param("companyId") String companyId,
-                                        @Param("currentDate") String currentDate,
-                                        Pageable pageable);
+            @Param("currentDate") String currentDate,
+            Pageable pageable);
 
     @Query("""
                 SELECT j
@@ -103,6 +103,7 @@ public interface JobRepository extends JpaRepository<Job, String> {
                 SELECT j
                 FROM Job j
                 WHERE j.company.id = :companyId
+                    AND (j.expiryDate IS NULL OR j.expiryDate >= :currentDate)
                     AND (:statuses IS NULL OR j.status IN :statuses)
                     AND (:categories IS NULL OR j.jobCategory IN :categories)
                     AND (:types IS NULL OR j.employmentType IN :types)
@@ -117,6 +118,7 @@ public interface JobRepository extends JpaRepository<Job, String> {
             @Param("categories") List<JobCategory> categories,
             @Param("types") List<EmploymentType> types,
             @Param("query") String query,
+            @Param("currentDate") String currentDate,
             Pageable pageable);
 
     @Query("""

@@ -66,4 +66,5 @@ public interface JobService {
     void syncCompanyJobsSearchDocuments(String companyId);
 
     boolean isJobPubliclyAvailable(Job job);
+    CvSuggestionResponse getCvSuggestion(String suggestionId, String candidateId);
 }

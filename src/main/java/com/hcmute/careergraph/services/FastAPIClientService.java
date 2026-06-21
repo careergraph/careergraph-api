@@ -19,4 +19,10 @@ public interface FastAPIClientService {
      * Trả về JSON string hoặc null nếu thất bại.
      */
     String extractCvKeywords(String jsonBody);
+
+    /**
+     * POST /api/v1/review-cv-builder — Review CV from builder with optional job context.
+     * Returns JSON string containing review results (overallScore, summary, strengths, improvements, jobFit).
+     */
+    String reviewCvBuilder(String jsonBody);
 }

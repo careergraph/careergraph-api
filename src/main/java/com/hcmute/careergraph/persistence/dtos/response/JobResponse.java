@@ -80,7 +80,10 @@ public record JobResponse(
 
         // Mapping field 'type' cho UI (UI dùng 'type' thay vì 'employmentType')
         // Sẽ được set = employmentType trong mapper
-        EmploymentType type
+        EmploymentType type,
+
+        // Job availability
+        boolean isExpired
 ) {
     /**
      * Nested DTO cho Skill lookup

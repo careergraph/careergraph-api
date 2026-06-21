@@ -25,8 +25,6 @@ import com.hcmute.careergraph.persistence.dtos.response.JobResponse;
 import com.hcmute.careergraph.persistence.models.Account;
 import com.hcmute.careergraph.persistence.models.Application;
 import com.hcmute.careergraph.persistence.models.Job;
-import com.hcmute.careergraph.repositories.ApplicationRepository;
-import com.hcmute.careergraph.repositories.SavedJobRepository;
 import com.hcmute.careergraph.services.ApplicationService;
 import com.hcmute.careergraph.services.CandidateService;
 import com.hcmute.careergraph.services.CompanyAccessPolicyService;
@@ -41,7 +39,6 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.Authentication;
-import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.util.StringUtils;
 
@@ -61,7 +58,6 @@ public class JobController {
         private final JobMapper jobMapper;
         private final ApplicationMapper applicationMapper;
         private final SecurityUtils securityUtils;
-        private final ApplicationRepository applicationRepository;
         private final SavedJobService savedJobService;
         private final CandidateService candidateService;
         private final CompanyAccessPolicyService companyAccessPolicyService;
@@ -648,6 +644,20 @@ public class JobController {
                 log.info("POST /api/v1/jobs/{}/cv-suggestion - Generating CV suggestion for candidateId: {}", jobId, candidateId);
 
                 CvSuggestionResponse result = jobService.generateCv(jobId, candidateId);
+
+                return RestResponse.<CvSuggestionResponse>builder()
+                                .status(HttpStatus.OK)
+                                .data(result)
+                                .build();
+        }
+
+        @GetMapping("/cv-suggestion/{suggestionId}")
+        public RestResponse<CvSuggestionResponse> getCvSuggestion(@PathVariable String suggestionId,
+                        Authentication authentication) {
+                String candidateId = securityUtils.extractCandidateId(authentication);
+                log.info("GET /api/v1/jobs/cv-suggestion/{} - Retrieving CV suggestion for candidateId: {}", suggestionId, candidateId);
+
+                CvSuggestionResponse result = jobService.getCvSuggestion(suggestionId, candidateId);
 
                 return RestResponse.<CvSuggestionResponse>builder()
                                 .status(HttpStatus.OK)
