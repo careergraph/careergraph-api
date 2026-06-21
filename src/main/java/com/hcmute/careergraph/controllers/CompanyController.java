@@ -230,7 +230,7 @@ public class CompanyController {
             pageable = PageRequest.of(page, size);
         }
 
-        Page<Job> jobs = jobService.getJobsByCompany(companyId, pageable);
+        Page<Job> jobs = jobService.getPublicJobsByCompany(companyId, pageable);
 
         return RestResponse.<Page<JobResponse>>builder()
                 .status(HttpStatus.OK)

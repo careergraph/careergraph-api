@@ -69,6 +69,18 @@ public class JobES {
     @Field(type = FieldType.Keyword)
     private String companyId;
 
+    @Field(type = FieldType.Keyword)
+    private String companyVerificationStatus;
+
+    @Field(type = FieldType.Keyword)
+    private String companyOperationalStatus;
+
+    @Field(type = FieldType.Boolean)
+    private Boolean companyBlocked;
+
+    @Field(type = FieldType.Boolean)
+    private Boolean jobSearchable;
+
     @Field(type = FieldType.Text, analyzer = "vi_analyzer")
     private List<String> qualifications;
 

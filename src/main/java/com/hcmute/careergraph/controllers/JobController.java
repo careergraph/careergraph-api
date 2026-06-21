@@ -29,6 +29,7 @@ import com.hcmute.careergraph.repositories.ApplicationRepository;
 import com.hcmute.careergraph.repositories.SavedJobRepository;
 import com.hcmute.careergraph.services.ApplicationService;
 import com.hcmute.careergraph.services.CandidateService;
+import com.hcmute.careergraph.services.CompanyAccessPolicyService;
 import com.hcmute.careergraph.services.JobService;
 import com.hcmute.careergraph.services.SavedJobService;
 import jakarta.validation.Valid;
@@ -63,6 +64,7 @@ public class JobController {
         private final ApplicationRepository applicationRepository;
         private final SavedJobService savedJobService;
         private final CandidateService candidateService;
+        private final CompanyAccessPolicyService companyAccessPolicyService;
 
         // ============================ JOB MANAGEMENT ============================
 
@@ -671,7 +673,11 @@ public class JobController {
         }
 
         private void validateJobAccess(Job job) {
-                if (job == null || job.getStatus() == Status.ACTIVE) {
+                if (job == null) {
+                        return;
+                }
+
+                if (job.getStatus() == Status.ACTIVE && companyAccessPolicyService.isJobPubliclyAvailable(job)) {
                         return;
                 }
 
