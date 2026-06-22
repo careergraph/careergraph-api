@@ -2,6 +2,7 @@ package com.hcmute.careergraph.services.impl;
 
 import com.hcmute.careergraph.enums.company.CompanyOperationalStatus;
 import com.hcmute.careergraph.enums.company.CompanyVerificationStatus;
+import com.hcmute.careergraph.exception.BadRequestException;
 import com.hcmute.careergraph.exception.NotFoundException;
 import com.hcmute.careergraph.persistence.dtos.request.CompanyVerificationRequests;
 import com.hcmute.careergraph.persistence.dtos.response.CompanyVerificationResponses;
@@ -217,6 +218,7 @@ public class AdminCompanyVerificationServiceImpl implements AdminCompanyVerifica
         companyAccessPolicyService.assertCurrentAccountIsAdmin();
         CompanyVerificationRequest verificationRequest = findVerificationRequest(requestId);
         Account adminAccount = findAccount(adminAccountId);
+        validateDecisionAllowed(verificationRequest, status);
 
         verificationRequest.setVerificationStatus(status);
         verificationRequest.setAdminNote(note.trim());
@@ -240,6 +242,15 @@ public class AdminCompanyVerificationServiceImpl implements AdminCompanyVerifica
         companyRepository.save(company);
         jobService.syncCompanyJobsSearchDocuments(company.getId());
         return savedRequest;
+    }
+
+    private void validateDecisionAllowed(
+            CompanyVerificationRequest verificationRequest,
+            CompanyVerificationStatus targetStatus) {
+        if (verificationRequest.getVerificationStatus() != CompanyVerificationStatus.PENDING_REVIEW) {
+            throw new BadRequestException(
+                    "Only pending verification requests can be updated to " + targetStatus.name());
+        }
     }
 
     private CompanyVerificationRequest latestOrSyntheticRequest(Company company) {

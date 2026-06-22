@@ -3,6 +3,7 @@ package com.hcmute.careergraph.services.impl;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.hcmute.careergraph.enums.common.FileType;
 import com.hcmute.careergraph.enums.common.Status;
+import com.hcmute.careergraph.persistence.documents.JobES;
 import com.hcmute.careergraph.persistence.models.Candidate;
 import com.hcmute.careergraph.persistence.models.Company;
 import com.hcmute.careergraph.persistence.models.File;
@@ -26,6 +27,8 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.Pageable;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.LocalDateTime;
@@ -71,6 +74,8 @@ class JobServiceImplTest {
     @Mock
     private CompanyAccessPolicyService companyAccessPolicyService;
     @Mock
+    private JobSearchDocumentFactory jobSearchDocumentFactory;
+    @Mock
     private ApplicationEventPublisher publisher;
 
     private JobServiceImpl jobService;
@@ -91,6 +96,7 @@ class JobServiceImplTest {
                 redisService,
                 fileRepository,
                 companyAccessPolicyService,
+                jobSearchDocumentFactory,
                 publisher
         );
         ReflectionTestUtils.setField(jobService, "maxUploadedCvContextChars", 24_000);
@@ -213,6 +219,38 @@ class JobServiceImplTest {
         assertThatThrownBy(() -> jobService.createJob(request, "company-1"))
                 .isInstanceOf(com.hcmute.careergraph.exception.BadRequestException.class)
                 .hasMessage("blocked");
+    }
+
+    @Test
+    void syncCompanyJobsSearchDocuments_shouldDeleteDocumentForNonPublicJob() {
+        Job privateJob = createJob();
+        privateJob.setId("job-private");
+
+        when(jobRepository.findByCompanyId("company-1", Pageable.unpaged()))
+                .thenReturn(new PageImpl<>(List.of(privateJob)));
+        when(jobSearchDocumentFactory.shouldIndex(privateJob)).thenReturn(false);
+
+        jobService.syncCompanyJobsSearchDocuments("company-1");
+
+        verify(jobESRepository).deleteById("job-private");
+    }
+
+    @Test
+    void syncCompanyJobsSearchDocuments_shouldUpsertDocumentForPublicJob() {
+        Job publicJob = createJob();
+        publicJob.setId("job-public");
+        JobES document = JobES.builder().id("job-public").build();
+
+        when(jobRepository.findByCompanyId("company-1", Pageable.unpaged()))
+                .thenReturn(new PageImpl<>(List.of(publicJob)));
+        when(jobSearchDocumentFactory.shouldIndex(publicJob)).thenReturn(true);
+        when(jobSearchDocumentFactory.buildEmbeddingText(publicJob)).thenReturn("backend spring");
+        when(embedService.embed("backend spring")).thenReturn(new float[] {0.1f, 0.2f});
+        when(jobSearchDocumentFactory.toDocument(eq(publicJob), any(float[].class))).thenReturn(document);
+
+        jobService.syncCompanyJobsSearchDocuments("company-1");
+
+        verify(jobESRepository).save(document);
     }
 
     private Job createJob() {

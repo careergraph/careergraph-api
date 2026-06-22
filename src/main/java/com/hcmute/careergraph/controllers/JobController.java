@@ -120,6 +120,9 @@ public class JobController {
 
                 Job job = jobService.getJobById(id);
                 validateJobAccess(job);
+                if (companyAccessPolicyService.isJobPubliclyAvailable(job)) {
+                        job = jobService.incrementJobViews(id);
+                }
 
                 String candidateId = securityUtils.getCandidateId().orElse(null);
 
@@ -687,7 +690,7 @@ public class JobController {
                         return;
                 }
 
-                if (job.getStatus() == Status.ACTIVE && companyAccessPolicyService.isJobPubliclyAvailable(job)) {
+                if (companyAccessPolicyService.isJobPubliclyAvailable(job)) {
                         return;
                 }
 

@@ -7,7 +7,10 @@ import com.hcmute.careergraph.helper.SecurityUtils;
 import com.hcmute.careergraph.persistence.documents.CandidateES;
 import com.hcmute.careergraph.persistence.dtos.request.CandidateFilterRequest;
 import com.hcmute.careergraph.persistence.dtos.response.CandidateSuggestionResponse;
+import com.hcmute.careergraph.persistence.models.Company;
+import com.hcmute.careergraph.repositories.CompanyRepository;
 import com.hcmute.careergraph.services.CandidateESService;
+import com.hcmute.careergraph.services.CompanyAccessPolicyService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
@@ -19,6 +22,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 
 /**
  * Controller for Candidate Suggestion/Search functionality
@@ -31,10 +35,18 @@ public class CandidateSuggestionController {
 
   private final CandidateESService candidateESService;
   private final SecurityUtils securityUtils;
+  private final CompanyRepository companyRepository;
+  private final CompanyAccessPolicyService companyAccessPolicyService;
 
-  public CandidateSuggestionController(CandidateESService candidateESService, SecurityUtils securityUtils) {
+  public CandidateSuggestionController(
+      CandidateESService candidateESService,
+      SecurityUtils securityUtils,
+      CompanyRepository companyRepository,
+      CompanyAccessPolicyService companyAccessPolicyService) {
     this.candidateESService = candidateESService;
     this.securityUtils = securityUtils;
+    this.companyRepository = companyRepository;
+    this.companyAccessPolicyService = companyAccessPolicyService;
   }
 
   /**
@@ -64,6 +76,8 @@ public class CandidateSuggestionController {
         keyword, page, size);
 
     String companyId = securityUtils.extractCompanyId(authentication);
+    Company company = findCompany(companyId);
+    companyAccessPolicyService.assertCompanyCanSearchCandidates(company);
     Pageable pageable = PageRequest.of(page, size);
 
     // Initialize filter if null
@@ -174,5 +188,13 @@ public class CandidateSuggestionController {
         .message("Synced " + count + " candidates to Elasticsearch")
         .data(count)
         .build();
+  }
+
+  private Company findCompany(String companyId) {
+    Optional<Company> company = companyRepository.findById(companyId);
+    if (company.isEmpty()) {
+      throw new IllegalArgumentException("Company not found with ID: " + companyId);
+    }
+    return company.get();
   }
 }

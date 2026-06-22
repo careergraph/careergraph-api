@@ -1,6 +1,7 @@
 package com.hcmute.careergraph.config.app;
 
 import com.hcmute.careergraph.config.properties.ElasticsearchSyncProperties;
+import com.hcmute.careergraph.services.impl.ExpiredJobRepairService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.annotation.Profile;
@@ -17,6 +18,7 @@ public class ElasticsearchSyncScheduler {
 
   private final ElasticsearchDataInitializer jobSyncInitializer;
   private final CandidateElasticsearchDataInitializer candidateSyncInitializer;
+  private final ExpiredJobRepairService expiredJobRepairService;
   private final ElasticsearchSyncProperties syncProperties;
 
   private final AtomicBoolean jobSyncRunning = new AtomicBoolean(false);
@@ -38,6 +40,15 @@ public class ElasticsearchSyncScheduler {
     }
 
     try {
+      try {
+        ElasticsearchSyncResult expiryRepairResult = expiredJobRepairService.repairExpiredJobs();
+        log.info("Scheduled expired-job repair finished: indexed={}, skipped={}, message={}",
+          expiryRepairResult.indexed(),
+          expiryRepairResult.skipped(),
+          expiryRepairResult.message());
+      } catch (Exception expiredRepairException) {
+        log.error("Scheduled expired-job repair failed: {}", expiredRepairException.getMessage(), expiredRepairException);
+      }
       ElasticsearchSyncResult result = jobSyncInitializer.syncNow(null, syncProperties.getCron().getJobs().getBatchSize());
       log.info("Scheduled job Elasticsearch sync finished: batchSize={}, indexed={}, unchanged={}, pending={}, skipped={}, message={}",
         result.batchSize(),

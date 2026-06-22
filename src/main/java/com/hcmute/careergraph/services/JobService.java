@@ -22,6 +22,8 @@ public interface JobService {
 
     Job getJobById(String jobId);
 
+    Job incrementJobViews(String jobId);
+
     Page<Job> getJobByCategory(JobCategory jobCategory, Pageable pageable);
 
     Page<Job> getAllJobs(Pageable pageable);
