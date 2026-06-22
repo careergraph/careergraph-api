@@ -9,7 +9,11 @@ public interface CompanyAccessPolicyService {
 
     void assertCompanyCanManageJobs(Company company);
 
+    void assertCompanyCanSearchCandidates(Company company);
+
     void assertJobAcceptingCandidateApplications(Job job);
 
     boolean isJobPubliclyAvailable(Job job);
+
+    boolean isJobExpired(Job job);
 }
