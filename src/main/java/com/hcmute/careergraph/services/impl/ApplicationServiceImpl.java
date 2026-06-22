@@ -2,7 +2,6 @@ package com.hcmute.careergraph.services.impl;
 
 import com.hcmute.careergraph.enums.application.ApplicationStage;
 import com.hcmute.careergraph.enums.candidate.ContactType;
-import com.hcmute.careergraph.enums.common.Status;
 import com.hcmute.careergraph.exception.BadRequestException;
 import com.hcmute.careergraph.persistence.dtos.request.ApplicationRequest;
 import com.hcmute.careergraph.persistence.dtos.request.ApplicationStageUpdateRequest;
@@ -172,47 +171,7 @@ public class ApplicationServiceImpl implements ApplicationService {
             throw new BadRequestException("Job not found");
         }
 
-        if (job.getStatus() != Status.ACTIVE) {
-            throw new BadRequestException("Job is not accepting applications");
-        }
-
         companyAccessPolicyService.assertJobAcceptingCandidateApplications(job);
-
-        if (isDeadlinePassed(job.getExpiryDate())) {
-            throw new BadRequestException("Job application deadline has passed");
-        }
-    }
-
-    private boolean isDeadlinePassed(String expiryDate) {
-        if (!StringUtils.hasText(expiryDate)) {
-            return false;
-        }
-
-        String normalized = expiryDate.trim();
-        try {
-            return LocalDate.now().isAfter(LocalDate.parse(normalized));
-        } catch (DateTimeException ignored) {
-            // Fall through and try to parse a full timestamp.
-        }
-
-        try {
-            return LocalDateTime.now().isAfter(LocalDateTime.parse(normalized));
-        } catch (DateTimeException ignored) {
-            // Fall through and try offset-aware formats below.
-        }
-
-        try {
-            return Instant.now().isAfter(OffsetDateTime.parse(normalized).toInstant());
-        } catch (DateTimeException ignored) {
-            // Fall through and try a raw instant timestamp below.
-        }
-
-        try {
-            return Instant.now().isAfter(Instant.parse(normalized));
-        } catch (DateTimeException ignored) {
-            log.warn("Unable to parse job expiryDate [{}]; allowing application by default", normalized);
-            return false;
-        }
     }
 
     @Override

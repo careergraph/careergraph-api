@@ -12,6 +12,7 @@ import com.hcmute.careergraph.repositories.JobNotificationHistoryRepository;
 import com.hcmute.careergraph.repositories.JobNotificationQueueRepository;
 import com.hcmute.careergraph.repositories.JobRepository;
 import com.hcmute.careergraph.repositories.NewlyPostedJobRepository;
+import com.hcmute.careergraph.services.CompanyAccessPolicyService;
 import com.hcmute.careergraph.services.JobRecommendationService;
 import com.hcmute.careergraph.services.MailService;
 import lombok.RequiredArgsConstructor;
@@ -24,6 +25,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 /**
@@ -52,6 +54,7 @@ public class DailyDigestScheduler {
     private final NewlyPostedJobRepository newlyPostedJobRepo;
     private final MailService mailService;
     private final JobRecommendationService recommendService;
+    private final CompanyAccessPolicyService companyAccessPolicyService;
 
     /**
      * STEP 1: Build queue - Tìm job phù hợp cho từng candidate
@@ -115,14 +118,29 @@ public class DailyDigestScheduler {
             if (user == null || !Boolean.TRUE.equals(user.getIsOpenToNotifyNewJob()))
                 return;
 
-            // Chỉ lấy tối đa 5 queue items để gửi
+            Map<String, Job> jobsById = items.stream()
+                    .map(JobNotificationQueue::getJobId)
+                    .distinct()
+                    .map(jobId -> jobRepo.findById(jobId).orElse(null))
+                    .filter(Objects::nonNull)
+                    .collect(Collectors.toMap(Job::getId, Function.identity()));
+
+            List<JobNotificationQueue> invalidItems = items.stream()
+                    .filter(item -> !companyAccessPolicyService.isJobPubliclyAvailable(jobsById.get(item.getJobId())))
+                    .toList();
+            if (!invalidItems.isEmpty()) {
+                queueRepo.deleteAll(invalidItems);
+            }
+
             List<JobNotificationQueue> itemsToSend = items.stream()
+                    .filter(item -> !invalidItems.contains(item))
                     .limit(5)
                     .toList();
 
             List<Job> jobs = itemsToSend.stream()
-                    .map(q -> jobRepo.findById(q.getJobId()).orElse(null))
+                    .map(q -> jobsById.get(q.getJobId()))
                     .filter(Objects::nonNull)
+                    .filter(companyAccessPolicyService::isJobPubliclyAvailable)
                     .toList();
 
             if (jobs.isEmpty())
@@ -171,8 +189,6 @@ public class DailyDigestScheduler {
         }
     }
 }
-
-
 
 
 

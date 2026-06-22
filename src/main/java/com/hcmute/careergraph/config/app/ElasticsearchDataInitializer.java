@@ -2,40 +2,28 @@ package com.hcmute.careergraph.config.app;
 
 import com.hcmute.careergraph.config.properties.ElasticsearchSyncProperties;
 import com.hcmute.careergraph.config.properties.EmbeddingRuntimeProperties;
-import com.hcmute.careergraph.enums.company.CompanyOperationalStatus;
-import com.hcmute.careergraph.enums.company.CompanyVerificationStatus;
-import com.hcmute.careergraph.enums.common.Status;
-import com.hcmute.careergraph.helper.VietnamProvinceUtils;
 import com.hcmute.careergraph.persistence.documents.JobES;
-import com.hcmute.careergraph.persistence.event.JobCreatedEvent;
 import com.hcmute.careergraph.persistence.models.Job;
 import com.hcmute.careergraph.repositories.JobESRepository;
-import com.hcmute.careergraph.repositories.JobNotificationHistoryRepository;
-import com.hcmute.careergraph.repositories.JobNotificationQueueRepository;
 import com.hcmute.careergraph.repositories.JobRepository;
-import com.hcmute.careergraph.repositories.NewlyPostedJobRepository;
 import com.hcmute.careergraph.services.EmbedService;
 import com.hcmute.careergraph.services.HuggingFaceEmbeddingService;
+import com.hcmute.careergraph.services.impl.ExpiredJobRepairService;
+import com.hcmute.careergraph.services.impl.JobSearchDocumentFactory;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.CommandLineRunner;
-import org.springframework.context.annotation.Profile;
-import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.core.annotation.Order;
+import org.springframework.context.annotation.Profile;
 import org.springframework.data.elasticsearch.core.ElasticsearchOperations;
 import org.springframework.stereotype.Component;
 
-import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
-import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
-import java.util.stream.IntStream;
 
 @Component
 @Profile("!test")
@@ -51,41 +39,26 @@ public class ElasticsearchDataInitializer implements CommandLineRunner {
     private final ElasticsearchOperations elasticsearchOperations;
     private final HuggingFaceEmbeddingService huggingFaceEmbeddingService;
     private static final int EMBEDDING_BATCH_SIZE = 100;
-    private final ApplicationEventPublisher publisher;
-    private final JobNotificationHistoryRepository historyRepo;
-    private final JobNotificationQueueRepository queueRepo;
-    private final NewlyPostedJobRepository newlyPostedJobRepo;
     private final EmbedService embeddingModel;
     private final ElasticsearchSyncProperties syncProperties;
     private final EmbeddingRuntimeProperties embeddingRuntimeProperties;
-
-    private static final List<String> KEYWORDS = List.of(
-            "java",
-            "developer",
-            "backend",
-            "frontend",
-            "react",
-            "fullstack");
-
-    private String normalize(String text) {
-        return text
-                .toLowerCase()
-                .replaceAll("[^a-z0-9 ]", " ")
-                .replaceAll("\\s+", " ")
-                .trim();
-    }
-
-    private boolean matchTitle(Job job) {
-        String title = normalize(job.getTitle());
-        // String title = job.getTitle().toLowerCase();
-        return KEYWORDS.stream().anyMatch(title::contains);
-    }
+    private final JobSearchDocumentFactory jobSearchDocumentFactory;
+    private final ExpiredJobRepairService expiredJobRepairService;
 
     @Override
     public void run(String... args) throws Exception {
         if (!syncProperties.getJobs().isSyncEnabled()) {
             log.info("Skip Job Elasticsearch synchronization because APP_ES_SYNC_JOBS_ENABLED=false");
             return;
+        }
+        try {
+            ElasticsearchSyncResult expiredRepairResult = expiredJobRepairService.repairExpiredJobs();
+            log.info("Startup expired-job repair finished: indexed={}, skipped={}, message={}",
+                    expiredRepairResult.indexed(),
+                    expiredRepairResult.skipped(),
+                    expiredRepairResult.message());
+        } catch (Exception exception) {
+            log.error("Startup expired-job repair failed: {}", exception.getMessage(), exception);
         }
         syncNow(null, null);
     }
@@ -122,7 +95,7 @@ public class ElasticsearchDataInitializer implements CommandLineRunner {
                 }
 
                 List<Job> activeJobs = allJobs.stream()
-                        .filter(this::shouldIndexJob)
+                        .filter(jobSearchDocumentFactory::shouldIndex)
                         .toList();
 
                 Set<String> activeJobIds = activeJobs.stream()
@@ -138,6 +111,10 @@ public class ElasticsearchDataInitializer implements CommandLineRunner {
 
                 if (!staleDocumentIds.isEmpty()) {
                     jobESRepository.deleteAllById(staleDocumentIds);
+                    log.warn(
+                            "Job Elasticsearch drift detected before sync: staleDocuments={}, sampleIds={}",
+                            staleDocumentIds.size(),
+                            sampleIds(staleDocumentIds));
                 }
 
                 if (activeJobs.isEmpty()) {
@@ -158,8 +135,7 @@ public class ElasticsearchDataInitializer implements CommandLineRunner {
                 List<JobES> jobsWithoutEmbeddingChanges = new ArrayList<>();
 
                 for (Job job : activeJobs) {
-                    String searchText = buildSearchText(job);
-                    String contentHash = hashText(searchText);
+                    String contentHash = jobSearchDocumentFactory.buildContentHash(job);
                     JobES existing = jobESRepository.findById(job.getId()).orElse(null);
 
                     if (!effectiveForce && existing != null && contentHash.equals(existing.getContentHash())) {
@@ -169,6 +145,16 @@ public class ElasticsearchDataInitializer implements CommandLineRunner {
 
                     jobsNeedingEmbedding.add(job);
                 }
+
+                log.info(
+                        "Job Elasticsearch sync state: totalJobs={}, eligibleJobs={}, staleDocuments={}, changedJobs={}, unchangedJobs={}, force={}, batchSize={}",
+                        allJobs.size(),
+                        activeJobs.size(),
+                        staleDocumentIds.size(),
+                        jobsNeedingEmbedding.size(),
+                        jobsWithoutEmbeddingChanges.size(),
+                        effectiveForce,
+                        effectiveMaxEmbeddings);
 
                 if (jobsNeedingEmbedding.isEmpty() && indexedJobsCount >= activeJobs.size()) {
                     log.info("Skip Job Elasticsearch synchronization because no jobs changed since the last index run.");
@@ -185,7 +171,9 @@ public class ElasticsearchDataInitializer implements CommandLineRunner {
 
                 int cappedCount = Math.min(jobsNeedingEmbedding.size(), Math.max(1, effectiveMaxEmbeddings));
                 List<Job> jobsToEmbed = jobsNeedingEmbedding.subList(0, cappedCount);
-                List<String> texts = jobsToEmbed.stream().map(this::buildSearchText).toList();
+                List<String> texts = jobsToEmbed.stream()
+                        .map(jobSearchDocumentFactory::buildEmbeddingText)
+                        .toList();
                 List<float[]> vectors = new ArrayList<>();
 
                 for (int start = 0; start < texts.size(); start += EMBEDDING_BATCH_SIZE) {
@@ -195,15 +183,13 @@ public class ElasticsearchDataInitializer implements CommandLineRunner {
                 }
 
                 if (effectiveForce) {
-                    queueRepo.deleteAll();
-                    historyRepo.deleteAll();
-                    newlyPostedJobRepo.deleteAll();
                     clearIndexData();
                 }
 
-                List<JobES> jobsToSave = IntStream.range(0, jobsToEmbed.size())
-                        .mapToObj(i -> toJobDocument(jobsToEmbed.get(i), vectors.get(i)))
-                        .toList();
+                List<JobES> jobsToSave = new ArrayList<>(jobsToEmbed.size());
+                for (int index = 0; index < jobsToEmbed.size(); index++) {
+                    jobsToSave.add(jobSearchDocumentFactory.toDocument(jobsToEmbed.get(index), vectors.get(index)));
+                }
 
                 jobESRepository.saveAll(jobsToSave);
 
@@ -255,17 +241,17 @@ public class ElasticsearchDataInitializer implements CommandLineRunner {
                                 "Embedding provider rate-limited. Skipped retries for this run: " + e.getMessage());
                         }
 
-                System.err.println("Attempt " + attempt + " failed. Reason: " + e.getMessage());
+                log.warn("Job Elasticsearch synchronization attempt {} failed: {}", attempt, e.getMessage(), e);
 
                 if (attempt < MAX_RETRIES) {
-                    System.out.println("Retrying in " + DELAY_SECONDS + " seconds...");
+                    log.info("Retrying job Elasticsearch synchronization in {} seconds.", DELAY_SECONDS);
                     try {
                         TimeUnit.SECONDS.sleep(DELAY_SECONDS);
                     } catch (InterruptedException ie) {
                         // Nếu luồng bị gián đoạn, chúng ta nên khôi phục lại trạng thái gián đoạn
                         // để các mã gọi ở tầng cao hơn biết và xử lý.
                         Thread.currentThread().interrupt();
-                        System.err.println("Synchronization thread was interrupted during delay.");
+                        log.warn("Job Elasticsearch synchronization thread was interrupted during retry delay.");
                         return new ElasticsearchSyncResult(
                                 "jobs",
                                 true,
@@ -277,8 +263,8 @@ public class ElasticsearchDataInitializer implements CommandLineRunner {
                                 "Synchronization thread was interrupted during delay.");
                     }
                 } else {
-                    System.err.println("Failed to synchronize data to Elasticsearch after " + MAX_RETRIES
-                            + " attempts. Application may experience search issues.");
+                    log.error("Failed to synchronize jobs to Elasticsearch after {} attempts. Search drift may persist.",
+                            MAX_RETRIES);
                     return new ElasticsearchSyncResult(
                             "jobs",
                             true,
@@ -301,6 +287,16 @@ public class ElasticsearchDataInitializer implements CommandLineRunner {
                 0,
                 0,
                 "Job Elasticsearch synchronization finished without processing.");
+    }
+
+    private String sampleIds(List<String> ids) {
+        if (ids == null || ids.isEmpty()) {
+            return "[]";
+        }
+        return ids.stream()
+                .limit(5)
+                .toList()
+                .toString();
     }
 
     private boolean isRateLimitError(Throwable throwable) {
@@ -375,73 +371,6 @@ public class ElasticsearchDataInitializer implements CommandLineRunner {
                 localEx.addSuppressed(geminiEx);
                 throw new IllegalStateException("Gemini-primary batch embedding failed and local fallback is unavailable.", localEx);
             }
-        }
-    }
-
-    private String buildSearchText(Job job) {
-        return "%s\n%s\n%s".formatted(
-                job.getTitle(),
-                job.getJobCategory().getDisplayName(),
-                job.getState());
-    }
-
-    private boolean shouldIndexJob(Job job) {
-        return job != null
-                && job.getStatus() == Status.ACTIVE
-                && job.getCompany() != null;
-    }
-
-    private JobES toJobDocument(Job job, float[] embedding) {
-        String searchText = buildSearchText(job);
-        String contentHash = hashText(searchText);
-        if (matchTitle(job)) {
-            publisher.publishEvent(new JobCreatedEvent(job.getId()));
-            System.out.println("➡️ Marked as newly posted: " + job.getTitle());
-        }
-        return JobES.builder()
-                .id(job.getId())
-                .title(job.getTitle())
-                .description(job.getDescription())
-                .status(job.getStatus().name())
-                .jobCategory(job.getJobCategory().name())
-                .employmentType(job.getEmploymentType().name())
-                .experienceLevel(toEnumName(job.getExperienceLevel()))
-                .education(toEnumName(job.getEducation()))
-                .state(job.getState())
-                .provinceSlug(VietnamProvinceUtils.slugFromStateName(job.getState()))
-                .provinceCode(VietnamProvinceUtils.codeFromStateName(job.getState()))
-                .city(job.getCity())
-                .companyId(job.getCompany().getId())
-                .companyVerificationStatus(job.getCompany().getVerificationStatus() != null
-                        ? job.getCompany().getVerificationStatus().name()
-                        : CompanyVerificationStatus.NOT_SUBMITTED.name())
-                .companyOperationalStatus(job.getCompany().getOperationalStatus() != null
-                        ? job.getCompany().getOperationalStatus().name()
-                        : CompanyOperationalStatus.ACTIVE.name())
-                .companyBlocked(job.getCompany().getOperationalStatus() == CompanyOperationalStatus.BLOCKED)
-                .jobSearchable(job.getCompany().getVerificationStatus() == CompanyVerificationStatus.APPROVED
-                        && job.getCompany().getOperationalStatus() == CompanyOperationalStatus.ACTIVE)
-                .createdAt(job.getCreatedDate() != null ? job.getCreatedDate().toLocalDate() : LocalDate.now())
-                .contentHash(contentHash)
-                .embedding(embedding)
-                .build();
-    }
-
-    private String toEnumName(Enum<?> value) {
-        return value != null ? value.name() : null;
-    }
-
-    private String hashText(String text) {
-        try {
-            MessageDigest digest = MessageDigest.getInstance("SHA-256");
-            byte[] hash = digest.digest(text.getBytes(StandardCharsets.UTF_8));
-            StringBuilder builder = new StringBuilder(hash.length * 2);
-            for (byte value : hash) {
-                builder.append(String.format(Locale.ROOT, "%02x", value));
-            }
-            return builder.toString();
-        } catch (NoSuchAlgorithmException ex) {
-            throw new IllegalStateException("SHA-256 algorithm is not available", ex);
         }
     }
 

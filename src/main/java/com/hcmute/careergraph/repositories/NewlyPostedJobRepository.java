@@ -5,6 +5,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 
 import java.util.List;
+import java.util.Collection;
 
 public interface NewlyPostedJobRepository extends JpaRepository<NewlyPostedJob, String> {
 
@@ -14,4 +15,6 @@ public interface NewlyPostedJobRepository extends JpaRepository<NewlyPostedJob, 
   List<String> findAllJobIds();
 
   void deleteByJobId(String jobId);
+
+  long deleteByJobIdIn(Collection<String> jobIds);
 }

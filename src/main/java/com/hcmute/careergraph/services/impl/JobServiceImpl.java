@@ -76,6 +76,7 @@ public class JobServiceImpl implements JobService {
     private final RedisService redisService;
     private final FileRepository fileRepository;
     private final CompanyAccessPolicyService companyAccessPolicyService;
+    private final JobSearchDocumentFactory jobSearchDocumentFactory;
 
     private final ApplicationEventPublisher publisher;
 
@@ -134,12 +135,15 @@ public class JobServiceImpl implements JobService {
     public Job getJobById(String jobId) {
         log.info("Fetching job with ID: {}", jobId);
 
-        Job job = jobRepository.findById(jobId)
+        return jobRepository.findById(jobId)
                 .orElseThrow(() -> new IllegalArgumentException("Job not found with ID: " + jobId));
+    }
 
-        // Increase views of job
+    @Transactional
+    @Override
+    public Job incrementJobViews(String jobId) {
+        Job job = getJobById(jobId);
         job.setViews(job.getViews() + 1);
-
         return jobRepository.save(job);
     }
 
@@ -809,19 +813,18 @@ public class JobServiceImpl implements JobService {
         if (!StringUtils.hasText(companyId)) {
             return;
         }
-        jobRepository.findByCompanyId(companyId, Pageable.unpaged())
-                .getContent()
-                .forEach(this::syncJobSearchDocument);
+        List<Job> companyJobs = jobRepository.findByCompanyId(companyId, Pageable.unpaged()).getContent();
+        long publicJobs = companyJobs.stream().filter(jobSearchDocumentFactory::shouldIndex).count();
+        long nonPublicJobs = companyJobs.size() - publicJobs;
+
+        log.info("Syncing company jobs to Elasticsearch: companyId={}, totalJobs={}, publicJobs={}, nonPublicJobs={}",
+                companyId, companyJobs.size(), publicJobs, nonPublicJobs);
+
+        companyJobs.forEach(this::syncJobSearchDocument);
     }
 
     @Override
     public boolean isJobPubliclyAvailable(Job job) {
-        if (job == null || job.getStatus() != Status.ACTIVE) {
-            return false;
-        }
-        if (isDeadlinePassed(job.getExpiryDate())) {
-            return false;
-        }
         return companyAccessPolicyService.isJobPubliclyAvailable(job);
     }
 
@@ -1498,35 +1501,14 @@ public class JobServiceImpl implements JobService {
             return;
         }
 
-        if (job.getStatus() != Status.ACTIVE) {
+        if (!jobSearchDocumentFactory.shouldIndex(job)) {
             jobESRepository.deleteById(job.getId());
             return;
         }
 
-        JobES jobES = JobES.builder()
-                .id(job.getId())
-                .title(job.getTitle())
-                .description(job.getDescription())
-                .status(job.getStatus().name())
-                .jobCategory(job.getJobCategory().name())
-                .employmentType(job.getEmploymentType().name())
-                .experienceLevel(toEnumName(job.getExperienceLevel()))
-                .education(toEnumName(job.getEducation()))
-                .state(job.getState())
-                .provinceSlug(VietnamProvinceUtils.slugFromStateName(job.getState()))
-                .provinceCode(VietnamProvinceUtils.codeFromStateName(job.getState()))
-                .city(job.getCity())
-                .companyId(job.getCompany().getId())
-                .companyVerificationStatus(job.getCompany().getVerificationStatus().name())
-                .companyOperationalStatus(job.getCompany().getOperationalStatus().name())
-                .companyBlocked(job.getCompany().getOperationalStatus() == CompanyOperationalStatus.BLOCKED)
-                .jobSearchable(isJobPubliclyAvailable(job))
-                .qualifications(job.getQualifications())
-                .minimumQualifications(job.getMinimumQualifications())
-                .responsibilities(job.getResponsibilities())
-                .createdAt(job.getCreatedDate() != null ? job.getCreatedDate().toLocalDate() : LocalDate.now())
-                .embedding(embedService.embed(buildJobSearchText(job)))
-                .build();
+        JobES jobES = jobSearchDocumentFactory.toDocument(
+                job,
+                embedService.embed(jobSearchDocumentFactory.buildEmbeddingText(job)));
         jobESRepository.save(jobES);
     }
 

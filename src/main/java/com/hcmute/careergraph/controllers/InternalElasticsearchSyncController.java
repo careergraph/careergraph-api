@@ -4,7 +4,9 @@ import com.hcmute.careergraph.config.app.CandidateElasticsearchDataInitializer;
 import com.hcmute.careergraph.config.app.ElasticsearchDataInitializer;
 import com.hcmute.careergraph.config.app.ElasticsearchSyncResult;
 import com.hcmute.careergraph.helper.RestResponse;
+import com.hcmute.careergraph.services.impl.ExpiredJobRepairService;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Profile;
 import org.springframework.http.HttpStatus;
@@ -24,10 +26,12 @@ import java.util.Map;
 @RequestMapping("internal/elasticsearch")
 @RequiredArgsConstructor
 @Profile("!test")
+@Slf4j
 public class InternalElasticsearchSyncController {
 
   private final ElasticsearchDataInitializer jobSyncInitializer;
   private final CandidateElasticsearchDataInitializer candidateSyncInitializer;
+  private final ExpiredJobRepairService expiredJobRepairService;
 
   @Value("${socket.internal.api-key:dev-secret-change-in-prod}")
   private String internalApiKey;
@@ -44,7 +48,21 @@ public class InternalElasticsearchSyncController {
     validateInternalApiKey(providedInternalApiKey);
 
     String normalizedTarget = target.trim().toLowerCase(Locale.ROOT);
+    log.info(
+      "Manual Elasticsearch sync requested: target={}, force={}, forceJobs={}, forceCandidates={}, jobBatchSize={}, candidateBatchSize={}",
+      normalizedTarget,
+      force,
+      forceJobs,
+      forceCandidates,
+      jobBatchSize,
+      candidateBatchSize);
     Map<String, ElasticsearchSyncResult> results = new LinkedHashMap<>();
+
+    if (normalizedTarget.equals("all")
+        || normalizedTarget.equals("jobs")
+        || normalizedTarget.equals("expired-jobs")) {
+      results.put("expired-jobs", expiredJobRepairService.repairExpiredJobs());
+    }
 
     if (normalizedTarget.equals("all") || normalizedTarget.equals("jobs")) {
       boolean effectiveForceJobs = forceJobs != null ? forceJobs : force;
@@ -58,8 +76,10 @@ public class InternalElasticsearchSyncController {
 
     if (results.isEmpty()) {
       throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
-          "Invalid target. Supported values: all, jobs, candidates");
+          "Invalid target. Supported values: all, jobs, candidates, expired-jobs");
     }
+
+    log.info("Manual Elasticsearch sync finished: targets={}", results.keySet());
 
     return RestResponse.<Map<String, ElasticsearchSyncResult>>builder()
         .status(HttpStatus.OK)
