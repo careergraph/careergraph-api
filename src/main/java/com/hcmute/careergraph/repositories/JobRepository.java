@@ -10,6 +10,7 @@ import com.hcmute.careergraph.enums.job.JobCategory;
 import com.hcmute.careergraph.persistence.models.Job;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -21,6 +22,13 @@ import java.util.*;
 
 @Repository
 public interface JobRepository extends JpaRepository<Job, String> {
+
+    @EntityGraph(attributePaths = "company")
+    @Query("""
+                SELECT j
+                FROM Job j
+            """)
+    List<Job> findAllForSearchIndexSync();
 
     @Query("""
                 SELECT j

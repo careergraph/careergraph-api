@@ -17,6 +17,7 @@ import org.springframework.core.annotation.Order;
 import org.springframework.context.annotation.Profile;
 import org.springframework.data.elasticsearch.core.ElasticsearchOperations;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -46,6 +47,7 @@ public class ElasticsearchDataInitializer implements CommandLineRunner {
     private final ExpiredJobRepairService expiredJobRepairService;
 
     @Override
+    @Transactional(readOnly = true)
     public void run(String... args) throws Exception {
         if (!syncProperties.getJobs().isSyncEnabled()) {
             log.info("Skip Job Elasticsearch synchronization because APP_ES_SYNC_JOBS_ENABLED=false");
@@ -63,6 +65,7 @@ public class ElasticsearchDataInitializer implements CommandLineRunner {
         syncNow(null, null);
     }
 
+    @Transactional(readOnly = true)
     public ElasticsearchSyncResult syncNow(Boolean forceOverride, Integer maxEmbeddingsOverride) {
         boolean effectiveForce = forceOverride != null ? forceOverride : syncProperties.getJobs().isForceFullSync();
         int effectiveMaxEmbeddings = maxEmbeddingsOverride != null ? maxEmbeddingsOverride : syncProperties.getJobs().getMaxEmbeddingsPerRun();
@@ -87,7 +90,7 @@ public class ElasticsearchDataInitializer implements CommandLineRunner {
                 // 2. THỰC HIỆN ĐỒNG BỘ HÓA DỮ LIỆU
                 System.out.println("Attempt " + attempt + ": Starting data synchronization to Elasticsearch...");
 
-                List<Job> allJobs = jobRepository.findAll();
+                List<Job> allJobs = jobRepository.findAllForSearchIndexSync();
                 if (allJobs.isEmpty()) {
                     log.info("No jobs found in database. Skipping Elasticsearch synchronization.");
                     return new ElasticsearchSyncResult("jobs", true, effectiveForce, effectiveMaxEmbeddings, 0, 0, 0,
