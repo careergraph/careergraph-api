@@ -14,6 +14,8 @@ public interface MailService {
                                          String note);
 
     void sendHtml(String to, String subject, String html);
+
+    void sendHtmlSync(String to, String subject, String html);
 }
 
 

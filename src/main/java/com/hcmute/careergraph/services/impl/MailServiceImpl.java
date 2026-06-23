@@ -93,15 +93,23 @@ public class MailServiceImpl implements MailService {
     @Async("mailTaskExecutor")
     public void sendHtml(String to, String subject, String html) {
         try {
+            sendHtmlSync(to, subject, html);
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    @Override
+    public void sendHtmlSync(String to, String subject, String html) {
+        try {
             MimeMessage msg = mailSender.createMimeMessage();
-            MimeMessageHelper helper =
-                    new MimeMessageHelper(msg, true, "UTF-8");
+            MimeMessageHelper helper = new MimeMessageHelper(msg, true, "UTF-8");
             helper.setTo(to);
             helper.setSubject(subject);
             helper.setText(html, true);
             mailSender.send(msg);
         } catch (Exception e) {
-            throw new RuntimeException(e);
+            throw new RuntimeException("Failed to send HTML email", e);
         }
     }
 }

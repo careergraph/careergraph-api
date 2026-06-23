@@ -17,11 +17,13 @@ import com.hcmute.careergraph.services.JobRecommendationService;
 import com.hcmute.careergraph.services.MailService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -29,23 +31,27 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 
 /**
- * Scheduler cho Daily Job Digest.
- * 
+ * Weekly digest scheduler.
+ *
  * Flow:
- * 1. buildQueue() chạy trước (ví dụ 7:00 AM):
- * - Với mỗi candidate: query ES tìm job match từ NewlyPostedJob
- * - Đưa vào JobNotificationQueue
- * 
- * 2. sendDailyDigest() chạy sau (ví dụ 8:00 AM):
- * - Gửi email cho từng candidate
- * - Lưu history
- * - Xóa khỏi queue
- * - Xóa toàn bộ NewlyPostedJob (reset cho ngày mai)
+ * 1. buildQueue() runs before the send window and prepares matched jobs per candidate.
+ * 2. sendDailyDigest() sends weekly digest emails in small user batches.
+ * 3. Successfully sent items are written to history and removed from the queue.
+ * 4. Newly posted jobs are cleared after the digest window finishes.
  */
 @Component
 @RequiredArgsConstructor
 @Slf4j
 public class DailyDigestScheduler {
+
+    private static final int DIGEST_BATCH_SIZE = 50;
+    private static final int MAX_JOBS_PER_EMAIL = 5;
+
+    @Value("${application.web.base-url:http://localhost:5000}")
+    private String webBaseUrl;
+
+    @Value("${application.schedule.digest.enabled:true}")
+    private boolean digestEnabled;
 
     private final JobNotificationQueueRepository queueRepo;
     private final JobRepository jobRepo;
@@ -57,14 +63,18 @@ public class DailyDigestScheduler {
     private final CompanyAccessPolicyService companyAccessPolicyService;
 
     /**
-     * STEP 1: Build queue - Tìm job phù hợp cho từng candidate
-     * Chạy trước sendDailyDigest (ví dụ 7:00 AM)
+     * Build the queue before the weekly digest send window.
+     * Default schedule: 07:00 every Monday.
      */
-    // @Scheduled(cron = "0 0 7 * * *") // Production: 7:00 AM mỗi ngày
-    // @Scheduled(cron = "0 */2 * * * *") // Test: mỗi 2 phút
+    @Scheduled(cron = "${application.schedule.digest.build-cron:0 0 7 ? * MON}")
     @Transactional
     public void buildQueue() {
-        log.info("🔨 Starting buildQueue - Finding matching jobs for candidates...");
+        if (!digestEnabled) {
+            log.info("Skipping buildQueue because digest scheduling is disabled");
+            return;
+        }
+
+        log.info("Starting buildQueue - finding matching jobs for candidates");
 
         List<String> newlyPostedJobIds = newlyPostedJobRepo.findAllJobIds();
         if (newlyPostedJobIds.isEmpty()) {
@@ -76,29 +86,34 @@ public class DailyDigestScheduler {
         List<Candidate> candidates = candidateRepo.findAllByIsOpenToNotifyNewJob(true);
         log.info("Found {} candidates with notifications enabled", candidates.size());
 
-        for (Candidate c : candidates) {
+        for (Candidate candidate : candidates) {
             try {
-                recommendService.recommendJobsForCandidate(c, 5);
-            } catch (Exception e) {
-                log.error("Error recommending jobs for candidate {}: {}", c.getId(), e.getMessage());
+                recommendService.recommendJobsForCandidate(candidate, MAX_JOBS_PER_EMAIL);
+            } catch (Exception exception) {
+                log.error("Error recommending jobs for candidate {}: {}",
+                        candidate.getId(),
+                        exception.getMessage());
             }
         }
 
-        log.info("✅ buildQueue completed");
+        log.info("buildQueue completed");
     }
 
     /**
-     * STEP 2: Send daily digest emails
-     * Chạy sau buildQueue (ví dụ 8:00 AM)
+     * Send weekly digest emails.
+     * Default schedule: 08:00 every Monday.
      */
-    // @Scheduled(cron = "0 0 8 * * *") // Production: 8:00 AM mỗi ngày
-    // @Scheduled(cron = "0 0 8 ? * MON,FRI")
-    // @Scheduled(cron = "0 */3 * * * ?") // Test: mỗi 3 phút
+    @Scheduled(cron = "${application.schedule.digest.send-cron:0 0 8 ? * MON}")
     @Transactional
     public void sendDailyDigest() {
-        log.info("📧 Starting sendDailyDigest...");
+        if (!digestEnabled) {
+            log.info("Skipping sendDailyDigest because digest scheduling is disabled");
+            return;
+        }
 
-        var queues = queueRepo.findBySendTypeAndStatusSend(
+        log.info("Starting sendDailyDigest");
+
+        List<JobNotificationQueue> queues = queueRepo.findBySendTypeAndStatusSend(
                 SendType.DAILY,
                 StatusSend.PENDING);
 
@@ -111,84 +126,111 @@ public class DailyDigestScheduler {
         Map<String, List<JobNotificationQueue>> byUser = queues.stream()
                 .collect(Collectors.groupingBy(JobNotificationQueue::getUserId));
 
-        log.info("Processing {} users with pending jobs", byUser.size());
+        List<Map.Entry<String, List<JobNotificationQueue>>> userEntries = new ArrayList<>(byUser.entrySet());
+        List<List<Map.Entry<String, List<JobNotificationQueue>>>> batches = partition(userEntries, DIGEST_BATCH_SIZE);
 
-        byUser.forEach((userId, items) -> {
-            Candidate user = candidateRepo.findById(userId).orElse(null);
-            if (user == null || !Boolean.TRUE.equals(user.getIsOpenToNotifyNewJob()))
-                return;
+        int successCount = 0;
+        int skippedOrFailedCount = 0;
 
-            Map<String, Job> jobsById = items.stream()
-                    .map(JobNotificationQueue::getJobId)
-                    .distinct()
-                    .map(jobId -> jobRepo.findById(jobId).orElse(null))
-                    .filter(Objects::nonNull)
-                    .collect(Collectors.toMap(Job::getId, Function.identity()));
+        log.info("Processing {} users with pending jobs in {} batches", userEntries.size(), batches.size());
 
-            List<JobNotificationQueue> invalidItems = items.stream()
-                    .filter(item -> !companyAccessPolicyService.isJobPubliclyAvailable(jobsById.get(item.getJobId())))
-                    .toList();
-            if (!invalidItems.isEmpty()) {
-                queueRepo.deleteAll(invalidItems);
+        for (int batchIndex = 0; batchIndex < batches.size(); batchIndex++) {
+            List<Map.Entry<String, List<JobNotificationQueue>>> batch = batches.get(batchIndex);
+            log.info("Processing digest batch {}/{} with {} users", batchIndex + 1, batches.size(), batch.size());
+
+            for (Map.Entry<String, List<JobNotificationQueue>> entry : batch) {
+                boolean sent = processUserDigest(entry.getKey(), entry.getValue());
+                if (sent) {
+                    successCount++;
+                } else {
+                    skippedOrFailedCount++;
+                }
             }
+        }
 
-            List<JobNotificationQueue> itemsToSend = items.stream()
-                    .filter(item -> !invalidItems.contains(item))
-                    .limit(5)
-                    .toList();
+        log.info("Digest sending summary: {} successful users, {} skipped or failed users",
+                successCount,
+                skippedOrFailedCount);
 
-            List<Job> jobs = itemsToSend.stream()
-                    .map(q -> jobsById.get(q.getJobId()))
-                    .filter(Objects::nonNull)
-                    .filter(companyAccessPolicyService::isJobPubliclyAvailable)
-                    .toList();
-
-            if (jobs.isEmpty())
-                return;
-
-            try {
-                mailService.sendHtml(
-                        user.getAccount().getEmail(),
-                        "🔥 Việc làm mới dành cho bạn",
-                        JobMailTemplateBuilder.build(jobs, "http://localhost:5000"));
-
-                // Đánh dấu và xóa những items đã gửi
-                itemsToSend.forEach(q -> {
-                    q.setStatusSend(StatusSend.SENT);
-                    historyRepo.save(JobNotificationHistory.builder()
-                            .userId(q.getUserId())
-                            .jobId(q.getJobId())
-                            .sentAt(LocalDateTime.now())
-                            .sendType(q.getSendType())
-                            .build());
-                });
-
-                queueRepo.deleteAll(itemsToSend);
-                log.info("✅ Sent {} jobs to {}", jobs.size(), user.getAccount().getEmail());
-
-            } catch (Exception e) {
-                log.error("Failed to send email to {}: {}", user.getAccount().getEmail(), e.getMessage());
-            }
-        });
-
-        // Sau khi gửi xong cho tất cả → Xóa toàn bộ NewlyPostedJob
         clearNewlyPostedJobs();
-
-        log.info("📧 sendDailyDigest completed");
+        log.info("sendDailyDigest completed");
     }
 
-    /**
-     * Xóa toàn bộ NewlyPostedJob sau khi gửi xong
-     * Để ngày mai có job mới sẽ bắt đầu fresh
-     */
+    private boolean processUserDigest(String userId, List<JobNotificationQueue> items) {
+        Candidate user = candidateRepo.findById(userId).orElse(null);
+        if (user == null || !Boolean.TRUE.equals(user.getIsOpenToNotifyNewJob())) {
+            return false;
+        }
+
+        Map<String, Job> jobsById = items.stream()
+                .map(JobNotificationQueue::getJobId)
+                .distinct()
+                .map(jobId -> jobRepo.findById(jobId).orElse(null))
+                .filter(Objects::nonNull)
+                .collect(Collectors.toMap(Job::getId, Function.identity()));
+
+        List<JobNotificationQueue> invalidItems = items.stream()
+                .filter(item -> !companyAccessPolicyService.isJobPubliclyAvailable(jobsById.get(item.getJobId())))
+                .toList();
+        if (!invalidItems.isEmpty()) {
+            queueRepo.deleteAll(invalidItems);
+        }
+
+        List<JobNotificationQueue> itemsToSend = items.stream()
+                .filter(item -> !invalidItems.contains(item))
+                .limit(MAX_JOBS_PER_EMAIL)
+                .toList();
+
+        List<Job> jobs = itemsToSend.stream()
+                .map(queueItem -> jobsById.get(queueItem.getJobId()))
+                .filter(Objects::nonNull)
+                .filter(companyAccessPolicyService::isJobPubliclyAvailable)
+                .toList();
+
+        if (jobs.isEmpty()) {
+            return false;
+        }
+
+        try {
+            mailService.sendHtmlSync(
+                    user.getAccount().getEmail(),
+                    "Weekly job digest for you",
+                    JobMailTemplateBuilder.build(jobs, webBaseUrl));
+
+            LocalDateTime sentAt = LocalDateTime.now();
+            itemsToSend.forEach(queueItem -> {
+                queueItem.setStatusSend(StatusSend.SENT);
+                historyRepo.save(JobNotificationHistory.builder()
+                        .userId(queueItem.getUserId())
+                        .jobId(queueItem.getJobId())
+                        .sentAt(sentAt)
+                        .sendType(queueItem.getSendType())
+                        .build());
+            });
+
+            queueRepo.deleteAll(itemsToSend);
+            log.info("Sent {} jobs to {}", jobs.size(), user.getAccount().getEmail());
+            return true;
+        } catch (Exception exception) {
+            log.error("Failed to send email to {}: {}", user.getAccount().getEmail(), exception.getMessage());
+            return false;
+        }
+    }
+
     private void clearNewlyPostedJobs() {
         long count = newlyPostedJobRepo.count();
         if (count > 0) {
             newlyPostedJobRepo.deleteAll();
-            log.info("🗑️ Cleared {} newly posted jobs", count);
+            log.info("Cleared {} newly posted jobs", count);
         }
     }
+
+    private <T> List<List<T>> partition(List<T> source, int batchSize) {
+        List<List<T>> batches = new ArrayList<>();
+        for (int start = 0; start < source.size(); start += batchSize) {
+            int end = Math.min(start + batchSize, source.size());
+            batches.add(source.subList(start, end));
+        }
+        return batches;
+    }
 }
-
-
-

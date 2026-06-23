@@ -96,6 +96,13 @@ fast-api:
 
 # Sàng lọc AI sau khi ứng viên nộp đơn (async, sau commit). Tắt mặc định để tránh surprise trên môi trường cũ.
 application:
+  web:
+    base-url: ${WEB_BASE_URL:http://localhost:5000}
+  schedule:
+    digest:
+      enabled: ${DIGEST_ENABLED:true}
+      build-cron: ${DIGEST_BUILD_CRON:0 0 7 ? * MON}
+      send-cron: ${DIGEST_SEND_CRON:0 0 8 ? * MON}
   ai-screening:
     enabled: ${APPLICATION_AI_SCREENING_ENABLED:false}
     # Ứng viên được giữ APPLIED nếu matchScore >= giá trị này; dưới ngưỡng → REJECTED (nếu enabled).
