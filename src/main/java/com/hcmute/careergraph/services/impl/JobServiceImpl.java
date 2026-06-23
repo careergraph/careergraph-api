@@ -745,7 +745,7 @@ public class JobServiceImpl implements JobService {
             assert esResponse.hits().total() != null;
             long total = esResponse.hits().total().value();
 
-            return new PageImpl<>(ljobs, pageable, ljobs.size());
+            return new PageImpl<>(ljobs, pageable, total);
         }
         return jobs;
     }
