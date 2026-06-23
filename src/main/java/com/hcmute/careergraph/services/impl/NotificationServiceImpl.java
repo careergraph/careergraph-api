@@ -373,8 +373,8 @@ public class NotificationServiceImpl implements NotificationService {
     createNotification(
         companyAccountOpt.get().getId(),
         NotificationType.NEW_APPLICATION,
-        "New application received",
-        candidateName + " applied for " + jobTitle,
+        "Đơn ứng tuyển mới",
+        candidateName + " ứng tuyển cho vị trí " + jobTitle,
         data);
   }
 
