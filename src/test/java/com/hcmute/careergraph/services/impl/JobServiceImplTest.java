@@ -1,9 +1,12 @@
 package com.hcmute.careergraph.services.impl;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.hcmute.careergraph.enums.common.PartyType;
 import com.hcmute.careergraph.enums.common.FileType;
 import com.hcmute.careergraph.enums.common.Status;
 import com.hcmute.careergraph.persistence.documents.JobES;
+import com.hcmute.careergraph.persistence.dtos.request.JobFilterRequest;
+import com.hcmute.careergraph.persistence.dtos.response.CandidateSearchProfile;
 import com.hcmute.careergraph.persistence.models.Candidate;
 import com.hcmute.careergraph.persistence.models.Company;
 import com.hcmute.careergraph.persistence.models.File;
@@ -251,6 +254,76 @@ class JobServiceImplTest {
         jobService.syncCompanyJobsSearchDocuments("company-1");
 
         verify(jobESRepository).save(document);
+    }
+
+    @Test
+    void searchEmbed_shouldPreferIntentTextWhenCandidateHasSavedCriteria() {
+        Candidate candidate = createCandidate();
+        JobFilterRequest filter = new JobFilterRequest();
+
+        when(candidateRepository.findById("candidate-1")).thenReturn(Optional.of(candidate));
+        when(candidateSearchTextBuilder.buildProfile(candidate)).thenReturn(
+                CandidateSearchProfile.builder()
+                        .intentText("Backend Developer Ho Chi Minh Full time")
+                        .cvKeywords("Java Spring Docker Kubernetes")
+                        .embeddingText("Backend Developer Ho Chi Minh Full time")
+                        .hasIntent(true)
+                        .cvKeywordsSource("GEMINI")
+                        .build()
+        );
+        when(jobESService.knnSearch(
+                eq("Backend Developer Ho Chi Minh Full time"),
+                eq(filter),
+                eq("candidate-1"),
+                any(Pageable.class),
+                eq(PartyType.CANDIDATE)
+        )).thenReturn(null);
+
+        var result = jobService.searchEmbed(filter, "candidate-1", "", Pageable.ofSize(10), PartyType.CANDIDATE);
+
+        assertThat(result.getContent()).isEmpty();
+        verify(jobESService).knnSearch(
+                eq("Backend Developer Ho Chi Minh Full time"),
+                eq(filter),
+                eq("candidate-1"),
+                any(Pageable.class),
+                eq(PartyType.CANDIDATE)
+        );
+    }
+
+    @Test
+    void searchEmbed_shouldFallbackToCvKeywordsOnlyWhenIntentIsEmpty() {
+        Candidate candidate = createCandidate();
+        JobFilterRequest filter = new JobFilterRequest();
+
+        when(candidateRepository.findById("candidate-1")).thenReturn(Optional.of(candidate));
+        when(candidateSearchTextBuilder.buildProfile(candidate)).thenReturn(
+                CandidateSearchProfile.builder()
+                        .intentText("")
+                        .cvKeywords("Java Spring Docker Kubernetes")
+                        .embeddingText("Java Spring Docker Kubernetes")
+                        .hasIntent(false)
+                        .cvKeywordsSource("GEMINI")
+                        .build()
+        );
+        when(jobESService.knnSearch(
+                eq("Java Spring Docker Kubernetes"),
+                eq(filter),
+                eq("candidate-1"),
+                any(Pageable.class),
+                eq(PartyType.CANDIDATE)
+        )).thenReturn(null);
+
+        var result = jobService.searchEmbed(filter, "candidate-1", "", Pageable.ofSize(10), PartyType.CANDIDATE);
+
+        assertThat(result.getContent()).isEmpty();
+        verify(jobESService).knnSearch(
+                eq("Java Spring Docker Kubernetes"),
+                eq(filter),
+                eq("candidate-1"),
+                any(Pageable.class),
+                eq(PartyType.CANDIDATE)
+        );
     }
 
     private Job createJob() {

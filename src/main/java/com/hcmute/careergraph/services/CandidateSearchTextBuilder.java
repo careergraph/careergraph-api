@@ -15,8 +15,8 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
+import java.util.ArrayList;
 import java.util.List;
-import java.util.Optional;
 
 @Slf4j
 @Service
@@ -24,6 +24,7 @@ import java.util.Optional;
 public class CandidateSearchTextBuilder {
 
     private static final int RESUME_SNIPPET_CHARS = 4000;
+    private static final int MAX_FALLBACK_CV_KEYWORDS_CHARS = 500;
 
     private final FileRepository fileRepository;
     private final CvKeywordsHeuristicExtractor heuristicExtractor;
@@ -59,9 +60,9 @@ public class CandidateSearchTextBuilder {
 
         if (includeResume) {
             fileRepository.findFirstByOwnerIdAndStatusAndFileTypeInAndShareToFindJobTrueOrderByCreatedDateDesc(
-                            candidate.getId(),
-                            Status.ACTIVE,
-                            List.of(FileType.RESUME, FileType.CV))
+                    candidate.getId(),
+                    Status.ACTIVE,
+                    List.of(FileType.RESUME, FileType.CV))
                     .map(File::getResumeExtractedText)
                     .filter(StringUtils::hasText)
                     .map(this::resumeSnippet)
@@ -73,9 +74,11 @@ public class CandidateSearchTextBuilder {
 
     /**
      * V2: Build structured CandidateSearchProfile cho personalized search.
-     * - intentText: chỉ từ profile signals (desiredPosition, skills, industries)
+     * - intentText: ưu tiên tiêu chí tìm việc và profile signals mà ứng viên chủ
+     * động khai báo
      * - cvKeywords: extracted keywords từ CV (heuristic/gemini tùy strategy)
-     * - embeddingText: tổng hợp cả hai để dùng cho KNN
+     * - embeddingText: chỉ dùng intentText nếu có, fallback sang CV keywords khi
+     * thiếu intent
      */
     public CandidateSearchProfile buildProfile(Candidate candidate) {
         if (candidate == null) {
@@ -88,12 +91,15 @@ public class CandidateSearchTextBuilder {
                     .build();
         }
 
-        // 1. Build intentText từ profile signals
+        // 1. Build intentText từ job criteria + profile signals.
+        // Explicit criteria needs to lead, because CV keywords are only a cold-start
+        // fallback.
         StringBuilder intentSb = new StringBuilder();
         append(intentSb, candidate.getDesiredPosition());
-        append(intentSb, candidate.getCurrentJobTitle());
-        appendAll(intentSb, candidate.getIndustries());
-        if (candidate.getSkills() != null) {
+        // appendAll(intentSb, candidate.getIndustries());
+        // appendAll(intentSb, candidate.getLocations());
+        // appendAll(intentSb, candidate.getWorkTypes());
+        if ((intentSb.toString().replaceAll("\\s+", " ").trim()).length() <= 0 && candidate.getSkills() != null) {
             candidate.getSkills().stream()
                     .map(skill -> skill.getSkill() != null ? skill.getSkill().getName() : null)
                     .forEach(value -> append(intentSb, value));
@@ -101,22 +107,23 @@ public class CandidateSearchTextBuilder {
         String intentText = intentSb.toString().replaceAll("\\s+", " ").trim();
         boolean hasIntent = StringUtils.hasText(intentText);
 
-        // 2. Get CV keywords — không dùng shareToFindJob filter
+        // 2. Get fallback CV keywords from all active uploaded resumes — không dùng
+        // shareToFindJob filter
         String cvKeywords = "";
         String cvKeywordsSource = "NONE";
 
-        Optional<File> cvFileOpt = fileRepository.findFirstByOwnerIdAndStatusAndFileTypeInOrderByCreatedDateDesc(
+        List<File> cvFiles = fileRepository.findByOwnerIdAndStatusAndFileTypeInOrderByCreatedDateDesc(
                 candidate.getId(),
                 Status.ACTIVE,
                 List.of(FileType.RESUME, FileType.CV));
 
-        if (cvFileOpt.isPresent()) {
-            File cvFile = cvFileOpt.get();
-            cvKeywords = resolveKeywords(cvFile);
-            cvKeywordsSource = determineCvKeywordsSource(cvFile, cvKeywords);
+        if (!cvFiles.isEmpty()) {
+            cvKeywords = resolveKeywords(cvFiles);
+            cvKeywordsSource = determineCvKeywordsSource(cvFiles, cvKeywords);
         }
 
-        // 3. Build embedding text (intent + keywords, tối đa 500 chars)
+        // 3. Build search text for embedding/KNN.
+        // Production rule: once intent exists, do not dilute it with CV text.
         String embeddingText = buildEmbeddingText(intentText, cvKeywords);
 
         return CandidateSearchProfile.builder()
@@ -128,7 +135,39 @@ public class CandidateSearchTextBuilder {
                 .build();
     }
 
-    private String resolveKeywords(File cvFile) {
+    private String resolveKeywords(List<File> cvFiles) {
+        List<String> keywordParts = new ArrayList<>();
+        int remainingChars = MAX_FALLBACK_CV_KEYWORDS_CHARS;
+
+        for (File cvFile : cvFiles) {
+            if (remainingChars <= 0) {
+                break;
+            }
+
+            String fileKeywords = resolveKeywordsFromSingleFile(cvFile);
+            if (!StringUtils.hasText(fileKeywords)) {
+                continue;
+            }
+
+            String normalized = fileKeywords.replaceAll("\\s+", " ").trim();
+            if (!StringUtils.hasText(normalized)) {
+                continue;
+            }
+
+            if (normalized.length() > remainingChars) {
+                normalized = normalized.substring(0, remainingChars).trim();
+            }
+
+            if (StringUtils.hasText(normalized)) {
+                keywordParts.add(normalized);
+                remainingChars -= normalized.length() + 1;
+            }
+        }
+
+        return String.join(" ", keywordParts).trim();
+    }
+
+    private String resolveKeywordsFromSingleFile(File cvFile) {
         // GEMINI or HYBRID: prefer stored AI keywords if available
         if (("GEMINI".equalsIgnoreCase(cvKeywordsStrategy) || "HYBRID".equalsIgnoreCase(cvKeywordsStrategy))
                 && StringUtils.hasText(cvFile.getCvKeywordsJson())) {
@@ -147,12 +186,15 @@ public class CandidateSearchTextBuilder {
         return "";
     }
 
-    private String determineCvKeywordsSource(File cvFile, String cvKeywords) {
-        if (!StringUtils.hasText(cvKeywords)) return "NONE";
-        if (StringUtils.hasText(cvFile.getCvKeywordsJson())) {
-            String geminiKeywords = extractSearchKeywordsFromJson(cvFile.getCvKeywordsJson());
-            if (StringUtils.hasText(geminiKeywords) && geminiKeywords.equals(cvKeywords)) {
-                return "GEMINI";
+    private String determineCvKeywordsSource(List<File> cvFiles, String cvKeywords) {
+        if (!StringUtils.hasText(cvKeywords))
+            return "NONE";
+        for (File cvFile : cvFiles) {
+            if (StringUtils.hasText(cvFile.getCvKeywordsJson())) {
+                String geminiKeywords = extractSearchKeywordsFromJson(cvFile.getCvKeywordsJson());
+                if (StringUtils.hasText(geminiKeywords)) {
+                    return "GEMINI";
+                }
             }
         }
         return "HEURISTIC";
@@ -172,16 +214,17 @@ public class CandidateSearchTextBuilder {
     }
 
     private String buildEmbeddingText(String intentText, String cvKeywords) {
-        StringBuilder sb = new StringBuilder();
         if (StringUtils.hasText(intentText)) {
-            sb.append(intentText);
+            return truncate(intentText, 500);
         }
-        if (StringUtils.hasText(cvKeywords)) {
-            if (sb.length() > 0) sb.append(' ');
-            sb.append(cvKeywords);
+        return truncate(cvKeywords, 500);
+    }
+
+    private String truncate(String value, int maxChars) {
+        if (!StringUtils.hasText(value)) {
+            return "";
         }
-        String result = sb.toString();
-        return result.length() > 500 ? result.substring(0, 500) : result;
+        return value.length() > maxChars ? value.substring(0, maxChars) : value;
     }
 
     private void appendAll(StringBuilder sb, List<String> values) {

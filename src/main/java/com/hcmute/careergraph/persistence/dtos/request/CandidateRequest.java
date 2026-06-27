@@ -1,5 +1,6 @@
 package com.hcmute.careergraph.persistence.dtos.request;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import jakarta.validation.constraints.NotNull;
 import lombok.*;
 
@@ -66,6 +67,7 @@ public final class CandidateRequest {
     }
 
     @Builder
+    @JsonIgnoreProperties(ignoreUnknown = true)
     public record CandidateExperienceRequest(
             String startDate,
             String endDate,

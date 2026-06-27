@@ -25,7 +25,8 @@ public class CandidateSearchProfile {
     private String cvKeywords;
 
     /**
-     * Text tổng hợp intentText + cvKeywords cho embedding/KNN search.
+     * Text dùng cho embedding/KNN search.
+     * Ưu tiên intentText; chỉ fallback sang CV keywords khi candidate chưa có intent rõ ràng.
      */
     private String embeddingText;
 

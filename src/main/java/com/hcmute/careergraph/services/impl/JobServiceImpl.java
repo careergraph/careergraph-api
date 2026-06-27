@@ -469,13 +469,11 @@ public class JobServiceImpl implements JobService {
 
         // V2: Use structured profile instead of raw text dump
         var profile = candidateSearchTextBuilder.buildProfile(candidate);
-        // Prefer intentText for BM25 (high signal), fallback to cvKeywords
+        // Prefer intentText for BM25, fallback to CV only when candidate has no clear
+        // intent.
         String keyword = profile.getIntentText();
         if (!StringUtils.hasText(keyword)) {
             keyword = profile.getCvKeywords();
-        } else if (StringUtils.hasText(profile.getCvKeywords())) {
-            // Append cvKeywords as boost signal (but intent leads)
-            keyword = keyword + " " + profile.getCvKeywords();
         }
 
         if (!StringUtils.hasText(keyword)) {
@@ -707,9 +705,12 @@ public class JobServiceImpl implements JobService {
                 Candidate candidate = candidateRepository.findById(partyId)
                         .orElse(null);
                 if (candidate != null && !hasKeyword) {
-                    // V2: Use embeddingText from structured profile for KNN search
+                    // Intent-first personalization; CV is fallback only when criteria/profile
+                    // intent is empty.
                     var profile = candidateSearchTextBuilder.buildProfile(candidate);
-                    keyword = profile.getEmbeddingText();
+                    keyword = StringUtils.hasText(profile.getIntentText())
+                            ? profile.getIntentText()
+                            : profile.getCvKeywords();
                 }
             }
 
