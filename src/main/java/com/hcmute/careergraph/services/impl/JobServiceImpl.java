@@ -469,12 +469,11 @@ public class JobServiceImpl implements JobService {
 
         // V2: Use structured profile instead of raw text dump
         var profile = candidateSearchTextBuilder.buildProfile(candidate);
-        // Prefer intentText for BM25, fallback to CV only when candidate has no clear
+        // Prefer intentText for BM25, fallback to CV  only when candidate has no clear
         // intent.
-        String keyword = profile.getIntentText();
-        if (!StringUtils.hasText(keyword)) {
-            keyword = profile.getCvKeywords();
-        }
+        String keyword = StringUtils.hasText(profile.getIntentText())
+                ? profile.getIntentText()
+                : profile.getCvKeywords();
 
         if (!StringUtils.hasText(keyword)) {
             return getJobsForAnonymousUser();
@@ -484,7 +483,8 @@ public class JobServiceImpl implements JobService {
         // Get current date for filtering expired jobs
         Pageable pageable = PageRequest.of(0, 6);
 
-        SearchResponse<JobES> listSearch = jobESService.searchJobsByNavtiveAndFuzzy(keyword, pageable);
+        SearchResponse<JobES> listSearch = jobESService.knnSearch(keyword, null, null, pageable, null);
+            
         if (listSearch == null || listSearch.hits() == null || listSearch.hits().hits().isEmpty()) {
             log.warn(
                     "Personalized ES search returned no usable response for candidateId={}, falling back to latest jobs",
