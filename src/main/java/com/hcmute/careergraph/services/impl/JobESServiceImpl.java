@@ -88,6 +88,10 @@ public class JobESServiceImpl implements JobESService {
                 return query.split("\\s+").length <= 12;
         }
 
+        private JobFilterRequest normalizeFilter(JobFilterRequest filter) {
+                return filter != null ? filter : new JobFilterRequest();
+        }
+
         /**
          * Filter-only search: match_all + post filter, sắp xếp theo createdAt desc.
          * Dùng khi user chưa nhập keyword nhưng có chọn filter.
@@ -99,6 +103,7 @@ public class JobESServiceImpl implements JobESService {
                         Pageable pageable,
                         PartyType type) {
                 try {
+                        JobFilterRequest safeFilter = normalizeFilter(filter);
                         return client.search(s -> s
                                         .index("jobs_es")
                                         .from((int) pageable.getOffset())
@@ -108,71 +113,71 @@ public class JobESServiceImpl implements JobESService {
                                         .postFilter(pf -> pf
                                                         .bool(b -> {
                                                                 // Mặc định chỉ hiện ACTIVE
-                                                                if (filter.getStatuses() != null
-                                                                                && !filter.getStatuses().isEmpty()) {
+                                                                if (safeFilter.getStatuses() != null
+                                                                                && !safeFilter.getStatuses().isEmpty()) {
                                                                         b.filter(fq -> fq.terms(t -> t
                                                                                         .field("status")
                                                                                         .terms(v -> v.value(
-                                                                                                        filter.getStatuses()
+                                                                                                        safeFilter.getStatuses()
                                                                                                                         .stream()
                                                                                                                         .map(st -> FieldValue
                                                                                                                                         .of(st.name()))
                                                                                                                         .toList()))));
                                                                 }
 
-                                                                if (filter.getJobCategories() != null
-                                                                                && !filter.getJobCategories()
+                                                                if (safeFilter.getJobCategories() != null
+                                                                                && !safeFilter.getJobCategories()
                                                                                                 .isEmpty()) {
                                                                         b.filter(fq -> fq.terms(t -> t
                                                                                         .field("jobCategory.keyword")
                                                                                         .terms(v -> v.value(
-                                                                                                        filter.getJobCategories()
+                                                                                                        safeFilter.getJobCategories()
                                                                                                                         .stream()
                                                                                                                         .map(c -> FieldValue
                                                                                                                                         .of(c.name()))
                                                                                                                         .toList()))));
                                                                 }
 
-                                                                if (filter.getEmploymentTypes() != null
-                                                                                && !filter.getEmploymentTypes()
+                                                                if (safeFilter.getEmploymentTypes() != null
+                                                                                && !safeFilter.getEmploymentTypes()
                                                                                                 .isEmpty()) {
                                                                         b.filter(fq -> fq.terms(t -> t
                                                                                         .field("employmentType")
                                                                                         .terms(v -> v.value(
-                                                                                                        filter.getEmploymentTypes()
+                                                                                                        safeFilter.getEmploymentTypes()
                                                                                                                         .stream()
                                                                                                                         .map(e -> FieldValue
                                                                                                                                         .of(e.name()))
                                                                                                                         .toList()))));
                                                                 }
 
-                                                                if (filter.getExperienceLevels() != null
-                                                                                && !filter.getExperienceLevels()
+                                                                if (safeFilter.getExperienceLevels() != null
+                                                                                && !safeFilter.getExperienceLevels()
                                                                                                 .isEmpty()) {
                                                                         b.filter(fq -> fq.terms(t -> t
                                                                                         .field("experienceLevel")
                                                                                         .terms(v -> v.value(
-                                                                                                        filter.getExperienceLevels()
+                                                                                                        safeFilter.getExperienceLevels()
                                                                                                                         .stream()
                                                                                                                         .map(e -> FieldValue
                                                                                                                                         .of(e.name()))
                                                                                                                         .toList()))));
                                                                 }
 
-                                                                if (filter.getEducationTypes() != null
-                                                                                && !filter.getEducationTypes()
+                                                                if (safeFilter.getEducationTypes() != null
+                                                                                && !safeFilter.getEducationTypes()
                                                                                                 .isEmpty()) {
                                                                         b.filter(fq -> fq.terms(t -> t
                                                                                         .field("education")
                                                                                         .terms(v -> v.value(
-                                                                                                        filter.getEducationTypes()
+                                                                                                        safeFilter.getEducationTypes()
                                                                                                                         .stream()
                                                                                                                         .map(e -> FieldValue
                                                                                                                                         .of(e.name()))
                                                                                                                         .toList()))));
                                                                 }
 
-                                                                JobLocationFilterSupport.applyLocationFilter(b, filter);
+                                                                JobLocationFilterSupport.applyLocationFilter(b, safeFilter);
 
                                                                 if (type != PartyType.COMPANY) {
                                                                         b.filter(fq -> fq.term(t -> t
@@ -204,6 +209,7 @@ public class JobESServiceImpl implements JobESService {
                         Pageable pageable,
                         PartyType type) {
                 try {
+                        JobFilterRequest safeFilter = normalizeFilter(filter);
                         return client.search(s -> s
                                         .index("jobs_es")
                                         .from((int) pageable.getOffset())
@@ -216,12 +222,12 @@ public class JobESServiceImpl implements JobESService {
                                                         .filter(f -> f.bool(b -> {
 
                                                                 /* ===== STATUS ===== */
-                                                                if (filter.getStatuses() != null
-                                                                                && !filter.getStatuses().isEmpty()) {
+                                                                if (safeFilter.getStatuses() != null
+                                                                                && !safeFilter.getStatuses().isEmpty()) {
                                                                         b.filter(q -> q.terms(t -> t
                                                                                         .field("status")
                                                                                         .terms(v -> v.value(
-                                                                                                        filter.getStatuses()
+                                                                                                        safeFilter.getStatuses()
                                                                                                                         .stream()
                                                                                                                         .map(s1 -> FieldValue
                                                                                                                                         .of(s1.name()))
@@ -229,12 +235,12 @@ public class JobESServiceImpl implements JobESService {
                                                                 }
 
                                                                 /* ===== JOB CATEGORY ===== */
-                                                                if (filter.getJobCategories() != null && !filter
+                                                                if (safeFilter.getJobCategories() != null && !safeFilter
                                                                                 .getJobCategories().isEmpty()) {
                                                                         b.filter(q -> q.terms(t -> t
                                                                                         .field("jobCategory.keyword")
                                                                                         .terms(v -> v.value(
-                                                                                                        filter.getJobCategories()
+                                                                                                        safeFilter.getJobCategories()
                                                                                                                         .stream()
                                                                                                                         .map(c -> FieldValue
                                                                                                                                         .of(c.name()))
@@ -242,12 +248,12 @@ public class JobESServiceImpl implements JobESService {
                                                                 }
 
                                                                 /* ===== EMPLOYMENT TYPE ===== */
-                                                                if (filter.getEmploymentTypes() != null && !filter
+                                                                if (safeFilter.getEmploymentTypes() != null && !safeFilter
                                                                                 .getEmploymentTypes().isEmpty()) {
                                                                         b.filter(q -> q.terms(t -> t
                                                                                         .field("employmentType")
                                                                                         .terms(v -> v.value(
-                                                                                                        filter.getEmploymentTypes()
+                                                                                                        safeFilter.getEmploymentTypes()
                                                                                                                         .stream()
                                                                                                                         .map(e -> FieldValue
                                                                                                                                         .of(e.name()))
@@ -255,12 +261,12 @@ public class JobESServiceImpl implements JobESService {
                                                                 }
 
                                                                 /* ===== EXPERIENCE ===== */
-                                                                if (filter.getExperienceLevels() != null && !filter
+                                                                if (safeFilter.getExperienceLevels() != null && !safeFilter
                                                                                 .getExperienceLevels().isEmpty()) {
                                                                         b.filter(q -> q.terms(t -> t
                                                                                         .field("experienceLevel")
                                                                                         .terms(v -> v.value(
-                                                                                                        filter.getExperienceLevels()
+                                                                                                        safeFilter.getExperienceLevels()
                                                                                                                         .stream()
                                                                                                                         .map(e -> FieldValue
                                                                                                                                         .of(e.name()))
@@ -268,12 +274,12 @@ public class JobESServiceImpl implements JobESService {
                                                                 }
 
                                                                 /* ===== EDUCATION ===== */
-                                                                if (filter.getEducationTypes() != null && !filter
+                                                                if (safeFilter.getEducationTypes() != null && !safeFilter
                                                                                 .getEducationTypes().isEmpty()) {
                                                                         b.filter(q -> q.terms(t -> t
                                                                                         .field("education")
                                                                                         .terms(v -> v.value(
-                                                                                                        filter.getEducationTypes()
+                                                                                                        safeFilter.getEducationTypes()
                                                                                                                         .stream()
                                                                                                                         .map(e -> FieldValue
                                                                                                                                         .of(e.name()))
@@ -281,7 +287,7 @@ public class JobESServiceImpl implements JobESService {
                                                                 }
 
                                                                 /* ===== LOCATION ===== */
-                                                                JobLocationFilterSupport.applyLocationFilter(b, filter);
+                                                                JobLocationFilterSupport.applyLocationFilter(b, safeFilter);
 
                                                                 if (type != PartyType.COMPANY) {
                                                                         b.filter(q -> q.term(t -> t
@@ -335,6 +341,7 @@ public class JobESServiceImpl implements JobESService {
                         Pageable pageable,
                         PartyType type) {
                 try {
+                        JobFilterRequest safeFilter = normalizeFilter(filter);
                         String normalizedKeyword = normalizeSearchQuery(keyword);
                         boolean allowFuzzy = shouldUseFuzzy(normalizedKeyword);
                         float[] queryVector = embedService.embed(normalizedKeyword);
@@ -434,12 +441,12 @@ public class JobESServiceImpl implements JobESService {
                                         .postFilter(pf -> pf
                                                         .bool(b -> {
                                                                 /* ===== STATUS ===== */
-                                                                if (filter.getStatuses() != null
-                                                                                && !filter.getStatuses().isEmpty()) {
+                                                                if (safeFilter.getStatuses() != null
+                                                                                && !safeFilter.getStatuses().isEmpty()) {
                                                                         b.filter(fq -> fq.terms(t -> t
                                                                                         .field("status")
                                                                                         .terms(v -> v.value(
-                                                                                                        filter.getStatuses()
+                                                                                                        safeFilter.getStatuses()
                                                                                                                         .stream()
                                                                                                                         .map(st -> FieldValue
                                                                                                                                         .of(st.name()))
@@ -447,13 +454,13 @@ public class JobESServiceImpl implements JobESService {
                                                                 }
 
                                                                 /* ===== JOB CATEGORY ===== */
-                                                                if (filter.getJobCategories() != null
-                                                                                && !filter.getJobCategories()
+                                                                if (safeFilter.getJobCategories() != null
+                                                                                && !safeFilter.getJobCategories()
                                                                                                 .isEmpty()) {
                                                                         b.filter(fq -> fq.terms(t -> t
                                                                                         .field("jobCategory.keyword")
                                                                                         .terms(v -> v.value(
-                                                                                                        filter.getJobCategories()
+                                                                                                        safeFilter.getJobCategories()
                                                                                                                         .stream()
                                                                                                                         .map(c -> FieldValue
                                                                                                                                         .of(c.name()))
@@ -461,13 +468,13 @@ public class JobESServiceImpl implements JobESService {
                                                                 }
 
                                                                 /* ===== EMPLOYMENT TYPE ===== */
-                                                                if (filter.getEmploymentTypes() != null
-                                                                                && !filter.getEmploymentTypes()
+                                                                if (safeFilter.getEmploymentTypes() != null
+                                                                                && !safeFilter.getEmploymentTypes()
                                                                                                 .isEmpty()) {
                                                                         b.filter(fq -> fq.terms(t -> t
                                                                                         .field("employmentType")
                                                                                         .terms(v -> v.value(
-                                                                                                        filter.getEmploymentTypes()
+                                                                                                        safeFilter.getEmploymentTypes()
                                                                                                                         .stream()
                                                                                                                         .map(e -> FieldValue
                                                                                                                                         .of(e.name()))
@@ -475,13 +482,13 @@ public class JobESServiceImpl implements JobESService {
                                                                 }
 
                                                                 /* ===== EXPERIENCE LEVEL ===== */
-                                                                if (filter.getExperienceLevels() != null
-                                                                                && !filter.getExperienceLevels()
+                                                                if (safeFilter.getExperienceLevels() != null
+                                                                                && !safeFilter.getExperienceLevels()
                                                                                                 .isEmpty()) {
                                                                         b.filter(fq -> fq.terms(t -> t
                                                                                         .field("experienceLevel")
                                                                                         .terms(v -> v.value(
-                                                                                                        filter.getExperienceLevels()
+                                                                                                        safeFilter.getExperienceLevels()
                                                                                                                         .stream()
                                                                                                                         .map(e -> FieldValue
                                                                                                                                         .of(e.name()))
@@ -489,13 +496,13 @@ public class JobESServiceImpl implements JobESService {
                                                                 }
 
                                                                 /* ===== EDUCATION ===== */
-                                                                if (filter.getEducationTypes() != null
-                                                                                && !filter.getEducationTypes()
+                                                                if (safeFilter.getEducationTypes() != null
+                                                                                && !safeFilter.getEducationTypes()
                                                                                                 .isEmpty()) {
                                                                         b.filter(fq -> fq.terms(t -> t
                                                                                         .field("education")
                                                                                         .terms(v -> v.value(
-                                                                                                        filter.getEducationTypes()
+                                                                                                        safeFilter.getEducationTypes()
                                                                                                                         .stream()
                                                                                                                         .map(e -> FieldValue
                                                                                                                                         .of(e.name()))
@@ -503,7 +510,7 @@ public class JobESServiceImpl implements JobESService {
                                                                 }
 
                                                                 /* ===== LOCATION ===== */
-                                                                JobLocationFilterSupport.applyLocationFilter(b, filter);
+                                                                JobLocationFilterSupport.applyLocationFilter(b, safeFilter);
 
                                                                 /* ===== COMPANY ===== */
                                                                 if (type == PartyType.COMPANY && partyId != null) {
