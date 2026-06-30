@@ -42,3 +42,6 @@ docker run
 /docs.*
 
 /docs/commit/
+
+
+.venv/
