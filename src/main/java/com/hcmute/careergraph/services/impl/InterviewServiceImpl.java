@@ -588,6 +588,13 @@ public class InterviewServiceImpl implements InterviewService {
 
         InterviewFeedback saved = feedbackRepository.save(feedback);
 
+        if (interview.getInterviewStatus() != InterviewStatus.COMPLETED) {
+            interview.setInterviewStatus(InterviewStatus.COMPLETED);
+            interviewRepository.save(interview);
+        }
+
+        syncRoomParticipantCompletionAfterFeedback(interview);
+
         // Auto-update application stage based on recommendation
         updateApplicationStageFromFeedback(interview, recommendation);
 
@@ -945,6 +952,34 @@ public class InterviewServiceImpl implements InterviewService {
             return false;
         }
         return !LocalDateTime.now().isBefore(interview.getScheduledAt());
+    }
+
+    private void syncRoomParticipantCompletionAfterFeedback(Interview interview) {
+        if (interview == null || interview.getType() != InterviewType.ONLINE) {
+            return;
+        }
+
+        if (!StringUtils.hasText(interview.getMeetingLink()) || interview.getApplication() == null) {
+            return;
+        }
+
+        roomParticipantRepository
+                .findByRoomCodeAndApplicationId(interview.getMeetingLink(), interview.getApplication().getId())
+                .ifPresent(participant -> {
+                    if (participant.getJoinedAt() == null) {
+                        return;
+                    }
+
+                    if (participant.getAdmitStatus() != AdmitStatus.COMPLETED) {
+                        participant.setAdmitStatus(AdmitStatus.COMPLETED);
+                    }
+
+                    if (participant.getLeftAt() == null) {
+                        participant.setLeftAt(LocalDateTime.now());
+                    }
+
+                    roomParticipantRepository.save(participant);
+                });
     }
 
     private void updateApplicationStageFromFeedback(Interview interview, FeedbackRecommendation recommendation) {
