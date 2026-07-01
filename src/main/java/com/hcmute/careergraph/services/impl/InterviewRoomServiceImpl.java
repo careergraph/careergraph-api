@@ -182,12 +182,9 @@ public class InterviewRoomServiceImpl implements InterviewRoomService {
         RoomParticipant participant = participantRepository.findByRoomIdAndCandidateId(roomId, candidateId)
                 .orElseThrow(() -> new BadRequestException("Participant not found in this room"));
 
-        if (participant.getAdmitStatus() == AdmitStatus.REMOVED) {
-            throw new BadRequestException("Participant has been removed and cannot be readmitted in this session");
-        }
-
         participant.setAdmitStatus(AdmitStatus.ADMITTED);
         participant.setJoinedAt(LocalDateTime.now());
+        participant.setLeftAt(null);
         RoomParticipant saved = participantRepository.save(participant);
         autoTransitionInterviewToInProgress(saved);
         return saved;
