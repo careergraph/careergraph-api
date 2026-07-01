@@ -29,7 +29,7 @@ public class CvKeywordsExtractionService {
     private final CvKeywordsHeuristicExtractor heuristicExtractor;
     private final ObjectMapper objectMapper;
 
-    @Value("${application.cv-keywords.strategy:HYBRID}")
+    @Value("${application.cv-keywords.strategy:HEURISTIC}")
     private String strategy;
 
     @Value("${application.cv-keywords.max-keywords-chars:300}")

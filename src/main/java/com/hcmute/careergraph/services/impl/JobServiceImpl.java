@@ -1294,9 +1294,19 @@ public class JobServiceImpl implements JobService {
                     "   - If experience is DIFFERENT specialty (e.g., Backend, UX/UI, QA when job is Frontend) → relevant = false\n");
             sb.append("   Return 'relevanceReason' with brief explanation of why relevant or not.\n");
             sb.append(
-                    "8. HEADLINE LENGTH: The 'headline' field MUST be between 40-120 characters. Keep it concise, professional, and impactful.\n");
+                    "8. HEADLINE LENGTH: The 'headline' field MUST be a brief professional title of 3-6 words, maximum 60 characters. Do NOT use buzzwords or long sentences separated by bars (|). Example: 'Senior Backend Engineer' or 'Java & Spring Boot Developer'.\n");
             sb.append(
-                    "9. LANGUAGE: The job description is in English. ALL generated content (headline, summary, bulletPoints, suggestions) MUST be in English ONLY. Do NOT mix Vietnamese and English.\n\n");
+                    "9. WRITING STYLE & FORMAT (Extremely Critical):\n");
+            sb.append(
+                    "   - For each experience, write 3-5 concise, results-oriented bullet points starting with an action verb (e.g., 'Developed...', 'Built...', 'Optimized...'). Do NOT write long paragraphs.\n");
+            sb.append(
+                    "   - The LAST bullet point of each experience MUST list the technologies used in the format: 'Tech Stack: Tech1, Tech2, Tech3'. Example: 'Tech Stack: Spring Boot, MySQL, Redis, Docker'.\n");
+            sb.append(
+                    "   - For the 'skills' list, return only the most relevant, high-impact technical skills (e.g. frameworks, databases, programming languages) for the target job (maximum 10-12 key skills). Do NOT include soft skills, basic tooling (Postman, Slack, Notion, Git), or generic task names (Unit Testing, API Design).\n");
+            sb.append(
+                    "   - Keep the personal 'summary' short, professional and direct, limited to 2-3 sentences.\n");
+            sb.append(
+                    "10. LANGUAGE: The job description is in English. ALL generated content (headline, summary, bulletPoints, suggestions) MUST be in English ONLY. Do NOT mix Vietnamese and English.\n\n");
             sb.append("OUTPUT FORMAT: A single valid JSON (no markdown, no explanation):\n");
             sb.append("{\n" +
                     "  \"personal\": { \"fullName\": \"...\", \"headline\": \"...\", \"summary\": \"...\", \"location\": \"...\" },\n"
@@ -1331,9 +1341,19 @@ public class JobServiceImpl implements JobService {
             sb.append(
                     "7. CHỈ LỌC EXPERIENCES LIÊN QUAN: Chỉ trả về những experiences có 'relevant' = true. KHÔNG trả về experiences không liên quan.\n");
             sb.append(
-                    "8. HEADLINE LENGTH: Field 'headline' PHẢI có độ dài 40-120 ký tự. Giữ ngắn gọn, chuyên nghiệp và ấn tượng.\n");
+                    "8. HEADLINE LENGTH: Field 'headline' PHẢI là một chức danh chuyên môn ngắn gọn từ 3-6 từ, tối đa 60 ký tự. KHÔNG sử dụng các từ sáo rỗng hoặc câu dài phân tách bằng dấu gạch đứng (|). Ví dụ: 'Kỹ sư Backend Senior' hoặc 'Lập trình viên Java & Spring Boot'.\n");
             sb.append(
-                    "9. NGÔN NGỮ: Công việc này sử dụng tiếng Việt. TẤT CẢ nội dung bạn viết (headline, summary, bulletPoints, suggestions) PHẢI là tiếng Việt HOÀN TOÀN. KHÔNG được trộn lẫn tiếng Anh và tiếng Việt.\n\n");
+                    "9. PHONG CÁCH VIẾT & TRÌNH BÀY (Cực kỳ quan trọng):\n");
+            sb.append(
+                    "   - Với mỗi kinh nghiệm (experience), viết từ 3-5 gạch đầu dòng (bulletPoints) ngắn gọn, tập trung vào kết quả và bắt đầu bằng động từ hành động chuyên nghiệp (ví dụ: 'Phát triển...', 'Thiết kế...', 'Tối ưu hóa...'). KHÔNG viết đoạn dài dòng.\n");
+            sb.append(
+                    "   - Dòng cuối cùng của mỗi mục kinh nghiệm bắt buộc phải liệt kê công nghệ sử dụng theo định dạng: 'Tech Stack: Tech1, Tech2, Tech3'. Ví dụ: 'Tech Stack: Spring Boot, MySQL, Redis, Docker'.\n");
+            sb.append(
+                    "   - Với danh sách 'skills', chỉ trả về các kỹ năng kỹ thuật cốt lõi và quan trọng nhất (ví dụ: ngôn ngữ lập trình, frameworks, cơ sở dữ liệu) phù hợp trực tiếp với công việc ứng tuyển (tối đa 10-12 kỹ năng). TUYỆT ĐỐI không đưa vào kỹ năng mềm, các công cụ cơ bản (Postman, Slack, Notion, Git), hoặc tên công việc chung chung (Unit Testing, Thiết kế API).\n");
+            sb.append(
+                    "   - Phần 'summary' giữ ngắn gọn, chuyên nghiệp, đi thẳng vào thế mạnh, giới hạn từ 2-3 câu.\n");
+            sb.append(
+                    "10. NGÔN NGỮ: Công việc này sử dụng tiếng Việt. TẤT CẢ nội dung bạn viết (headline, summary, bulletPoints, suggestions) PHẢI là tiếng Việt HOÀN TOÀN. KHÔNG được trộn lẫn tiếng Anh và tiếng Việt.\n\n");
             sb.append("ĐỊNH DẠNG ĐẦU RA: DUY NHẤT một JSON hợp lệ (không markdown, không giải thích):\n");
             sb.append("{\n" +
                     "  \"personal\": { \"fullName\": \"...\", \"headline\": \"...\", \"summary\": \"...\", \"location\": \"...\" },\n"

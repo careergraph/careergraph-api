@@ -30,7 +30,7 @@ public class AppConfig {
     @Value("${socket.http.connect-timeout-ms:5000}")
     private int socketHttpConnectTimeoutMs;
 
-    @Value("${socket.http.response-timeout-ms:10000}")
+    @Value("${socket.http.response-timeout-ms:60000}")
     private long socketHttpResponseTimeoutMs;
 
     @Bean

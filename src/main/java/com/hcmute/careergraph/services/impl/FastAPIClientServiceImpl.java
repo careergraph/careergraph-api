@@ -35,7 +35,7 @@ public class FastAPIClientServiceImpl implements FastAPIClientService {
                     .bodyValue(request)
                     .retrieve()
                     .bodyToMono(ChatResponse.class)
-                    .timeout(Duration.ofSeconds(30))
+                    .timeout(Duration.ofSeconds(60))
                     .retryWhen(Retry.fixedDelay(1, Duration.ofSeconds(1)))
                     .block();
 
@@ -64,7 +64,7 @@ public class FastAPIClientServiceImpl implements FastAPIClientService {
                     .bodyValue(prompt)
                     .retrieve()
                     .bodyToMono(String.class)
-                    .timeout(Duration.ofSeconds(30))
+                    .timeout(Duration.ofSeconds(120))
                     .retryWhen(Retry.fixedDelay(1, Duration.ofSeconds(1)))
                     .block();
 
@@ -91,7 +91,7 @@ public class FastAPIClientServiceImpl implements FastAPIClientService {
                     .bodyValue(jsonBody)
                     .retrieve()
                     .bodyToMono(String.class)
-                    .timeout(Duration.ofSeconds(45))
+                    .timeout(Duration.ofSeconds(120))
                     .retryWhen(Retry.fixedDelay(1, Duration.ofSeconds(1)))
                     .block();
 
@@ -141,13 +141,13 @@ public class FastAPIClientServiceImpl implements FastAPIClientService {
 
             String response = webClient.post()
                 .uri(FAST_API_URL + "/api/v1/review-cv-builder")
-                .header("Content-Type", "application/json")
-                .bodyValue(jsonBody)
-                .retrieve()
-                .bodyToMono(String.class)
-                .timeout(Duration.ofSeconds(45))
-                .retryWhen(Retry.fixedDelay(1, Duration.ofSeconds(1)))
-                .block();
+                    .header("Content-Type", "application/json")
+                    .bodyValue(jsonBody)
+                    .retrieve()
+                    .bodyToMono(String.class)
+                    .timeout(Duration.ofSeconds(120))
+                    .retryWhen(Retry.fixedDelay(1, Duration.ofSeconds(1)))
+                    .block();
 
             if (response == null) {
                 throw new RuntimeException("FastAPI returned null response");
