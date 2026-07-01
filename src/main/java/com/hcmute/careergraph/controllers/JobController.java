@@ -126,15 +126,22 @@ public class JobController {
 
                 String candidateId = securityUtils.getCandidateId().orElse(null);
 
-                boolean applied = false;
+                boolean hasApplied = false;
+                boolean reapplyBlocked = false;
                 if (candidateId != null) {
-                        applied = applicationService.isApplicationReapplyBlocked(id, candidateId);
+                        hasApplied = applicationService.existsApplicationsByJobIdAndCandidateId(id, candidateId);
+                        reapplyBlocked = applicationService.isApplicationReapplyBlocked(id, candidateId);
                 }
                 boolean idSaved = false;
                 if (candidateId != null) {
                         idSaved = savedJobService.existsByCandidateIdAndJobId(candidateId, id);
                 }
-                JobResponse jobResponse = jobMapper.toResponseWithStatusAppliedAndLiked(job, applied, idSaved);
+                JobResponse jobResponse = jobMapper.toResponseWithStatusAppliedAndLiked(
+                                job,
+                                hasApplied,
+                                hasApplied,
+                                reapplyBlocked,
+                                idSaved);
                 return RestResponse.<JobResponse>builder()
                                 .status(HttpStatus.OK)
                                 .message("Job retrieved successfully")
