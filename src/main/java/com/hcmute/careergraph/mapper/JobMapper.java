@@ -194,7 +194,12 @@ public class JobMapper {
         return false;
     }
 
-    public JobResponse toResponseWithStatusAppliedAndLiked(Job job, boolean isApplied, boolean isSaved) {
+    public JobResponse toResponseWithStatusAppliedAndLiked(
+            Job job,
+            boolean isApplied,
+            boolean hasApplied,
+            boolean reapplyBlocked,
+            boolean isSaved) {
         if (job == null) {
             return null;
         }
@@ -265,12 +270,18 @@ public class JobMapper {
                 // Timeline - null for now, có thể implement sau
                 .timeline(null)
                 .isApplied(isApplied)
+                .hasApplied(hasApplied)
+                .reapplyBlocked(reapplyBlocked)
                 .isSaved(isSaved)
 
                 // Job availability
                 .isExpired(isJobExpired(job))
 
                 .build();
+    }
+
+    public JobResponse toResponseWithStatusAppliedAndLiked(Job job, boolean isApplied, boolean isSaved) {
+        return toResponseWithStatusAppliedAndLiked(job, isApplied, isApplied, false, isSaved);
     }
 
     /**
@@ -291,7 +302,7 @@ public class JobMapper {
         }
 
         return jobs.stream()
-                .map(job -> toResponseWithStatusAppliedAndLiked(job, false, true))
+                .map(job -> toResponseWithStatusAppliedAndLiked(job, false, false, false, true))
                 .collect(Collectors.toList());
     }
 

@@ -23,6 +23,8 @@ public record JobResponse(
         String companyName,
 
         boolean isApplied,
+        boolean hasApplied,
+        boolean reapplyBlocked,
         boolean isSaved,
 
         // Arrays
