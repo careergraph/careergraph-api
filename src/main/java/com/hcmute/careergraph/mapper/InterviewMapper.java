@@ -174,6 +174,18 @@ public class InterviewMapper {
                 return InterviewRecordingResponse.builder()
                                 .id(recording.getId())
                                 .interviewId(recording.getInterview() != null ? recording.getInterview().getId() : null)
+                                .roomParticipantId(recording.getRoomParticipant() != null ? recording.getRoomParticipant().getId() : null)
+                                .applicationId(recording.getRoomParticipant() != null && recording.getRoomParticipant().getApplication() != null
+                                                ? recording.getRoomParticipant().getApplication().getId()
+                                                : null)
+                                .candidateId(recording.getRoomParticipant() != null && recording.getRoomParticipant().getCandidate() != null
+                                                ? recording.getRoomParticipant().getCandidate().getId()
+                                                : null)
+                                .candidateName(recording.getRoomParticipant() != null && recording.getRoomParticipant().getCandidate() != null
+                                                ? ((java.util.Optional.ofNullable(recording.getRoomParticipant().getCandidate().getFirstName()).orElse("")
+                                                                + " "
+                                                                + java.util.Optional.ofNullable(recording.getRoomParticipant().getCandidate().getLastName()).orElse("")).trim())
+                                                : null)
                                 .fileKey(recording.getFileKey())
                                 .fileSize(recording.getFileSize())
                                 .durationSeconds(recording.getDurationSeconds())

@@ -19,5 +19,5 @@ public class InterviewRecordingRequest {
 
     private String mimeType;
 
-    private String interviewId;
+    private String roomParticipantId;
 }

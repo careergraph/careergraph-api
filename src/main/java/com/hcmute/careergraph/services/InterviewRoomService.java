@@ -51,6 +51,11 @@ public interface InterviewRoomService {
     RoomParticipant removeParticipant(String roomId, String candidateId);
 
     /**
+     * Mark a participant as voluntarily left the active room session.
+     */
+    RoomParticipant leaveParticipant(String roomId, String candidateId);
+
+    /**
      * Mark a participant slot as completed after interview ends.
      */
     RoomParticipant completeParticipant(String roomId, String candidateId);

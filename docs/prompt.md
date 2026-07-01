@@ -1,6 +1,7 @@
 Bạn hãy đóng vai trò là senior dev 15 + năm kinh nghiệm và nhà thiết kê hệ thống chuẩn production hãy thực hiện. Bạn hãy đọc src để đúng ngữ cảnh. 
 
-- Tôi đang bị lỗi socket trên môi trường thực, hãy nghiên cứu sửa lỗi. deploy trên chuyển qua dùng socket pooling có được không  có chuẩn production. (ở môi trường local hoạt động bình thường). TÔi dùng VPS để host API, RTC, Traefik ( dùng reverse proxy). Dùng cloudfront để trỏ tới. 
+- Khi ở cuộc phỏng vấn thì HR kick Ứng viên ra khỏi phòng thì oke rồi, nhưng tại sao khi khi ứng viên xin vào lại phòng thì HR cũng nhận được yêu cầu vào phòng và khi HR tick thì ứng viên và hr không nhìn thấy nhau như là ở 2 room khác nhau vậy, đối phương bật cam không thấy mà nhìn thấy là đang chờ vào phòng... khi reload f5 lại thì mới thấy được nhau.
+- Và khi HR record , khi kết thúc ghi âm sau khi upload lên cloudinary thì hiện form để chọn thông tin ứng viên để gán nhưng form hiện lên thì báo không có ứng viên nào vào phòng( mặt dù code 1 2 commit trưóc của HR là thấy )
 
 Bạn hãy đóng vai trò là senior test để kiểm tra lại các chức năng đã hoạt động đúng chủân chưa. 
 Và đóng vai trò là khách hàng khó tính kiểm tra lại UI UX thuận tiện chưa production chaư

@@ -182,6 +182,17 @@ public class InterviewRoomServiceImpl implements InterviewRoomService {
         RoomParticipant participant = participantRepository.findByRoomIdAndCandidateId(roomId, candidateId)
                 .orElseThrow(() -> new BadRequestException("Participant not found in this room"));
 
+        boolean anotherCandidateStillAdmitted = participantRepository
+                .findByRoomIdAndAdmitStatusIn(roomId, List.of(AdmitStatus.ADMITTED))
+                .stream()
+                .anyMatch(existing -> existing.getCandidate() != null
+                        && !existing.getCandidate().getId().equals(candidateId));
+
+        if (anotherCandidateStillAdmitted) {
+            throw new BadRequestException(
+                    "Chỉ được phép có một ứng viên ở trạng thái đang phỏng vấn trong phòng tại cùng một thời điểm");
+        }
+
         if (participant.getAdmitStatus() == AdmitStatus.REMOVED) {
             throw new BadRequestException("Participant has been removed and cannot be readmitted in this session");
         }
@@ -199,6 +210,24 @@ public class InterviewRoomServiceImpl implements InterviewRoomService {
                 .orElseThrow(() -> new BadRequestException("Participant not found in this room"));
 
         participant.setAdmitStatus(AdmitStatus.REMOVED);
+        participant.setLeftAt(LocalDateTime.now());
+        return participantRepository.save(participant);
+    }
+
+    @Override
+    public RoomParticipant leaveParticipant(String roomId, String candidateId) {
+        RoomParticipant participant = participantRepository.findByRoomIdAndCandidateId(roomId, candidateId)
+                .orElseThrow(() -> new BadRequestException("Participant not found in this room"));
+
+        if (participant.getAdmitStatus() == AdmitStatus.REMOVED) {
+            throw new BadRequestException("Participant has been removed from this room");
+        }
+
+        if (participant.getJoinedAt() == null) {
+            throw new BadRequestException("Participant has not joined the room yet");
+        }
+
+        participant.setAdmitStatus(resolveParticipantLeaveStatus(participant));
         participant.setLeftAt(LocalDateTime.now());
         return participantRepository.save(participant);
     }
@@ -247,33 +276,49 @@ public class InterviewRoomServiceImpl implements InterviewRoomService {
         return participantRepository.findByRoomId(roomId);
     }
 
+    private AdmitStatus resolveParticipantLeaveStatus(RoomParticipant participant) {
+        Interview matchedInterview = findClosestRoomInterview(participant);
+        if (matchedInterview != null && matchedInterview.getInterviewStatus() == InterviewStatus.COMPLETED) {
+            return AdmitStatus.COMPLETED;
+        }
+        return AdmitStatus.WAITING_LOBBY;
+    }
+
     private void autoTransitionInterviewToInProgress(RoomParticipant participant) {
-        if (participant.getApplication() == null || participant.getRoom() == null) {
+        Interview matchedInterview = findClosestRoomInterview(participant);
+        if (matchedInterview == null) {
             return;
+        }
+
+        if (matchedInterview.getInterviewStatus() == InterviewStatus.SCHEDULED
+                || matchedInterview.getInterviewStatus() == InterviewStatus.CONFIRMED) {
+            matchedInterview.setInterviewStatus(InterviewStatus.IN_PROGRESS);
+            interviewRepository.save(matchedInterview);
+            log.info("Interview {} auto-transitioned to IN_PROGRESS when candidate {} admitted in room {}",
+                    matchedInterview.getId(),
+                    participant.getCandidate() != null ? participant.getCandidate().getId() : "unknown",
+                    participant.getRoom() != null ? participant.getRoom().getRoomCode() : "unknown");
+        }
+    }
+
+    private Interview findClosestRoomInterview(RoomParticipant participant) {
+        if (participant.getApplication() == null || participant.getRoom() == null) {
+            return null;
         }
 
         String applicationId = participant.getApplication().getId();
         String roomCode = participant.getRoom().getRoomCode();
         LocalDateTime slotStart = participant.getSlotStart();
 
-        interviewRepository.findByApplicationId(applicationId).stream()
+        return interviewRepository.findByApplicationId(applicationId).stream()
                 .filter(i -> roomCode.equals(i.getMeetingLink()))
-                .filter(i -> i.getInterviewStatus() == InterviewStatus.SCHEDULED
-                        || i.getInterviewStatus() == InterviewStatus.CONFIRMED)
                 .min(Comparator.comparingLong(i -> {
                     if (slotStart == null || i.getScheduledAt() == null) {
                         return Long.MAX_VALUE;
                     }
                     return Math.abs(ChronoUnit.SECONDS.between(i.getScheduledAt(), slotStart));
                 }))
-                .ifPresent(i -> {
-                    i.setInterviewStatus(InterviewStatus.IN_PROGRESS);
-                    interviewRepository.save(i);
-                    log.info("Interview {} auto-transitioned to IN_PROGRESS when candidate {} admitted in room {}",
-                            i.getId(),
-                            participant.getCandidate() != null ? participant.getCandidate().getId() : "unknown",
-                            roomCode);
-                });
+                .orElse(null);
     }
 
     private String generateRoomCode(LocalDate date) {

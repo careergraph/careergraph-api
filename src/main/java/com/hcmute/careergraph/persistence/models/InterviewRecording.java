@@ -15,14 +15,18 @@ import java.time.LocalDateTime;
 @SuperBuilder
 @NoArgsConstructor
 @AllArgsConstructor
-@ToString(callSuper = true, exclude = {"interview"})
-@EqualsAndHashCode(callSuper = true, exclude = {"interview"})
+@ToString(callSuper = true, exclude = {"interview", "roomParticipant"})
+@EqualsAndHashCode(callSuper = true, exclude = {"interview", "roomParticipant"})
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class InterviewRecording extends BaseEntity {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "interview_id", nullable = false)
     private Interview interview;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "room_participant_id")
+    private RoomParticipant roomParticipant;
 
     @Column(name = "file_key", length = 500)
     private String fileKey;

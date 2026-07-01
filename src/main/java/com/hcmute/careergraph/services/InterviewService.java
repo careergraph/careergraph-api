@@ -62,6 +62,8 @@ public interface InterviewService {
 
     Interview getInterviewByRoomCode(String roomCode);
 
+    Interview getInterviewByRoomCodeForCandidate(String roomCode, String candidateId);
+
     List<Interview> getInterviewsByRoomCode(String roomCode);
 
     InterviewRecording saveRecording(String interviewId, InterviewRecordingRequest request, String recordedBy);

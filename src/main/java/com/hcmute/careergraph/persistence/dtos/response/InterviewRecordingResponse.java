@@ -12,6 +12,10 @@ public class InterviewRecordingResponse {
 
     private String id;
     private String interviewId;
+    private String roomParticipantId;
+    private String applicationId;
+    private String candidateId;
+    private String candidateName;
     private String fileKey;
     private Long fileSize;
     private Integer durationSeconds;

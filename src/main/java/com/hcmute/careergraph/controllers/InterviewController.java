@@ -83,8 +83,13 @@ public class InterviewController {
     }
 
     @GetMapping("/room/{roomCode}")
-    public RestResponse<InterviewResponse> getInterviewByRoomCode(@PathVariable String roomCode) {
-        Interview interview = interviewService.getInterviewByRoomCode(roomCode);
+    public RestResponse<InterviewResponse> getInterviewByRoomCode(
+            @PathVariable String roomCode,
+            Authentication authentication) {
+        String candidateId = securityUtils.extractCandidateId(authentication);
+        Interview interview = StringUtils.hasText(candidateId)
+                ? interviewService.getInterviewByRoomCodeForCandidate(roomCode, candidateId)
+                : interviewService.getInterviewByRoomCode(roomCode);
         return RestResponse.<InterviewResponse>builder()
                 .status(HttpStatus.OK)
                 .message("Interview room info retrieved successfully")

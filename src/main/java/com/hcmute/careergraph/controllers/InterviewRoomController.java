@@ -109,6 +109,20 @@ public class InterviewRoomController {
                                 .build();
         }
 
+        @PostMapping("/{roomCode}/participants/{candidateId}/leave")
+        public RestResponse<InterviewRoomResponse.RoomParticipantResponse> leaveParticipant(
+                        @PathVariable String roomCode,
+                        @PathVariable String candidateId) {
+
+                InterviewRoom room = roomService.getRoomByCode(roomCode);
+                RoomParticipant participant = roomService.leaveParticipant(room.getId(), candidateId);
+                return RestResponse.<InterviewRoomResponse.RoomParticipantResponse>builder()
+                                .status(HttpStatus.OK)
+                                .message("Participant left active session")
+                                .data(toParticipantResponse(participant))
+                                .build();
+        }
+
         @PostMapping("/{roomCode}/participants/{candidateId}/complete")
         public RestResponse<InterviewRoomResponse.RoomParticipantResponse> completeParticipant(
                         @PathVariable String roomCode,

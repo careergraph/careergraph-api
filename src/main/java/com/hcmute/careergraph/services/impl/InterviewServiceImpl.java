@@ -40,6 +40,7 @@ import java.util.Set;
 @RequiredArgsConstructor
 @Slf4j
 public class InterviewServiceImpl implements InterviewService {
+    private static final long ROOM_EARLY_JOIN_MINUTES = 15;
 
     private final InterviewRepository interviewRepository;
     private final InterviewParticipantRepository participantRepository;
@@ -549,18 +550,16 @@ public class InterviewServiceImpl implements InterviewService {
             String reviewerAccountId) {
         Interview interview = getInterviewById(interviewId);
 
-        if (interview.getInterviewStatus() != InterviewStatus.SCHEDULED
-                && interview.getInterviewStatus() != InterviewStatus.CONFIRMED
-                && interview.getInterviewStatus() != InterviewStatus.IN_PROGRESS
-                && interview.getInterviewStatus() != InterviewStatus.COMPLETED) {
+        if (interview.getInterviewStatus() != InterviewStatus.COMPLETED) {
             throw new AppException(ErrorType.BAD_REQUEST,
-                    "Feedback can only be added to SCHEDULED, CONFIRMED, IN_PROGRESS, or COMPLETED interviews");
+                    "Feedback can only be added after the interview has been completed");
         }
 
-        validateInterviewReadyForHrAction(
-                interview,
-                "Cannot add feedback before the scheduled start time",
-                "Cannot add feedback because candidate has not joined this interview room yet");
+        if (interview.getType() == InterviewType.ONLINE) {
+            validateCandidateJoinedForRoomInterview(
+                    interview,
+                    "Cannot add feedback because candidate has not joined this interview room yet");
+        }
 
         if (feedbackRepository.existsByInterviewIdAndReviewerId(interviewId, reviewerAccountId)) {
             throw new AppException(ErrorType.BAD_REQUEST, "You have already submitted feedback for this interview");
@@ -815,6 +814,27 @@ public class InterviewServiceImpl implements InterviewService {
                 .orElse(interviews.get(0));
     }
 
+    @Override
+    public Interview getInterviewByRoomCodeForCandidate(String roomCode, String candidateId) {
+        List<Interview> interviews = getInterviewsByRoomCode(roomCode);
+
+        Interview interview = interviews.stream()
+                .filter(i -> i.getCandidate() != null && candidateId.equals(i.getCandidate().getId()))
+                .filter(i -> ACTIVE_STATUSES.contains(i.getInterviewStatus()))
+                .min(Comparator.comparing(Interview::getScheduledAt,
+                        Comparator.nullsLast(Comparator.naturalOrder())))
+                .orElseThrow(() -> new AppException(ErrorType.BAD_REQUEST,
+                        "Bạn không có lịch phỏng vấn hợp lệ trong phòng này"));
+
+        LocalDateTime scheduledAt = interview.getScheduledAt();
+        if (scheduledAt != null && LocalDateTime.now().isBefore(scheduledAt.minusMinutes(ROOM_EARLY_JOIN_MINUTES))) {
+            throw new AppException(ErrorType.BAD_REQUEST,
+                    "Bạn chỉ có thể vào phòng trước 15 phút so với lịch hẹn");
+        }
+
+        return interview;
+    }
+
     @Transactional(readOnly = true)
     public List<Interview> getInterviewsByRoomCode(String roomCode) {
         List<Interview> interviews = interviewRepository.findByMeetingLinkOrderByScheduledAtAsc(roomCode);
@@ -863,8 +883,11 @@ public class InterviewServiceImpl implements InterviewService {
         validateCandidateJoinedForRoomInterview(interview,
                 "Cannot save recording because candidate has not joined this interview room yet");
 
+        RoomParticipant assignedParticipant = resolveRecordingParticipant(interview, request);
+
         InterviewRecording recording = InterviewRecording.builder()
                 .interview(interview)
+                .roomParticipant(assignedParticipant)
                 .fileKey(request.getFileKey())
                 .fileSize(request.getFileSize())
                 .durationSeconds(request.getDurationSeconds())
@@ -938,6 +961,42 @@ public class InterviewServiceImpl implements InterviewService {
         if (!hasInterviewStarted(interview)) {
             throw new AppException(ErrorType.BAD_REQUEST, beforeScheduledStartMessage);
         }
+    }
+
+    private RoomParticipant resolveRecordingParticipant(Interview interview, InterviewRecordingRequest request) {
+        if (interview == null || interview.getType() != InterviewType.ONLINE) {
+            return null;
+        }
+
+        if (!StringUtils.hasText(interview.getMeetingLink()) || interview.getApplication() == null) {
+            return null;
+        }
+
+        if (StringUtils.hasText(request.getRoomParticipantId())) {
+            RoomParticipant participant = roomParticipantRepository.findById(request.getRoomParticipantId())
+                    .orElseThrow(() -> new AppException(ErrorType.BAD_REQUEST, "Room participant not found for recording"));
+
+            boolean sameRoom = participant.getRoom() != null
+                    && interview.getMeetingLink().equals(participant.getRoom().getRoomCode());
+            boolean sameApplication = participant.getApplication() != null
+                    && interview.getApplication().getId().equals(participant.getApplication().getId());
+
+            if (!sameRoom || !sameApplication) {
+                throw new AppException(ErrorType.BAD_REQUEST,
+                        "Recording participant does not match the selected interview candidate");
+            }
+
+            if (participant.getJoinedAt() == null) {
+                throw new AppException(ErrorType.BAD_REQUEST,
+                        "Cannot assign recording to a candidate who has not joined the room");
+            }
+
+            return participant;
+        }
+
+        return roomParticipantRepository
+                .findByRoomCodeAndApplicationId(interview.getMeetingLink(), interview.getApplication().getId())
+                .orElse(null);
     }
 
     private boolean hasInterviewStarted(Interview interview) {
