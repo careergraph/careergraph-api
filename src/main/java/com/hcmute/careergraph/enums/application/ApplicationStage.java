@@ -13,21 +13,21 @@ import java.util.Set;
  * The transition map keeps the workflow extensible while enforcing realistic HR rules.
  */
 public enum ApplicationStage {
-    APPLIED("Application submitted"),
-    SCREENING("Profile screening"),
-    INTERVIEW("Interview"),
-    HR_CONTACTED("HR contacted"),
-    SCHEDULED("Scheduled"),
-    INTERVIEW_SCHEDULED("Interview scheduled"),
-    INTERVIEW_COMPLETED("Interview completed"),
-    TRIAL("Trial period"),
-    OFFER_EXTENDED("Offer extended"),
-    OFFER_ACCEPTED("Offer accepted"),
-    OFFER_DECLINED("Offer declined"),
-    HIRED("Officially hired"),
-    OFFBOARDED("Employee has left company"),
-    REJECTED("Application rejected"),
-    WITHDRAWN("Application withdrawn");
+    APPLIED("Đã ứng tuyển"),
+    SCREENING("Sàng lọc hồ sơ"),
+    INTERVIEW("Phỏng vấn"),
+    HR_CONTACTED("HR liên hệ"),
+    SCHEDULED("Đã lên lịch"),
+    INTERVIEW_SCHEDULED("Đã lên lịch phỏng vấn"),
+    INTERVIEW_COMPLETED("Hoàn tất phỏng vấn"),
+    TRIAL("Thử việc"),
+    OFFER_EXTENDED("Đã gửi đề nghị nhận việc"),
+    OFFER_ACCEPTED("Đã chấp nhận đề nghị"),
+    OFFER_DECLINED("Đã từ chối đề nghị"),
+    HIRED("Đã nhận việc"),
+    OFFBOARDED("Đã nghỉ việc"),
+    REJECTED("Không phù hợp"),
+    WITHDRAWN("Đã rút hồ sơ");
 
         private static final List<ApplicationStage> CONFIGURABLE_STAGES = List.of(
             APPLIED,

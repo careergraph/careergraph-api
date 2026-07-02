@@ -298,7 +298,7 @@ public class ApplicationServiceImpl implements ApplicationService {
         ApplicationStage currentStage = application.getCurrentStage();
 
         if (targetStage == null) {
-            throw new RuntimeException("Target stage must be provided");
+            throw new BadRequestException("Target stage must be provided");
         }
 
         if (currentStage == targetStage) {
@@ -394,7 +394,7 @@ public class ApplicationServiceImpl implements ApplicationService {
         }
 
         if (currentStage.isTerminal()) {
-            throw new RuntimeException(String.format(
+            throw new BadRequestException(String.format(
                     "Stage transition from %s to %s is not allowed for application %s",
                     currentStage, targetStage, applicationId));
         }
@@ -413,14 +413,14 @@ public class ApplicationServiceImpl implements ApplicationService {
             List<CompanyRecruitmentStage> stages = companyRecruitmentStageService.getCompanyStages(company.getId());
             ApplicationStage nextActiveStage = resolveNextActiveStage(stages, currentStage);
             if (nextActiveStage == null || nextActiveStage != targetStage) {
-                throw new RuntimeException(String.format(
+                throw new BadRequestException(String.format(
                         "Stage transition from %s to %s is not allowed for application %s",
                         currentStage, targetStage, applicationId));
             }
         } else {
             Set<ApplicationStage> allowedTargets = BASE_TRANSITIONS.getOrDefault(currentStage, Set.of());
             if (!allowedTargets.contains(targetStage)) {
-                throw new RuntimeException(String.format(
+                throw new BadRequestException(String.format(
                         "Stage transition from %s to %s is not allowed for application %s",
                         currentStage, targetStage, applicationId));
             }
@@ -432,24 +432,24 @@ public class ApplicationServiceImpl implements ApplicationService {
             boolean activeStage = companyRecruitmentStageService
                     .isStageActiveForCompany(company.getId(), targetStage);
             if (!activeStage) {
-                throw new RuntimeException("Stage hiện đã bị tắt trong pipeline của công ty");
+                throw new BadRequestException("Stage hiện đã bị tắt trong pipeline của công ty");
             }
         }
 
         if (offerBeforeTrial
                 && currentStage == ApplicationStage.INTERVIEW_COMPLETED
                 && targetStage == ApplicationStage.TRIAL) {
-            throw new RuntimeException("Company pipeline yêu cầu gửi Offer trước khi chuyển sang Thử việc");
+            throw new BadRequestException("Company pipeline yêu cầu gửi Offer trước khi chuyển sang Thử việc");
         }
 
         if (!offerBeforeTrial
                 && currentStage == ApplicationStage.INTERVIEW_COMPLETED
                 && targetStage == ApplicationStage.OFFER_EXTENDED) {
-            throw new RuntimeException("Company pipeline yêu cầu qua Thử việc trước khi gửi Offer");
+            throw new BadRequestException("Company pipeline yêu cầu qua Thử việc trước khi gửi Offer");
         }
 
         if (currentStage == ApplicationStage.OFFBOARDED && targetStage != ApplicationStage.OFFBOARDED) {
-            throw new RuntimeException("Không thể chuyển stage sau khi hồ sơ đã ở trạng thái Nghỉ việc");
+            throw new BadRequestException("Không thể chuyển stage sau khi hồ sơ đã ở trạng thái Nghỉ việc");
         }
 
         if (currentStage == ApplicationStage.HIRED && targetStage == ApplicationStage.OFFBOARDED) {
@@ -631,7 +631,7 @@ public class ApplicationServiceImpl implements ApplicationService {
         String jobTitle = Optional.ofNullable(application.getJob())
                 .map(Job::getTitle)
                 .filter(StringUtils::hasText)
-                .orElse("your applied position");
+                .orElse("vị trí bạn đã ứng tuyển");
         String companyName = Optional.ofNullable(application.getJob())
                 .map(Job::getCompany)
                 .map(Company::getTagname)
@@ -691,7 +691,7 @@ public class ApplicationServiceImpl implements ApplicationService {
             return candidate.getTagname().trim();
         }
 
-        return "Candidate";
+        return "Ứng viên";
     }
 
     private String resolveActorLabel(String providedActor, Candidate candidate) {

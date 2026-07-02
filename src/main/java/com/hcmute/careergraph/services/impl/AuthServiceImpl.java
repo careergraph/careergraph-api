@@ -129,15 +129,36 @@ public class AuthServiceImpl implements AuthService {
             Company savedCompany = companyRepository.save(company);
             companyRecruitmentStageService.initializeDefaultStages(savedCompany);
         }
-        sendOtp(normalizedEmail);
+        sendOtp(normalizedEmail, isHR);
     }
 
     private void sendOtp(String email) {
+        Account account = accountRepository.findByEmail(normalizeEmail(email)).orElse(null);
+        sendOtp(email, account);
+    }
+
+    private void sendOtp(String email, boolean isHr) {
         String normalizedEmail = normalizeEmail(email);
         String otp = generateOtp();
         redisService.setObject(otpKey(normalizedEmail), otp, TIME_OTP_EXPIRED);
         log.info("OTP generated for {} (dev only log): {}", normalizedEmail, otp);
-        mailService.sendOtp(normalizedEmail, otp);
+        mailService.sendOtp(
+                normalizedEmail,
+                otp,
+                isHr ? "Nhà tuyển dụng" : "Ứng viên",
+                isHr ? "CareerGraph HR" : "CareerGraph");
+    }
+
+    private void sendOtp(String email, Account account) {
+        String normalizedEmail = normalizeEmail(email);
+        String otp = generateOtp();
+        redisService.setObject(otpKey(normalizedEmail), otp, TIME_OTP_EXPIRED);
+        log.info("OTP generated for {} (dev only log): {}", normalizedEmail, otp);
+        mailService.sendOtp(
+                normalizedEmail,
+                otp,
+                resolveOtpRecipientLabel(account),
+                resolveOtpPlatformName(account));
     }
 
     @Override
@@ -353,7 +374,11 @@ public class AuthServiceImpl implements AuthService {
         redisService.setObject(accountOtpKey(accountId, "email_change"), otp, TIME_OTP_EXPIRED);
         redisService.setObject(accountPendingKey(accountId, "email_change"), normalizedNewEmail, TIME_OTP_EXPIRED);
 
-        mailService.sendOtp(normalizedNewEmail, otp);
+        mailService.sendOtp(
+                normalizedNewEmail,
+                otp,
+                resolveOtpRecipientLabel(account),
+                resolveOtpPlatformName(account));
         return TIME_OTP_EXPIRED;
     }
 
@@ -403,8 +428,29 @@ public class AuthServiceImpl implements AuthService {
 
         redisService.setObject(accountOtpKey(accountId, "password_change"), otp, TIME_OTP_EXPIRED);
         redisService.setObject(accountPendingKey(accountId, "password_change"), nextPasswordHash, TIME_OTP_EXPIRED);
-        mailService.sendOtp(account.getEmail(), otp);
+        mailService.sendOtp(
+                account.getEmail(),
+                otp,
+                resolveOtpRecipientLabel(account),
+                resolveOtpPlatformName(account));
         return TIME_OTP_EXPIRED;
+    }
+
+    private String resolveOtpRecipientLabel(Account account) {
+        if (account == null) {
+            return "Người dùng";
+        }
+        if (account.getRole() == Role.HR) {
+            return "Nhà tuyển dụng";
+        }
+        return "Ứng viên";
+    }
+
+    private String resolveOtpPlatformName(Account account) {
+        if (account != null && account.getRole() == Role.HR) {
+            return "CareerGraph HR";
+        }
+        return "CareerGraph";
     }
 
     @Override

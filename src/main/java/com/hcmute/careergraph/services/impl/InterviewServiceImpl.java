@@ -2,6 +2,7 @@ package com.hcmute.careergraph.services.impl;
 
 import com.hcmute.careergraph.enums.common.ErrorType;
 import com.hcmute.careergraph.enums.application.ApplicationStage;
+import com.hcmute.careergraph.enums.candidate.ContactType;
 import com.hcmute.careergraph.enums.interview.*;
 import com.hcmute.careergraph.exception.AppException;
 import com.hcmute.careergraph.persistence.dtos.request.InterviewFeedbackRequest;
@@ -16,9 +17,11 @@ import com.hcmute.careergraph.repositories.*;
 import com.hcmute.careergraph.services.CompanyRecruitmentStageService;
 import com.hcmute.careergraph.services.InterviewRoomService;
 import com.hcmute.careergraph.services.InterviewService;
+import com.hcmute.careergraph.services.MailService;
 import com.hcmute.careergraph.services.NotificationService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -33,6 +36,7 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 
 @Service
@@ -52,6 +56,10 @@ public class InterviewServiceImpl implements InterviewService {
     private final InterviewRoomService roomService;
     private final CompanyRecruitmentStageService companyRecruitmentStageService;
     private final NotificationService notificationService;
+    private final MailService mailService;
+
+    @Value("${application.web.base-url:http://localhost:5000}")
+    private String candidateWebBaseUrl;
 
     private static final List<InterviewStatus> ACTIVE_STATUSES = List.of(InterviewStatus.SCHEDULED,
             InterviewStatus.CONFIRMED,
@@ -257,6 +265,10 @@ public class InterviewServiceImpl implements InterviewService {
         log.info("Interview created with id: {}", saved.getId());
         Interview reloaded = interviewRepository.findById(saved.getId()).orElse(saved);
         if (request.isNotifyCandidate()) {
+            dispatchInterviewScheduleEmail(
+                    reloaded,
+                    request.isConfirmOverwrite(),
+                    extractPlainInterviewNotes(reloaded.getNotes()));
             notificationService.onInterviewScheduled(reloaded, request.isConfirmOverwrite());
         }
         return reloaded;
@@ -388,6 +400,7 @@ public class InterviewServiceImpl implements InterviewService {
         interview.setCancellationReason(reason);
         interview.setHiddenFromCandidate(false);
         Interview saved = interviewRepository.save(interview);
+        dispatchInterviewCancellationEmail(saved);
         notificationService.onInterviewCancelledByHr(saved);
         return saved;
     }
@@ -457,6 +470,7 @@ public class InterviewServiceImpl implements InterviewService {
 
         log.info("Interview {} rescheduled to new interview {}", id, saved.getId());
         Interview reloaded = interviewRepository.findById(saved.getId()).orElse(saved);
+        dispatchInterviewScheduleEmail(reloaded, true, extractPlainInterviewNotes(reloaded.getNotes()));
         notificationService.onInterviewScheduled(reloaded, true);
         return reloaded;
     }
@@ -1145,5 +1159,143 @@ public class InterviewServiceImpl implements InterviewService {
             return String.format("[ROUND:%d]", roundNumber);
         }
         return String.format("[ROUND:%d] %s", roundNumber, withoutMarker);
+    }
+
+    private String extractPlainInterviewNotes(String notes) {
+        if (!StringUtils.hasText(notes)) {
+            return null;
+        }
+        String cleaned = notes.replaceFirst("^\\[ROUND:\\d+]\\s*", "").trim();
+        return StringUtils.hasText(cleaned) ? cleaned : null;
+    }
+
+    private void dispatchInterviewScheduleEmail(Interview interview, boolean rescheduled, String note) {
+        if (interview == null || interview.getCandidate() == null) {
+            return;
+        }
+
+        String recipientEmail = resolveCandidateEmail(interview.getCandidate());
+        if (!StringUtils.hasText(recipientEmail)) {
+            log.warn("No candidate email found for interview {}. Skip schedule email.", interview.getId());
+            return;
+        }
+
+        try {
+            mailService.sendInterviewScheduleEmail(
+                    recipientEmail,
+                    resolveCandidateDisplayName(interview.getCandidate()),
+                    resolveJobTitle(interview),
+                    resolveCompanyName(interview),
+                    interview.getScheduledAt(),
+                    interview.getDurationMinutes(),
+                    interview.getType(),
+                    interview.getType() == InterviewType.OFFLINE ? interview.getLocation() : null,
+                    buildCandidateInterviewRoomUrl(interview),
+                    note,
+                    rescheduled);
+        } catch (Exception ex) {
+            log.error("Failed to send interview schedule email for interview {}", interview.getId(), ex);
+        }
+    }
+
+    private void dispatchInterviewCancellationEmail(Interview interview) {
+        if (interview == null || interview.getCandidate() == null) {
+            return;
+        }
+
+        String recipientEmail = resolveCandidateEmail(interview.getCandidate());
+        if (!StringUtils.hasText(recipientEmail)) {
+            log.warn("No candidate email found for interview {}. Skip cancellation email.", interview.getId());
+            return;
+        }
+
+        try {
+            mailService.sendInterviewCancellationEmail(
+                    recipientEmail,
+                    resolveCandidateDisplayName(interview.getCandidate()),
+                    resolveJobTitle(interview),
+                    resolveCompanyName(interview),
+                    interview.getScheduledAt(),
+                    interview.getType(),
+                    StringUtils.hasText(interview.getCancellationReason())
+                            ? interview.getCancellationReason().trim()
+                            : "Nhà tuyển dụng đã hủy lịch phỏng vấn.");
+        } catch (Exception ex) {
+            log.error("Failed to send interview cancellation email for interview {}", interview.getId(), ex);
+        }
+    }
+
+    private String buildCandidateInterviewRoomUrl(Interview interview) {
+        if (interview == null || interview.getType() != InterviewType.ONLINE || !StringUtils.hasText(interview.getMeetingLink())) {
+            return null;
+        }
+
+        String normalizedBaseUrl = StringUtils.hasText(candidateWebBaseUrl)
+                ? candidateWebBaseUrl.replaceAll("/+$", "")
+                : "http://localhost:5000";
+        return normalizedBaseUrl + "/interview/room/" + interview.getMeetingLink().trim();
+    }
+
+    private String resolveCandidateEmail(Candidate candidate) {
+        if (candidate == null) {
+            return null;
+        }
+        if (candidate.getAccount() != null && StringUtils.hasText(candidate.getAccount().getEmail())) {
+            return candidate.getAccount().getEmail();
+        }
+        if (candidate.getContacts() == null || candidate.getContacts().isEmpty()) {
+            return null;
+        }
+
+        return candidate.getContacts().stream()
+                .filter(contact -> contact.getContactType() == ContactType.EMAIL)
+                .sorted(Comparator.comparing(contact -> Boolean.TRUE.equals(contact.getIsPrimary()) ? 0 : 1))
+                .map(Contact::getValue)
+                .filter(StringUtils::hasText)
+                .findFirst()
+                .orElse(null);
+    }
+
+    private String resolveCandidateDisplayName(Candidate candidate) {
+        if (candidate == null) {
+            return "Ứng viên";
+        }
+
+        StringBuilder builder = new StringBuilder();
+        if (StringUtils.hasText(candidate.getFirstName())) {
+            builder.append(candidate.getFirstName().trim());
+        }
+        if (StringUtils.hasText(candidate.getLastName())) {
+            if (!builder.isEmpty()) {
+                builder.append(' ');
+            }
+            builder.append(candidate.getLastName().trim());
+        }
+
+        if (!builder.isEmpty()) {
+            return builder.toString();
+        }
+
+        if (StringUtils.hasText(candidate.getTagname())) {
+            return candidate.getTagname().trim();
+        }
+
+        return "Ứng viên";
+    }
+
+    private String resolveJobTitle(Interview interview) {
+        return Optional.ofNullable(interview)
+                .map(Interview::getJob)
+                .map(Job::getTitle)
+                .filter(StringUtils::hasText)
+                .orElse("vị trí ứng tuyển");
+    }
+
+    private String resolveCompanyName(Interview interview) {
+        return Optional.ofNullable(interview)
+                .map(Interview::getCompany)
+                .map(Company::getTagname)
+                .filter(StringUtils::hasText)
+                .orElse("CareerGraph");
     }
 }

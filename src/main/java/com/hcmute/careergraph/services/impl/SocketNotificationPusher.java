@@ -7,6 +7,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
+import reactor.core.publisher.Mono;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -16,6 +17,8 @@ import java.util.UUID;
 @RequiredArgsConstructor
 @Slf4j
 public class SocketNotificationPusher {
+  private static final String NOTIFY_PATH = "/internal/notify";
+  private static final String UNREAD_COUNTS_PATH = "/internal/unread-counts";
 
   private final WebClient webClient;
 
@@ -36,7 +39,7 @@ public class SocketNotificationPusher {
     payload.put("notification", notification);
 
     webClient.post()
-        .uri(socketServerUrl + "/internal/notify")
+        .uri(socketServerUrl + NOTIFY_PATH)
         .header("x-internal-api-key", internalApiKey)
         .bodyValue(payload)
         .retrieve()
@@ -46,10 +49,16 @@ public class SocketNotificationPusher {
             notification.getType(),
             notification.getId(),
             userId))
-        .doOnError(error -> log.warn("Failed to push notification {} to user {}: {}",
-            notification.getType(),
-            userId,
-            error.getMessage()))
+        .onErrorResume(error -> {
+          log.warn(
+              "Socket push skipped endpoint={} user={} type={} notificationId={} reason={}",
+              NOTIFY_PATH,
+              userId,
+              notification.getType(),
+              notification.getId(),
+              summarizeError(error));
+          return Mono.empty();
+        })
         .subscribe();
   }
 
@@ -65,7 +74,7 @@ public class SocketNotificationPusher {
     payload.put("notifications", notifications);
 
     webClient.post()
-        .uri(socketServerUrl + "/internal/unread-counts")
+        .uri(socketServerUrl + UNREAD_COUNTS_PATH)
         .header("x-internal-api-key", internalApiKey)
         .bodyValue(payload)
         .retrieve()
@@ -75,9 +84,32 @@ public class SocketNotificationPusher {
             userId,
             notifications,
             messages))
-        .doOnError(error -> log.warn("Failed to push unread counts to user {}: {}",
-            userId,
-            error.getMessage()))
+        .onErrorResume(error -> {
+          log.warn(
+              "Socket push skipped endpoint={} user={} notifications={} messages={} reason={}",
+              UNREAD_COUNTS_PATH,
+              userId,
+              notifications,
+              messages,
+              summarizeError(error));
+          return Mono.empty();
+        })
         .subscribe();
+  }
+
+  private String summarizeError(Throwable error) {
+    Throwable root = error;
+    while (root.getCause() != null && root.getCause() != root) {
+      root = root.getCause();
+    }
+
+    String message = root.getMessage();
+    if (message == null || message.isBlank()) {
+      message = error.getMessage();
+    }
+
+    return message != null && !message.isBlank()
+        ? message
+        : error.getClass().getSimpleName();
   }
 }

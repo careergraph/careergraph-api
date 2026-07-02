@@ -1,6 +1,8 @@
 Bạn hãy đóng vai trò là senior dev 15 + năm kinh nghiệm và nhà thiết kê hệ thống chuẩn production hãy thực hiện. Bạn hãy đọc src để đúng ngữ cảnh. 
 
-Bây giờ các logic hiện tại đã oke rồi, bây giờ tôi muốn có 1 trường hợp là AI sẽ lọc bị sai xót nên tôi muốn là HR có thể xem lại hồ sơ ứng viên và có thể chuyển về hồ sơ về sàng lọc hoặc là ứng tuyển gì đó thì pipline tuyển dụng có thể thay đổi. nói cách khác là vẫn cho HR thực hiện trở về stage( mà phải phù hợp chủân prodution).  Còn HR thì sẽ nhấn từ chối ứng viên thì không thể roll back thôi.  Và thêm popup xác nhận khi HR nhấn từ chối ứng viên nữa. 
+Hãy kiểm tra chức năng gửi mail cho ứng viên hiện tại đang lẫn lộn tiếng anh, tiếng việt, stage của hồ sơ. Hãy thống nhất chủân production tiếng việt. Và khi hồ sơ chuyển đến stage phỏng vấn, và có phần tạo phòng phỏng vấn hoặc phỏng vấn bị huỷ thì báo cáo phù hợp. Có phỏng vấn mới thì báo cáo phong vấn mới có kèm thêm link nữa phỏng vấn nữa config domain qua env yaml nữa(cập nhật env example) , sửa lại xác thực OTP, Cái nào chưa đồng bộ chưa chủân production thì sửa lại hết.
+
+Và trong mail có trung tâm hỗ trợ bên ứng viên có cần tạo 1 trang hỗ trọ. Nhưng trang này bên Client chưa có thì có nên ẩn không , nếu để tạo trang có khó không. chức năng ở trang hỗ trợ này làm gì, phía bên admin hiện tại chỉ hỗ trợ xác thực account của doanh nghiệp chưa có hỗ trợ cho ứng viên. nên chỉ cần để mail cho ứng viên tự gửi mail thì chủân production không. 
 
 
 

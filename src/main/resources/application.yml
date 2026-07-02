@@ -98,6 +98,8 @@ fast-api:
 application:
   web:
     base-url: ${WEB_BASE_URL:http://localhost:5000}
+    help-center-url: ${HELP_CENTER_URL:}
+    company-address: ${COMPANY_ADDRESS:1 Vo Van Ngan, Thu Duc, TP. Ho Chi Minh, Viet Nam}
   schedule:
     digest:
       enabled: ${DIGEST_ENABLED:true}

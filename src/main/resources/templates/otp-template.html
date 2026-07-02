@@ -1,10 +1,10 @@
 <!DOCTYPE html>
-<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<html lang="vi" xmlns:th="http://www.thymeleaf.org">
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="x-apple-disable-message-reformatting" />
-    <title>OTP Verification</title>
+    <title>Xác thực OTP</title>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap');
 
@@ -39,10 +39,11 @@
                         <table width="100%" cellpadding="0" cellspacing="0">
                             <tr>
                                 <td style="text-align:left;">
-                                    <img th:src="${logoUrl}" alt="Logo" width="120" style="display:block;" />
+                                    <img th:if="${logoUrl}" th:src="${logoUrl}" alt="Logo" width="120" style="display:block;" />
+                                    <span th:unless="${logoUrl}" style="font-size:20px; font-weight:700; color:#111827;" th:text="${companyName}">CareerGraph</span>
                                 </td>
                                 <td style="text-align:right; color:#6b7280; font-size:14px; font-weight: 500;">
-                                    <span th:text="${date}">26 Sep, 2025</span>
+                                    <span th:text="${date}">26/09/2025</span>
                                 </td>
                             </tr>
                         </table>
@@ -100,8 +101,8 @@
                                 <a th:href="'mailto:' + ${supportEmail}" style="color:#3b82f6; text-decoration:none; font-weight:500;" th:text="${supportEmail}">
                                     support@careergraph.com
                                 </a>
-                                <span style="color:#d1d5db; margin:0 8px;">|</span>
-                                <a th:href="${helpCenterUrl}" target="_blank" style="color:#3b82f6; text-decoration:none; font-weight:500;">
+                                <span th:if="${hasHelpCenterUrl}" style="color:#d1d5db; margin:0 8px;">|</span>
+                                <a th:if="${hasHelpCenterUrl}" th:href="${helpCenterUrl}" target="_blank" style="color:#3b82f6; text-decoration:none; font-weight:500;">
                                     Trung tâm hỗ trợ
                                 </a>
                             </p>

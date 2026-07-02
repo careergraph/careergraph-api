@@ -3,7 +3,7 @@
 <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-        <title>Application stage update</title>
+        <title>Cập nhật trạng thái hồ sơ</title>
         <style>
                 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap');
                 .email-container { font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; color:#374151; line-height:1.6; }
@@ -20,41 +20,47 @@
                 <tr>
                     <td style="background-color:#ffffff; padding:30px 40px 20px 40px; border-bottom:1px solid #e5e7eb;">
                         <table width="100%"><tr>
-                            <td style="text-align:left;"><img th:src="${companyLogo}" alt="Logo" width="120" style="display:block;"/></td>
-                            <td style="text-align:right; color:#6b7280; font-size:14px;"><span th:text="${date}">28 Sep, 2025</span></td>
+                            <td style="text-align:left;">
+                                <img th:if="${companyLogo}" th:src="${companyLogo}" alt="Logo" width="120" style="display:block;"/>
+                                <span th:unless="${companyLogo}" style="font-size:20px; font-weight:700; color:#111827;" th:text="${companyName}">CareerGraph</span>
+                            </td>
+                            <td style="text-align:right; color:#6b7280; font-size:14px;"><span th:text="${changedDate}">28/09/2025</span></td>
                         </tr></table>
                     </td>
                 </tr>
 
                 <tr>
                     <td class="mobile-padding" style="padding:40px;">
-                        <p style="margin:0 0 12px 0; color:#6b7280;" th:text="'Dear ' + ${candidateName} + ','">Dear Candidate,</p>
+                        <p style="margin:0 0 12px 0; color:#6b7280;" th:text="'Xin chào ' + ${candidateName} + ','">Xin chào ứng viên,</p>
 
-                        <!-- Message box like OTP -->
                         <div style="background-color:#f9fafb; border-radius:8px; padding:20px; margin-bottom:20px; border-left:4px solid #3b82f6;">
-                            <p style="margin:0; color:#374151;">We wanted to let you know that your application for the <strong th:text="${jobTitle}">position</strong> role at <strong th:text="${companyName}">our company</strong> is now at the <span style="color:#2563eb; font-weight:600;" th:text="${stageLabel}">current stage</span>.</p>
+                            <p style="margin:0; color:#374151;">Hồ sơ ứng tuyển vị trí <strong th:text="${jobTitle}">vị trí</strong> tại <strong th:text="${companyName}">công ty</strong> của bạn hiện đang ở giai đoạn <span style="color:#2563eb; font-weight:600;" th:text="${stageLabel}">hiện tại</span>.</p>
                         </div>
 
-                        <div th:if="${note}" th:text="${note}" style="margin-top:12px;">Stage update note.</div>
+                        <div th:if="${note}" th:text="${note}" style="margin-top:12px;">Ghi chú cập nhật hồ sơ.</div>
 
-                        <!-- Centered stage card -->
                         <div style="text-align:center; margin:24px 0;">
                             <div style="background-color:#f8fafc; border:2px solid #e5e7eb; border-radius:12px; padding:24px; display:inline-block; min-width:220px;">
                                 <p style="margin:0 0 8px 0; font-size:12px; color:#6b7280; font-weight:600; text-transform:uppercase;">Giai đoạn hiện tại</p>
-                                <div style="font-size:20px; font-weight:700; color:#1f2937;" th:text="${stageLabel}">Interview</div>
+                                <div style="font-size:20px; font-weight:700; color:#1f2937;" th:text="${stageLabel}">Phỏng vấn</div>
                             </div>
                         </div>
 
-                        <p th:if="${terminal}" style="margin-top:12px;">This stage concludes the recruitment process. Our team will be in touch with any final details shortly.</p>
-                        <p th:if="${!terminal}" style="margin-top:12px;">Our team will keep you updated as the next steps are scheduled. You can always follow your progress by signing in to your candidate dashboard.</p>
+                        <p th:if="${terminal}" style="margin-top:12px;">Đây là giai đoạn kết thúc của quy trình tuyển dụng hiện tại. Nếu có bước tiếp theo, nhà tuyển dụng sẽ chủ động liên hệ với bạn.</p>
+                        <p th:if="${!terminal}" style="margin-top:12px;">Nhà tuyển dụng sẽ tiếp tục cập nhật cho bạn khi có bước tiếp theo trong quy trình tuyển dụng.</p>
 
-                        <p style="margin-top:16px;">Warm regards,<br/><span th:text="${companyName}">CareerGraph</span> hiring team</p>
+                        <p style="margin-top:16px;">Trân trọng,<br/>Đội ngũ tuyển dụng <span th:text="${companyName}">CareerGraph</span></p>
                     </td>
                 </tr>
 
                 <tr>
                     <td style="background-color:#f9fafb; padding:24px 40px; text-align:center; border-top:1px solid #e5e7eb;">
-                        <p style="margin:0 0 8px 0; color:#6b7280;">Need help? Contact us at <a th:href="${'mailto:' + supportEmail}" style="color:#3b82f6;" th:text="${supportEmail}">support@careergraph.com</a> or visit <a th:href="${helpCenterUrl}" style="color:#3b82f6;" th:text="${helpCenterUrl}">help center</a>.</p>
+                        <p style="margin:0 0 8px 0; color:#6b7280;">
+                            Cần hỗ trợ? Liên hệ <a th:href="${'mailto:' + supportEmail}" style="color:#3b82f6;" th:text="${supportEmail}">support@careergraph.com</a>
+                            <span th:if="${hasHelpCenterUrl}">
+                                hoặc xem thêm tại <a th:href="${helpCenterUrl}" style="color:#3b82f6;" target="_blank">trung tâm hỗ trợ</a>
+                            </span>.
+                        </p>
                         <p style="margin:8px 0 0 0; font-size:12px; color:#9ca3af;">&copy; <span th:text="${year}">2025</span> <span th:text="${companyName}">CareerGraph</span>. Tất cả quyền được bảo lưu.</p>
                     </td>
                 </tr>
