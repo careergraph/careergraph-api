@@ -15,5 +15,7 @@ public interface CompanyAccessPolicyService {
 
     boolean isJobPubliclyAvailable(Job job);
 
+    boolean isJobVisibleForDetail(Job job);
+
     boolean isJobExpired(Job job);
 }

@@ -697,7 +697,7 @@ public class JobController {
                         return;
                 }
 
-                if (companyAccessPolicyService.isJobPubliclyAvailable(job)) {
+                if (companyAccessPolicyService.isJobVisibleForDetail(job)) {
                         return;
                 }
 

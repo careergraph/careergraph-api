@@ -51,6 +51,22 @@ class CompanyAccessPolicyServiceImplTest {
     }
 
     @Test
+    void isJobVisibleForDetail_shouldReturnTrueForExpiredActiveJob() {
+        Job job = createJob();
+        job.setExpiryDate(LocalDate.now().minusDays(1).toString());
+
+        assertThat(service.isJobVisibleForDetail(job)).isTrue();
+    }
+
+    @Test
+    void isJobVisibleForDetail_shouldReturnFalseForDraftJob() {
+        Job job = createJob();
+        job.setStatus(Status.DRAFT);
+
+        assertThat(service.isJobVisibleForDetail(job)).isFalse();
+    }
+
+    @Test
     void isJobPubliclyAvailable_shouldReturnFalseForCompanyWithoutApprovedVerification() {
         Job job = createJob();
         job.getCompany().setVerificationStatus(CompanyVerificationStatus.PENDING_REVIEW);

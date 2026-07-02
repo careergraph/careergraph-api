@@ -91,6 +91,19 @@ public class CompanyAccessPolicyServiceImpl implements CompanyAccessPolicyServic
     }
 
     @Override
+    public boolean isJobVisibleForDetail(Job job) {
+        if (job == null || job.getCompany() == null) {
+            return false;
+        }
+        if (job.getStatus() != Status.ACTIVE) {
+            return false;
+        }
+        Company company = job.getCompany();
+        return company.getVerificationStatus() == CompanyVerificationStatus.APPROVED
+                && company.getOperationalStatus() == CompanyOperationalStatus.ACTIVE;
+    }
+
+    @Override
     public boolean isJobExpired(Job job) {
         if (job == null || !StringUtils.hasText(job.getExpiryDate())) {
             return false;

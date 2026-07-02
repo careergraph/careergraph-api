@@ -1,7 +1,11 @@
 Bạn hãy đóng vai trò là senior dev 15 + năm kinh nghiệm và nhà thiết kê hệ thống chuẩn production hãy thực hiện. Bạn hãy đọc src để đúng ngữ cảnh. 
 
-- Khi ở cuộc phỏng vấn thì HR kick Ứng viên ra khỏi phòng thì oke rồi, nhưng tại sao khi khi ứng viên xin vào lại phòng thì HR cũng nhận được yêu cầu vào phòng và khi HR tick thì ứng viên và hr không nhìn thấy nhau như là ở 2 room khác nhau vậy, đối phương bật cam không thấy mà nhìn thấy là đang chờ vào phòng... khi reload f5 lại thì mới thấy được nhau.
-- Và khi HR record , khi kết thúc ghi âm sau khi upload lên cloudinary thì hiện form để chọn thông tin ứng viên để gán nhưng form hiện lên thì báo không có ứng viên nào vào phòng( mặt dù code 1 2 commit trưóc của HR là thấy )
+Ở trang kanban khi click vào ứng viên hiện modal xem chi tiết, bây giờ tôi muốn thêm 1 nút là chuyển sang giao đoạn kế tiếp hoặc lấy(tên giai đoạn) trực tiếp theo pipeline hiện tại. Đồng thời card của ứng viên cũng chuyển sang giai đoạn kế tiếp luôn.  Hãy tính toán để nút acction ở đâu là phu hợp layout như nào là phù hợp text màu chữ ... cho chủân production. đúng nghiệp vụ đầy đủ để hỗ trợ cho HR thực hiện nhanh chóng ngoài việc kéo thả. Cũng lưu hiện tại ở kanbar khi chuyển đến cột phỏng vấn là hiện thêm lịch tạo phòng phỏng vấn cho ứng viên. Logic thực hiện vẫn giữ như vậy. 
+
+Và thứ 2 là khi trước stage liên hệ của HR thì khi HR liên hệ thì ở BE có tự đồng chuyển sang cột liên hệ luôn nhưng trên UI hiện tại không chuyển không rerender trực tiếp F5 lại mới chuyển sang. Có cách nào biết là sẽ chuyển snag cột liên hệ hoặc không chuyển không
+
+
+
 Hãy sửa ít nhất có thể chỉ sửa những cái lỗi hiện tại chuẩn logic như hiện tại đang làm
 Bạn hãy đóng vai trò là senior test để kiểm tra lại các chức năng đã hoạt động đúng chủân chưa. 
 Và đóng vai trò là khách hàng khó tính kiểm tra lại UI UX thuận tiện chưa production chaư
