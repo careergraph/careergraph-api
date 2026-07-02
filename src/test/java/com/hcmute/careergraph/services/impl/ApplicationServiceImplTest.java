@@ -1,9 +1,12 @@
 package com.hcmute.careergraph.services.impl;
 
+import com.hcmute.careergraph.enums.application.ApplicationStage;
 import com.hcmute.careergraph.enums.common.Status;
 import com.hcmute.careergraph.exception.BadRequestException;
 import com.hcmute.careergraph.persistence.dtos.request.ApplicationRequest;
+import com.hcmute.careergraph.persistence.dtos.request.ApplicationStageUpdateRequest;
 import com.hcmute.careergraph.persistence.models.Application;
+import com.hcmute.careergraph.persistence.models.ApplicationStageHistory;
 import com.hcmute.careergraph.persistence.models.Candidate;
 import com.hcmute.careergraph.persistence.models.Company;
 import com.hcmute.careergraph.persistence.models.Job;
@@ -22,11 +25,17 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationEventPublisher;
 
+import java.util.ArrayList;
+import java.time.LocalDateTime;
+import java.util.List;
 import java.time.LocalDate;
 import java.util.Optional;
 
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -95,5 +104,114 @@ class ApplicationServiceImplTest {
         assertThatThrownBy(() -> applicationService.createApplication(request))
                 .isInstanceOf(BadRequestException.class)
                 .hasMessage("Cong viec nay hien khong kha dung.");
+    }
+
+    @Test
+    void updateApplicationStage_shouldAllowRecoveringAiRejectedApplicationToScreening() {
+        Company company = new Company();
+        company.setId("company-1");
+
+        Job job = new Job();
+        job.setId("job-1");
+        job.setCompany(company);
+
+        Candidate candidate = new Candidate();
+        candidate.setId("candidate-1");
+
+        Application application = new Application();
+        application.setId("application-1");
+        application.setJob(job);
+        application.setCandidate(candidate);
+        application.setCurrentStage(ApplicationStage.REJECTED);
+        application.setStageHistory(new ArrayList<>(List.of(
+                ApplicationStageHistory.builder()
+                        .toStage(ApplicationStage.REJECTED)
+                        .changedBy(ApplicationAiScreeningServiceImpl.AI_SCREENING_ACTOR)
+                        .changedAt(LocalDateTime.now())
+                        .build()
+        )));
+
+        ApplicationStageUpdateRequest request = new ApplicationStageUpdateRequest();
+        request.setStage(ApplicationStage.SCREENING);
+
+        when(applicationRepository.findById("application-1")).thenReturn(Optional.of(application));
+        when(companyRecruitmentStageService.isStageActiveForCompany("company-1", ApplicationStage.SCREENING))
+                .thenReturn(true);
+        when(applicationRepository.save(any(Application.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        assertThatCode(() -> applicationService.updateApplicationStage("application-1", request))
+                .doesNotThrowAnyException();
+
+        verify(applicationRepository).save(any(Application.class));
+    }
+
+    @Test
+    void updateApplicationStage_shouldRejectRecoveringHrRejectedApplication() {
+        Company company = new Company();
+        company.setId("company-1");
+
+        Job job = new Job();
+        job.setId("job-1");
+        job.setCompany(company);
+
+        Candidate candidate = new Candidate();
+        candidate.setId("candidate-1");
+
+        Application application = new Application();
+        application.setId("application-2");
+        application.setJob(job);
+        application.setCandidate(candidate);
+        application.setCurrentStage(ApplicationStage.REJECTED);
+        application.setStageHistory(new ArrayList<>(List.of(
+                ApplicationStageHistory.builder()
+                        .toStage(ApplicationStage.REJECTED)
+                        .changedBy("company-hr-1")
+                        .changedAt(LocalDateTime.now())
+                        .build()
+        )));
+
+        ApplicationStageUpdateRequest request = new ApplicationStageUpdateRequest();
+        request.setStage(ApplicationStage.SCREENING);
+
+        when(applicationRepository.findById("application-2")).thenReturn(Optional.of(application));
+
+        assertThatThrownBy(() -> applicationService.updateApplicationStage("application-2", request))
+                .isInstanceOf(RuntimeException.class)
+                .hasMessageContaining("Stage transition from REJECTED to SCREENING is not allowed");
+    }
+
+    @Test
+    void updateApplicationStage_shouldRejectRecoveringAiRejectedApplicationToInterview() {
+        Company company = new Company();
+        company.setId("company-1");
+
+        Job job = new Job();
+        job.setId("job-1");
+        job.setCompany(company);
+
+        Candidate candidate = new Candidate();
+        candidate.setId("candidate-1");
+
+        Application application = new Application();
+        application.setId("application-3");
+        application.setJob(job);
+        application.setCandidate(candidate);
+        application.setCurrentStage(ApplicationStage.REJECTED);
+        application.setStageHistory(new ArrayList<>(List.of(
+                ApplicationStageHistory.builder()
+                        .toStage(ApplicationStage.REJECTED)
+                        .changedBy(ApplicationAiScreeningServiceImpl.AI_SCREENING_ACTOR)
+                        .changedAt(LocalDateTime.now())
+                        .build()
+        )));
+
+        ApplicationStageUpdateRequest request = new ApplicationStageUpdateRequest();
+        request.setStage(ApplicationStage.INTERVIEW);
+
+        when(applicationRepository.findById("application-3")).thenReturn(Optional.of(application));
+
+        assertThatThrownBy(() -> applicationService.updateApplicationStage("application-3", request))
+                .isInstanceOf(RuntimeException.class)
+                .hasMessageContaining("Stage transition from REJECTED to INTERVIEW is not allowed");
     }
 }

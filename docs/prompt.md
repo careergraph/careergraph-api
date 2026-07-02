@@ -1,8 +1,6 @@
 Bạn hãy đóng vai trò là senior dev 15 + năm kinh nghiệm và nhà thiết kê hệ thống chuẩn production hãy thực hiện. Bạn hãy đọc src để đúng ngữ cảnh. 
 
-Ở trang kanban khi click vào ứng viên hiện modal xem chi tiết, bây giờ tôi muốn thêm 1 nút là chuyển sang giao đoạn kế tiếp hoặc lấy(tên giai đoạn) trực tiếp theo pipeline hiện tại. Đồng thời card của ứng viên cũng chuyển sang giai đoạn kế tiếp luôn.  Hãy tính toán để nút acction ở đâu là phu hợp layout như nào là phù hợp text màu chữ ... cho chủân production. đúng nghiệp vụ đầy đủ để hỗ trợ cho HR thực hiện nhanh chóng ngoài việc kéo thả. Cũng lưu hiện tại ở kanbar khi chuyển đến cột phỏng vấn là hiện thêm lịch tạo phòng phỏng vấn cho ứng viên. Logic thực hiện vẫn giữ như vậy. 
-
-Và thứ 2 là khi trước stage liên hệ của HR thì khi HR liên hệ thì ở BE có tự đồng chuyển sang cột liên hệ luôn nhưng trên UI hiện tại không chuyển không rerender trực tiếp F5 lại mới chuyển sang. Có cách nào biết là sẽ chuyển snag cột liên hệ hoặc không chuyển không
+Bây giờ các logic hiện tại đã oke rồi, bây giờ tôi muốn có 1 trường hợp là AI sẽ lọc bị sai xót nên tôi muốn là HR có thể xem lại hồ sơ ứng viên và có thể chuyển về hồ sơ về sàng lọc hoặc là ứng tuyển gì đó thì pipline tuyển dụng có thể thay đổi. nói cách khác là vẫn cho HR thực hiện trở về stage( mà phải phù hợp chủân prodution).  Còn HR thì sẽ nhấn từ chối ứng viên thì không thể roll back thôi.  Và thêm popup xác nhận khi HR nhấn từ chối ứng viên nữa. 
 
 
 
@@ -14,7 +12,7 @@ careergraph-api/docs/reports
 careergraph-hr/docs/reports
 careergraph-client/docs/reports
 careergraph-rtc/docs/reports
-Đặt tên file có ngày và thể hiện file nó chứa nội dung gì hay fix gì
+Đặt tên file có ngày và thể hiện file nó chứa nội dung gì hay fix gì cái nào không ảnh hưởng thì không cần viết report(chỉ viết khi có code thay đổi)
 
 
 

@@ -59,6 +59,9 @@ public class ApplicationServiceImpl implements ApplicationService {
     private static final String SUBMISSION_NOTE = "Ứng viên đã nộp hồ sơ.";
     private static final String REAPPLY_NOTE = "Ứng viên đã nộp lại hồ sơ.";
     private static final String HR_MESSAGE_CONTACT_NOTE = "HR đã liên hệ với ứng viên qua tin nhắn.";
+    private static final Set<ApplicationStage> AI_REJECTED_RECOVERY_STAGES = EnumSet.of(
+            ApplicationStage.APPLIED,
+            ApplicationStage.SCREENING);
     private static final Set<ApplicationStage> REAPPLY_ALLOWED_STAGES = EnumSet.of(
             ApplicationStage.APPLIED,
             ApplicationStage.REJECTED,
@@ -385,6 +388,11 @@ public class ApplicationServiceImpl implements ApplicationService {
             return;
         }
 
+        if (currentStage == ApplicationStage.REJECTED) {
+            validateAiRejectedRecovery(application, company, targetStage, applicationId);
+            return;
+        }
+
         if (currentStage.isTerminal()) {
             throw new RuntimeException(String.format(
                     "Stage transition from %s to %s is not allowed for application %s",
@@ -499,6 +507,39 @@ public class ApplicationServiceImpl implements ApplicationService {
                 throw new RuntimeException("Stage hiện đã bị tắt trong pipeline của công ty");
             }
         }
+    }
+
+    private void validateAiRejectedRecovery(
+            Application application,
+            Company company,
+            ApplicationStage targetStage,
+            String applicationId) {
+        if (!AI_REJECTED_RECOVERY_STAGES.contains(targetStage) || !isLatestRejectionCreatedByAi(application)) {
+            throw new RuntimeException(String.format(
+                    "Stage transition from REJECTED to %s is not allowed for application %s",
+                    targetStage, applicationId));
+        }
+
+        if (company != null && ApplicationStage.isConfigurableStage(targetStage)) {
+            boolean activeStage = companyRecruitmentStageService
+                    .isStageActiveForCompany(company.getId(), targetStage);
+            if (!activeStage) {
+                throw new RuntimeException("Stage hiện đã bị tắt trong pipeline của công ty");
+            }
+        }
+    }
+
+    private boolean isLatestRejectionCreatedByAi(Application application) {
+        if (application == null || application.getStageHistory() == null || application.getStageHistory().isEmpty()) {
+            return false;
+        }
+
+        return application.getStageHistory().stream()
+                .filter(history -> history != null && history.getToStage() == ApplicationStage.REJECTED)
+                .max(Comparator.comparing(ApplicationStageHistory::getChangedAt,
+                        Comparator.nullsLast(Comparator.naturalOrder())))
+                .map(history -> ApplicationAiScreeningServiceImpl.AI_SCREENING_ACTOR.equals(history.getChangedBy()))
+                .orElse(false);
     }
 
     private static Map<ApplicationStage, Set<ApplicationStage>> buildBaseTransitions() {
