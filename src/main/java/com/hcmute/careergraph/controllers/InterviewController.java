@@ -72,7 +72,7 @@ public class InterviewController {
                 .build();
     }
 
-    @GetMapping("/{id}")
+    @GetMapping("/{id:[0-9a-fA-F\\-]{36}}")
     public RestResponse<InterviewResponse> getInterviewById(@PathVariable String id) {
         Interview interview = interviewService.getInterviewById(id);
         return RestResponse.<InterviewResponse>builder()
@@ -209,7 +209,7 @@ public class InterviewController {
                 .build();
     }
 
-    @PatchMapping("/{id}")
+    @PatchMapping("/{id:[0-9a-fA-F\\-]{36}}")
     public RestResponse<InterviewResponse> updateInterview(
             @PathVariable String id,
             @RequestBody InterviewUpdateRequest request,

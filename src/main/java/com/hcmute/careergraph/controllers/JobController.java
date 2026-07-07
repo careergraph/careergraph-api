@@ -114,7 +114,7 @@ public class JobController {
                                 .build();
         }
 
-        @GetMapping("/{id}")
+        @GetMapping("/{id:[0-9a-fA-F\\-]{36}}")
         public RestResponse<JobResponse> getJobById(@PathVariable String id) {
                 log.info("GET /api/v1/jobs/{} - Fetching job", id);
 
@@ -183,7 +183,7 @@ public class JobController {
          * @param authentication Authentication để lấy company ID
          * @return RestResponse<JobResponse>
          */
-        @PutMapping(value = "/{id}", consumes = "application/json", produces = "application/json")
+        @PutMapping(value = "/{id:[0-9a-fA-F\\-]{36}}", consumes = "application/json", produces = "application/json")
         public RestResponse<JobResponse> updateJob(
                         @PathVariable String id,
                         @Valid @RequestBody JobCreationRequest request,
@@ -268,7 +268,7 @@ public class JobController {
          * @param authentication Authentication để lấy company ID
          * @return RestResponse<Void>
          */
-        @DeleteMapping("/{id}")
+        @DeleteMapping("/{id:[0-9a-fA-F\\-]{36}}")
         public RestResponse<Void> deleteJob(
                         @PathVariable String id,
                         Authentication authentication) {

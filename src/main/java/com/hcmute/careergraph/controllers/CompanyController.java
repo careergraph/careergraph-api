@@ -139,7 +139,7 @@ public class CompanyController {
 
     }
 
-    @GetMapping("/{companyId}")
+    @GetMapping("/{companyId:[0-9a-fA-F\\-]{36}}")
     public RestResponse<CompanyResponse> getCompanyDetail(@PathVariable("companyId") String companyId) {
 
         if (companyId == null || companyId.isEmpty()) {
