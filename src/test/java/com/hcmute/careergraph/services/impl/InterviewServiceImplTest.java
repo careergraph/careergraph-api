@@ -24,6 +24,7 @@ import com.hcmute.careergraph.repositories.RoomParticipantRepository;
 import com.hcmute.careergraph.services.CompanyRecruitmentStageService;
 import com.hcmute.careergraph.services.InterviewRoomService;
 import com.hcmute.careergraph.services.NotificationService;
+import com.hcmute.careergraph.services.MailService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -49,6 +50,8 @@ class InterviewServiceImplTest {
     private InterviewParticipantRepository participantRepository;
     @Mock
     private RoomParticipantRepository roomParticipantRepository;
+    @Mock
+    private MailService mailService;
     @Mock
     private InterviewFeedbackRepository feedbackRepository;
     @Mock
@@ -81,7 +84,8 @@ class InterviewServiceImplTest {
                 accountRepository,
                 roomService,
                 companyRecruitmentStageService,
-                notificationService);
+                notificationService,
+            mailService);
     }
 
     @Test

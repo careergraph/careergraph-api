@@ -26,6 +26,9 @@ public class ChatRequest {
     @JsonProperty("previous_messages")
     private List<String> previousMessages;
 
+    @JsonProperty("user_location")
+    private String userLocation;
+
     // Request send from UI web
     @Data
     @Builder

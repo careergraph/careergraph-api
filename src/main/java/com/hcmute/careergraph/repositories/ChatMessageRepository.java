@@ -18,7 +18,7 @@ public interface ChatMessageRepository extends JpaRepository<ChatMessage, String
         FROM ChatMessage cm
         WHERE cm.chatConversation.id = :conversationId
         ORDER BY cm.createdDate DESC
-        LIMIT 3
+        LIMIT 5
     """)
     List<String> findLastFormattedMessage(@Param("conversationId") String conversationId);
 

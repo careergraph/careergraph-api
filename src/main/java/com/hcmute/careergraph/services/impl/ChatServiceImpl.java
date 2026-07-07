@@ -9,6 +9,8 @@ import com.hcmute.careergraph.persistence.dtos.request.ChatRequest;
 import com.hcmute.careergraph.persistence.dtos.response.ChatResponse;
 import com.hcmute.careergraph.persistence.models.ChatConversation;
 import com.hcmute.careergraph.persistence.models.ChatMessage;
+import com.hcmute.careergraph.persistence.models.Address;
+import com.hcmute.careergraph.repositories.CandidateRepository;
 import com.hcmute.careergraph.repositories.ChatConversationRepository;
 import com.hcmute.careergraph.repositories.ChatMessageRepository;
 import com.hcmute.careergraph.services.ChatService;
@@ -31,6 +33,7 @@ public class ChatServiceImpl implements ChatService {
     private final ChatConversationRepository chatConversationRepository;
     private final ChatMessageRepository chatMessageRepository;
     private final FastAPIClientService fastAPIClientService;
+    private final CandidateRepository candidateRepository;
 
 
     @Override
@@ -59,6 +62,15 @@ public class ChatServiceImpl implements ChatService {
         // Step 2: Query messages for context
         List<String> previousMessages = chatMessageRepository
                 .findLastFormattedMessage(conversationId);
+        if (previousMessages != null) {
+            previousMessages = new java.util.ArrayList<>(previousMessages);
+            java.util.Collections.reverse(previousMessages);
+        }
+
+        String candidateCity = null;
+        if (userId != null) {
+            candidateCity = getCandidateCity(userId);
+        }
 
         // Step 3: Build request for FastAPI
         ChatRequest request = ChatRequest.builder()
@@ -66,6 +78,7 @@ public class ChatServiceImpl implements ChatService {
                 .conversationId(conversationId)
                 .userId(userId)
                 .previousMessages(previousMessages)
+                .userLocation(candidateCity)
                 .build();
 
         // Step 4: Gọi FastAPI để generate AI response
@@ -139,6 +152,26 @@ public class ChatServiceImpl implements ChatService {
                         .build());
 
         return conversation;
+    }
+
+    private String getCandidateCity(String candidateId) {
+        try {
+            return candidateRepository.findById(candidateId)
+                    .map(candidate -> candidate.getAddresses().stream()
+                            .filter(addr -> Boolean.TRUE.equals(addr.getIsPrimary()))
+                            .map(Address::getProvince)
+                            .filter(prov -> prov != null && !prov.trim().isEmpty())
+                            .findFirst()
+                            .orElseGet(() -> candidate.getAddresses().stream()
+                                    .map(Address::getProvince)
+                                    .filter(prov -> prov != null && !prov.trim().isEmpty())
+                                    .findFirst()
+                                    .orElse(null)))
+                    .orElse(null);
+        } catch (Exception e) {
+            log.warn("Failed to retrieve candidate city for candidateId: {}. Error: {}", candidateId, e.getMessage());
+            return null;
+        }
     }
 
     private String generateTitle(String message) {
