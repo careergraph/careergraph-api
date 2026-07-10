@@ -389,7 +389,7 @@ public class JobESServiceImpl implements JobESService {
                                                                                                                 .operator(Operator.Or)
                                                                                                                 .minimumShouldMatch(
                                                                                                                                 "50%")
-                                                                                                                .boost(1.0f);
+                                                                                                                .boost(0.2f);
                                                                                                 if (allowFuzzy) {
                                                                                                         mm.fuzziness("AUTO");
                                                                                                 }
