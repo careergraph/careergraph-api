@@ -111,7 +111,6 @@ public interface JobRepository extends JpaRepository<Job, String> {
                 SELECT j
                 FROM Job j
                 WHERE j.company.id = :companyId
-                    AND (j.expiryDate IS NULL OR j.expiryDate >= :currentDate)
                     AND (:statuses IS NULL OR j.status IN :statuses)
                     AND (:categories IS NULL OR j.jobCategory IN :categories)
                     AND (:types IS NULL OR j.employmentType IN :types)

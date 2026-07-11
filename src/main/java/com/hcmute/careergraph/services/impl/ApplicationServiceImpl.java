@@ -611,6 +611,7 @@ public class ApplicationServiceImpl implements ApplicationService {
             case OFFBOARDED -> "Hồ sơ đã được cập nhật sang trạng thái nghỉ việc.";
             case REJECTED -> "Chúng tôi rất tiếc, hồ sơ của bạn chưa phù hợp ở lần này.";
             case WITHDRAWN -> "Bạn đã rút hồ sơ khỏi quy trình tuyển dụng.";
+            default -> stage.getLabel();
         };
     }
 

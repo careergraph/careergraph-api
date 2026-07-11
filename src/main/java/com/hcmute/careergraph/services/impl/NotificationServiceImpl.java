@@ -744,6 +744,7 @@ public class NotificationServiceImpl implements NotificationService {
       case OFFBOARDED -> "Nghỉ việc";
       case REJECTED -> "Ứng tuyển bị từ chối";
       case WITHDRAWN -> "Đã rút hồ sơ";
+      default -> stage.getLabel();
     };
   }
 

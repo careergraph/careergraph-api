@@ -27,7 +27,12 @@ public enum ApplicationStage {
     HIRED("Đã nhận việc"),
     OFFBOARDED("Đã nghỉ việc"),
     REJECTED("Không phù hợp"),
-    WITHDRAWN("Đã rút hồ sơ");
+    WITHDRAWN("Đã rút hồ sơ"),
+    CUSTOM_1("Tùy chỉnh 1"),
+    CUSTOM_2("Tùy chỉnh 2"),
+    CUSTOM_3("Tùy chỉnh 3"),
+    CUSTOM_4("Tùy chỉnh 4"),
+    CUSTOM_5("Tùy chỉnh 5");
 
         private static final List<ApplicationStage> CONFIGURABLE_STAGES = List.of(
             APPLIED,
@@ -39,7 +44,12 @@ public enum ApplicationStage {
             OFFER_EXTENDED,
             HIRED,
             OFFBOARDED,
-            REJECTED
+            REJECTED,
+            CUSTOM_1,
+            CUSTOM_2,
+            CUSTOM_3,
+            CUSTOM_4,
+            CUSTOM_5
         );
 
         private static final Set<ApplicationStage> REQUIRED_STAGES = EnumSet.of(APPLIED, REJECTED);

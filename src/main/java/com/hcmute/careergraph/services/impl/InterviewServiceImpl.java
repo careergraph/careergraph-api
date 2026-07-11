@@ -104,7 +104,7 @@ public class InterviewServiceImpl implements InterviewService {
             throw new AppException(ErrorType.BAD_REQUEST, "Thời lượng phỏng vấn tối thiểu là 15 phút");
         }
 
-        validateApplicationStageForScheduling(application);
+        validateApplicationStageForScheduling(application, companyId);
 
         LocalDateTime endAt = scheduledAt.plusMinutes(request.getDurationMinutes());
 
@@ -221,7 +221,7 @@ public class InterviewServiceImpl implements InterviewService {
 
         Interview saved = interviewRepository.save(interview);
 
-        if (application.getCurrentStage() != ApplicationStage.INTERVIEW) {
+        if (application.getCurrentStage() != ApplicationStage.INTERVIEW && !application.getCurrentStage().name().startsWith("CUSTOM_")) {
             ApplicationStage previousStage = application.getCurrentStage();
             application.setCurrentStage(ApplicationStage.INTERVIEW);
             application.setStageChangedAt(LocalDateTime.now());
@@ -635,8 +635,11 @@ public class InterviewServiceImpl implements InterviewService {
                 jobId,
                 ACTIVE_STATUSES,
                 LocalDateTime.now());
+                
+        Set<ApplicationStage> schedulableStages = getSchedulableStages(companyId);
+
         return allApps.stream()
-                .filter(app -> app.getCurrentStage() != null && SCHEDULABLE_STAGES.contains(app.getCurrentStage()))
+                .filter(app -> app.getCurrentStage() != null && schedulableStages.contains(app.getCurrentStage()))
                 .filter(app -> !scheduledAppIds.contains(app.getId()))
                 .toList();
     }
@@ -1003,6 +1006,10 @@ public class InterviewServiceImpl implements InterviewService {
                 return;
 
             ApplicationStage currentStage = application.getCurrentStage();
+            if (currentStage != null && currentStage.name().startsWith("CUSTOM_")) {
+                return;
+            }
+
             ApplicationStage newStage = resolveStageFromFeedback(application, recommendation);
             if (newStage == null) {
                 return;
@@ -1072,13 +1079,41 @@ public class InterviewServiceImpl implements InterviewService {
         };
     }
 
-    private void validateApplicationStageForScheduling(Application application) {
+    private Set<ApplicationStage> getSchedulableStages(String companyId) {
+        List<CompanyRecruitmentStage> companyStages = companyRecruitmentStageService.getCompanyStages(companyId).stream()
+                .filter(CompanyRecruitmentStage::isActive)
+                .toList();
+                
+        int interviewIndex = -1;
+        for (int i = 0; i < companyStages.size(); i++) {
+            if (companyStages.get(i).getStage() == ApplicationStage.INTERVIEW) {
+                interviewIndex = i;
+                break;
+            }
+        }
+        
+        Set<ApplicationStage> schedulableStages = new java.util.HashSet<>();
+        schedulableStages.add(ApplicationStage.INTERVIEW);
+        schedulableStages.add(ApplicationStage.INTERVIEW_SCHEDULED);
+        schedulableStages.add(ApplicationStage.INTERVIEW_COMPLETED);
+        
+        if (interviewIndex > 0) {
+            schedulableStages.add(companyStages.get(interviewIndex - 1).getStage());
+        } else if (interviewIndex == -1) {
+            schedulableStages.addAll(SCHEDULABLE_STAGES);
+        }
+        return schedulableStages;
+    }
+
+    private void validateApplicationStageForScheduling(Application application, String companyId) {
         ApplicationStage currentStage = application.getCurrentStage();
         if (currentStage == null) {
             throw new AppException(ErrorType.BAD_REQUEST, "Hồ sơ ứng viên chưa có trạng thái hợp lệ để lên lịch");
         }
 
-        if (!SCHEDULABLE_STAGES.contains(currentStage)) {
+        Set<ApplicationStage> schedulableStages = getSchedulableStages(companyId);
+
+        if (!schedulableStages.contains(currentStage)) {
             throw new AppException(
                     ErrorType.BAD_REQUEST,
                     String.format("Không thể lên lịch phỏng vấn khi hồ sơ đang ở trạng thái %s", currentStage));

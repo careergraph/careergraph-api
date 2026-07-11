@@ -63,15 +63,7 @@ public class CompanyRecruitmentStageServiceImpl implements CompanyRecruitmentSta
                 .orElseThrow(() -> new NotFoundException("Company not found"));
 
         Set<ApplicationStage> configurable = EnumSet.copyOf(ApplicationStage.getConfigurableStages());
-        Set<ApplicationStage> requestedStages = EnumSet.noneOf(ApplicationStage.class);
-        for (CompanyStageRequests.StageConfig config : stages) {
-            requestedStages.add(config.stage());
-        }
-
-        if (!requestedStages.containsAll(configurable) || requestedStages.size() != configurable.size()) {
-            throw new BadRequestException("Stage configuration must include all supported stages");
-        }
-
+        
         List<CompanyRecruitmentStage> existing = companyRecruitmentStageRepository
                 .findByCompanyIdOrderByDisplayOrderAsc(companyId);
         if (existing.isEmpty()) {
@@ -84,14 +76,6 @@ public class CompanyRecruitmentStageServiceImpl implements CompanyRecruitmentSta
             existingMap.put(stage.getStage(), stage);
         }
 
-        Map<ApplicationStage, CompanyStageRequests.StageConfig> configMap = new HashMap<>();
-        for (CompanyStageRequests.StageConfig config : stages) {
-            if (!ApplicationStage.isConfigurableStage(config.stage())) {
-                throw new BadRequestException("Stage " + config.stage() + " is not supported");
-            }
-            configMap.put(config.stage(), config);
-        }
-
         boolean hasExplicitOrder = stages.stream().allMatch(config -> config.displayOrder() != null);
         List<CompanyStageRequests.StageConfig> orderedConfigs = new ArrayList<>(stages);
         if (hasExplicitOrder) {
@@ -102,6 +86,10 @@ public class CompanyRecruitmentStageServiceImpl implements CompanyRecruitmentSta
         int order = 1;
         for (CompanyStageRequests.StageConfig config : orderedConfigs) {
             ApplicationStage stage = config.stage();
+            if (!ApplicationStage.isConfigurableStage(stage)) {
+                throw new BadRequestException("Stage " + stage + " is not supported");
+            }
+            
             CompanyRecruitmentStage setting = existingMap.get(stage);
             if (setting == null) {
                 setting = CompanyRecruitmentStage.builder()
@@ -110,9 +98,9 @@ public class CompanyRecruitmentStageServiceImpl implements CompanyRecruitmentSta
                         .build();
             }
 
-                boolean nextActive = config.active() != null
-                    ? Boolean.TRUE.equals(config.active())
-                    : setting.getStatus() == null || setting.isActive();
+            boolean nextActive = config.active() != null
+                ? Boolean.TRUE.equals(config.active())
+                : setting.getStatus() == null || setting.isActive();
 
             if (!nextActive && ApplicationStage.isRequiredStage(stage)) {
                 throw new BadRequestException("Required stage cannot be disabled: " + stage);
@@ -123,17 +111,46 @@ public class CompanyRecruitmentStageServiceImpl implements CompanyRecruitmentSta
                         companyId,
                         List.of(stage));
                 if (activeCount > 0) {
-                    throw new BadRequestException("Không thể tắt trạng thái đang có ứng viên");
+                    throw new BadRequestException("Không thể tắt trạng thái đang có ứng viên: " + stage.name());
                 }
             }
 
             setting.setDisplayOrder(order++);
+            setting.setLabel(config.label());
             if (nextActive) {
                 setting.activate();
             } else {
                 setting.deactivate();
             }
 
+            updated.add(setting);
+            configurable.remove(stage);
+        }
+
+        for (ApplicationStage missingStage : configurable) {
+            if (ApplicationStage.isRequiredStage(missingStage)) {
+                throw new BadRequestException("Required stage must be included in configuration: " + missingStage.name());
+            }
+
+            CompanyRecruitmentStage setting = existingMap.get(missingStage);
+            if (setting == null) {
+                setting = CompanyRecruitmentStage.builder()
+                        .company(company)
+                        .stage(missingStage)
+                        .build();
+            }
+
+            if (setting.isActive()) {
+                long activeCount = applicationRepository.countByJobCompanyIdAndCurrentStageIn(
+                        companyId,
+                        List.of(missingStage));
+                if (activeCount > 0) {
+                    throw new BadRequestException("Không thể tắt trạng thái đang có ứng viên: " + missingStage.name());
+                }
+            }
+
+            setting.setDisplayOrder(order++);
+            setting.deactivate();
             updated.add(setting);
         }
 

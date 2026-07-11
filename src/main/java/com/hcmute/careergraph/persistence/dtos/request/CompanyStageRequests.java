@@ -21,7 +21,8 @@ public final class CompanyStageRequests {
     public record StageConfig(
             @NotNull ApplicationStage stage,
             Boolean active,
-            Integer displayOrder
+            Integer displayOrder,
+            String label
     ) {
     }
 }
