@@ -2,6 +2,7 @@ package com.hcmute.careergraph.services.impl;
 
 import com.hcmute.careergraph.enums.application.ApplicationStage;
 import com.hcmute.careergraph.enums.candidate.ContactType;
+import com.hcmute.careergraph.enums.interview.InterviewStatus;
 import com.hcmute.careergraph.exception.BadRequestException;
 import com.hcmute.careergraph.persistence.dtos.request.ApplicationRequest;
 import com.hcmute.careergraph.persistence.dtos.request.ApplicationStageUpdateRequest;
@@ -9,6 +10,7 @@ import com.hcmute.careergraph.persistence.models.*;
 import com.hcmute.careergraph.repositories.ApplicationRepository;
 import com.hcmute.careergraph.repositories.CandidateRepository;
 import com.hcmute.careergraph.repositories.AccountRepository;
+import com.hcmute.careergraph.repositories.InterviewRepository;
 import com.hcmute.careergraph.repositories.JobRepository;
 import com.hcmute.careergraph.services.ApplicationService;
 import com.hcmute.careergraph.services.CompanyAccessPolicyService;
@@ -50,6 +52,7 @@ public class ApplicationServiceImpl implements ApplicationService {
     private final CandidateRepository candidateRepository;
     private final AccountRepository accountRepository;
     private final JobRepository jobRepository;
+    private final InterviewRepository interviewRepository;
     private final MailService mailService;
     private final NotificationService notificationService;
     private final ApplicationEventPublisher applicationEventPublisher;
@@ -66,6 +69,9 @@ public class ApplicationServiceImpl implements ApplicationService {
             ApplicationStage.APPLIED,
             ApplicationStage.REJECTED,
             ApplicationStage.OFFBOARDED);
+    private static final List<InterviewStatus> REJECT_CANCELLABLE_INTERVIEW_STATUSES = List.of(
+            InterviewStatus.SCHEDULED,
+            InterviewStatus.CONFIRMED);
     private static final Map<ApplicationStage, Set<ApplicationStage>> BASE_TRANSITIONS = buildBaseTransitions();
 
     @Override
@@ -330,6 +336,10 @@ public class ApplicationServiceImpl implements ApplicationService {
                 .changedAt(now)
                 .build());
 
+        if (targetStage == ApplicationStage.REJECTED) {
+            cancelActiveInterviewsForRejectedApplication(application);
+        }
+
         Application saved = applicationRepository.save(application);
         Account changedByAccount = StringUtils.hasText(request.getChangeBy())
                 ? accountRepository.findByCompanyId(request.getChangeBy()).orElse(null)
@@ -338,6 +348,25 @@ public class ApplicationServiceImpl implements ApplicationService {
         dispatchStageEmail(saved, targetStage, note, actor);
         log.info("Application {} moved from {} to {}", id, currentStage, targetStage);
         return saved;
+    }
+
+    private void cancelActiveInterviewsForRejectedApplication(Application application) {
+        if (application == null || application.getId() == null || application.getJob() == null) {
+            return;
+        }
+
+        List<Interview> activeInterviews = interviewRepository.findActiveByApplicationAndJob(
+                application.getId(),
+                application.getJob().getId(),
+                REJECT_CANCELLABLE_INTERVIEW_STATUSES);
+
+        for (Interview interview : activeInterviews) {
+            interview.setInterviewStatus(InterviewStatus.CANCELLED);
+            interview.setCancellationReason("Cancelled because application was rejected");
+            interview.setHiddenFromCandidate(false);
+            Interview savedInterview = interviewRepository.save(interview);
+            notificationService.onInterviewCancelledByHr(savedInterview);
+        }
     }
 
     @Override
@@ -350,6 +379,7 @@ public class ApplicationServiceImpl implements ApplicationService {
         if (application == null) {
             return;
         }
+        
 
         ApplicationStage currentStage = application.getCurrentStage();
         if (currentStage != ApplicationStage.APPLIED && currentStage != ApplicationStage.SCREENING) {
@@ -392,8 +422,11 @@ public class ApplicationServiceImpl implements ApplicationService {
             validateAiRejectedRecovery(application, company, targetStage, applicationId);
             return;
         }
-
-        if (currentStage.isTerminal()) {
+        
+        boolean terminalStage = company != null
+                ? companyRecruitmentStageService.isTerminalStageForCompany(company.getId(), currentStage)
+                : currentStage.isTerminal();
+        if (terminalStage) {
             throw new BadRequestException(String.format(
                     "Stage transition from %s to %s is not allowed for application %s",
                     currentStage, targetStage, applicationId));
@@ -410,8 +443,8 @@ public class ApplicationServiceImpl implements ApplicationService {
         }
 
         if (company != null) {
-            List<CompanyRecruitmentStage> stages = companyRecruitmentStageService.getCompanyStages(company.getId());
-            ApplicationStage nextActiveStage = resolveNextActiveStage(stages, currentStage);
+            ApplicationStage nextActiveStage = companyRecruitmentStageService
+                    .findNextActiveStage(company.getId(), currentStage);
             if (nextActiveStage == null || nextActiveStage != targetStage) {
                 throw new BadRequestException(String.format(
                         "Stage transition from %s to %s is not allowed for application %s",
@@ -459,35 +492,6 @@ public class ApplicationServiceImpl implements ApplicationService {
         if (currentStage == ApplicationStage.OFFER_ACCEPTED && targetStage == ApplicationStage.HIRED) {
             return;
         }
-    }
-
-    private ApplicationStage resolveNextActiveStage(
-            List<CompanyRecruitmentStage> stages,
-            ApplicationStage currentStage) {
-        if (stages == null || stages.isEmpty() || currentStage == null) {
-            return null;
-        }
-
-        stages.sort(Comparator.comparingInt(stage -> stage.getDisplayOrder() == null ? 0 : stage.getDisplayOrder()));
-        int currentIndex = -1;
-        for (int i = 0; i < stages.size(); i++) {
-            if (stages.get(i).getStage() == currentStage) {
-                currentIndex = i;
-                break;
-            }
-        }
-        if (currentIndex < 0) {
-            return null;
-        }
-
-        for (int i = currentIndex + 1; i < stages.size(); i++) {
-            CompanyRecruitmentStage next = stages.get(i);
-            if (next != null && next.isActive()) {
-                return next.getStage();
-            }
-        }
-
-        return null;
     }
 
     private static boolean isHrMessagingPromotion(ApplicationStage currentStage, ApplicationStage targetStage) {
@@ -633,15 +637,30 @@ public class ApplicationServiceImpl implements ApplicationService {
                 .map(Job::getTitle)
                 .filter(StringUtils::hasText)
                 .orElse("vị trí bạn đã ứng tuyển");
-        String companyName = Optional.ofNullable(application.getJob())
+        Company company = Optional.ofNullable(application.getJob())
                 .map(Job::getCompany)
-                .map(Company::getTagname)
+                .orElse(null);
+        String companyId = company != null ? company.getId() : null;
+        String companyName = Optional.ofNullable(company)
+                .map(Company::getName)
                 .filter(StringUtils::hasText)
+                .or(() -> Optional.ofNullable(company)
+                        .map(Company::getTagname)
+                        .filter(StringUtils::hasText))
                 .orElse("CareerGraph");
+        String stageLabel = companyRecruitmentStageService.resolveStageLabel(companyId, stage);
+        boolean terminal = companyRecruitmentStageService.isTerminalStageForCompany(companyId, stage);
 
         try {
             // Each state change triggers a tailored candidate notification.
-            mailService.sendApplicationStageUpdateEmail(recipientEmail, candidateName, jobTitle, companyName, stage,
+            mailService.sendApplicationStageUpdateEmail(
+                    recipientEmail,
+                    candidateName,
+                    jobTitle,
+                    companyName,
+                    stage,
+                    stageLabel,
+                    terminal,
                     note);
         } catch (Exception ex) {
             log.error("Failed to send stage update email for application {}", application.getId(), ex);

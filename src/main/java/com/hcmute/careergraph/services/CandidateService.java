@@ -43,6 +43,11 @@ public interface CandidateService {
 
     List<CandidateClientResponse.AppliedJobs> getAppliedJobs(String candidateId, String status) throws ChangeSetPersister.NotFoundException;
 
+    List<CandidateClientResponse.AppliedJobs> getAppliedJobs(String candidateId, String status, String companyId) throws ChangeSetPersister.NotFoundException;
+
+    CandidateClientResponse.AppliedJobFilterOptions getAppliedJobFilterOptions(String candidateId, String companyId)
+            throws ChangeSetPersister.NotFoundException;
+
     List<FileResponse> listFile(String idd, FileType fileType) throws ChangeSetPersister.NotFoundException;
 
     void deleteByFileId(String candidateId, String fileId) throws ChangeSetPersister.NotFoundException;

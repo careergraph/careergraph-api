@@ -1,6 +1,8 @@
 package com.hcmute.careergraph.repositories;
 
 import com.hcmute.careergraph.enums.application.ApplicationStage;
+import com.hcmute.careergraph.persistence.dtos.projection.AppliedJobCompanyProjection;
+import com.hcmute.careergraph.persistence.dtos.projection.AppliedJobStageProjection;
 import com.hcmute.careergraph.persistence.dtos.projection.AppliedJobsProjection;
 import com.hcmute.careergraph.persistence.models.Application;
 import org.springframework.data.domain.Page;
@@ -57,6 +59,7 @@ public interface ApplicationRepository extends JpaRepository<Application, String
                 SELECT
                     a.id             AS applicationId,
                     j.title          AS jobName,
+                    c.id             AS companyId,
                     c.name           AS companyName,
                     j.id             AS jobId,
                     a.appliedDate    AS appliedAt,
@@ -78,6 +81,7 @@ public interface ApplicationRepository extends JpaRepository<Application, String
                 SELECT
                     a.id             AS applicationId,
                     j.title          AS jobName,
+                    c.id             AS companyId,
                     c.name           AS companyName,
                     j.id             AS jobId,
                     a.appliedDate    AS appliedAt,
@@ -97,6 +101,7 @@ public interface ApplicationRepository extends JpaRepository<Application, String
                 SELECT
                     a.id             AS applicationId,
                     j.title          AS jobName,
+                    c.id             AS companyId,
                     c.name           AS companyName,
                     j.id             AS jobId,
                     a.appliedDate    AS appliedAt,
@@ -106,10 +111,39 @@ public interface ApplicationRepository extends JpaRepository<Application, String
                 FROM Application a
                 JOIN a.job j
                 JOIN j.company c
-                WHERE a.candidate.id =:candidateId and (:status IS NULL OR a.currentStage = :status)
+                WHERE a.candidate.id = :candidateId
+                  AND (:companyId IS NULL OR c.id = :companyId)
+                  AND (:status IS NULL OR a.currentStage = :status)
             """)
     Page<AppliedJobsProjection> findAppliedJobsAllByCandidateId(@Param("candidateId") String candidateId,
-            @Param("status") ApplicationStage status, Pageable pageable);
+            @Param("status") ApplicationStage status,
+            @Param("companyId") String companyId,
+            Pageable pageable);
+
+    @Query("""
+                SELECT DISTINCT
+                    c.id   AS companyId,
+                    c.name AS companyName
+                FROM Application a
+                JOIN a.job j
+                JOIN j.company c
+                WHERE a.candidate.id = :candidateId
+                ORDER BY c.name ASC
+            """)
+    List<AppliedJobCompanyProjection> findDistinctAppliedCompaniesByCandidateId(@Param("candidateId") String candidateId);
+
+    @Query("""
+                SELECT DISTINCT
+                    a.currentStage AS status
+                FROM Application a
+                JOIN a.job j
+                JOIN j.company c
+                WHERE a.candidate.id = :candidateId
+                  AND c.id = :companyId
+            """)
+    List<AppliedJobStageProjection> findDistinctAppliedStagesByCandidateIdAndCompanyId(
+            @Param("candidateId") String candidateId,
+            @Param("companyId") String companyId);
 
     boolean existsApplicationsByJobIdAndCandidateId(String jobId, String candidateId);
 

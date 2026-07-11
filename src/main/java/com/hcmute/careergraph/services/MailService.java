@@ -16,6 +16,8 @@ public interface MailService {
                                          String jobTitle,
                                          String companyName,
                                          ApplicationStage stage,
+                                         String stageLabel,
+                                         boolean terminal,
                                          String note);
 
     void sendInterviewScheduleEmail(String toEmail,

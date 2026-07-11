@@ -83,7 +83,7 @@ public class CompanyRecruitmentStageServiceImpl implements CompanyRecruitmentSta
         }
 
         List<CompanyRecruitmentStage> updated = new ArrayList<>();
-        int order = 1;
+        int nextDisplayOrder = 1;
         for (CompanyStageRequests.StageConfig config : orderedConfigs) {
             ApplicationStage stage = config.stage();
             if (!ApplicationStage.isConfigurableStage(stage)) {
@@ -115,8 +115,8 @@ public class CompanyRecruitmentStageServiceImpl implements CompanyRecruitmentSta
                 }
             }
 
-            setting.setDisplayOrder(order++);
             setting.setLabel(config.label());
+            setting.setDisplayOrder(config.displayOrder() != null ? config.displayOrder() : nextDisplayOrder);
             if (nextActive) {
                 setting.activate();
             } else {
@@ -125,6 +125,7 @@ public class CompanyRecruitmentStageServiceImpl implements CompanyRecruitmentSta
 
             updated.add(setting);
             configurable.remove(stage);
+            nextDisplayOrder++;
         }
 
         for (ApplicationStage missingStage : configurable) {
@@ -149,7 +150,7 @@ public class CompanyRecruitmentStageServiceImpl implements CompanyRecruitmentSta
                 }
             }
 
-            setting.setDisplayOrder(order++);
+            setting.setDisplayOrder(nextDisplayOrder++);
             setting.deactivate();
             updated.add(setting);
         }
@@ -239,6 +240,44 @@ public class CompanyRecruitmentStageServiceImpl implements CompanyRecruitmentSta
         }
 
         return null;
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public String resolveStageLabel(String companyId, ApplicationStage stage) {
+        if (stage == null) {
+            return "";
+        }
+
+        if (companyId == null || companyId.isBlank()) {
+            return stage.getLabel();
+        }
+
+        return companyRecruitmentStageRepository.findByCompanyIdAndStage(companyId, stage)
+                .map(CompanyRecruitmentStage::getLabel)
+                .filter(label -> label != null && !label.isBlank())
+                .orElse(stage.getLabel());
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public boolean isTerminalStageForCompany(String companyId, ApplicationStage stage) {
+        if (stage == null) {
+            return false;
+        }
+
+        if (stage == ApplicationStage.REJECTED
+                || stage == ApplicationStage.WITHDRAWN
+                || stage == ApplicationStage.OFFER_DECLINED
+                || stage == ApplicationStage.OFFBOARDED) {
+            return true;
+        }
+
+        if (companyId == null || companyId.isBlank()) {
+            return stage.isTerminal();
+        }
+
+        return findNextActiveStage(companyId, stage) == null;
     }
 
     private void syncCompanyFlags(Company company, List<CompanyRecruitmentStage> stages) {

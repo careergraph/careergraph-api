@@ -221,7 +221,7 @@ public class InterviewServiceImpl implements InterviewService {
 
         Interview saved = interviewRepository.save(interview);
 
-        if (application.getCurrentStage() != ApplicationStage.INTERVIEW && !application.getCurrentStage().name().startsWith("CUSTOM_")) {
+        if (application.getCurrentStage() != ApplicationStage.INTERVIEW) {
             ApplicationStage previousStage = application.getCurrentStage();
             application.setCurrentStage(ApplicationStage.INTERVIEW);
             application.setStageChangedAt(LocalDateTime.now());
@@ -412,7 +412,8 @@ public class InterviewServiceImpl implements InterviewService {
             throw new AppException(ErrorType.BAD_REQUEST, "Lịch phỏng vấn không thuộc công ty của bạn");
         }
 
-        // Prepare new interview times first so we can validate conflicts before mutating the original record.
+        // Prepare new interview times first so we can validate conflicts before
+        // mutating the original record.
         LocalDate date = LocalDate.parse(request.getNewDate(), DateTimeFormatter.ISO_LOCAL_DATE);
         LocalTime startTime = LocalTime.parse(request.getNewStartTime(), DateTimeFormatter.ofPattern("HH:mm"));
         LocalDateTime scheduledAt = LocalDateTime.of(date, startTime);
@@ -421,7 +422,8 @@ public class InterviewServiceImpl implements InterviewService {
         }
         LocalDateTime endAt = scheduledAt.plusMinutes(request.getDurationMinutes());
 
-        // Cancel the original only after the replacement slot is accepted by business rules.
+        // Cancel the original only after the replacement slot is accepted by business
+        // rules.
         original.setInterviewStatus(InterviewStatus.CANCELLED);
         original.setCancellationReason("Rescheduled");
         original.setHiddenFromCandidate(false);
@@ -635,7 +637,7 @@ public class InterviewServiceImpl implements InterviewService {
                 jobId,
                 ACTIVE_STATUSES,
                 LocalDateTime.now());
-                
+
         Set<ApplicationStage> schedulableStages = getSchedulableStages(companyId);
 
         return allApps.stream()
@@ -721,7 +723,8 @@ public class InterviewServiceImpl implements InterviewService {
         LocalDateTime scheduledAt = LocalDateTime.of(proposal.getProposedDate(), proposal.getProposedStartTime());
         LocalDateTime endAt = scheduledAt.plusMinutes(proposal.getProposedDurationMinutes());
 
-        // Cancel the original interview only after the replacement time passes privacy checks.
+        // Cancel the original interview only after the replacement time passes privacy
+        // checks.
         interview.setInterviewStatus(InterviewStatus.CANCELLED);
         interview.setCancellationReason("Rescheduled per candidate proposal");
         interview.setHiddenFromCandidate(false);
@@ -1061,9 +1064,10 @@ public class InterviewServiceImpl implements InterviewService {
                 ApplicationStage next = companyRecruitmentStageService.findNextActiveStage(companyId, currentStage);
                 yield next;
             }
-            case EXTEND_OFFER -> companyRecruitmentStageService.isStageActiveForCompany(companyId, ApplicationStage.OFFER_EXTENDED)
-                    ? ApplicationStage.OFFER_EXTENDED
-                    : null;
+            case EXTEND_OFFER ->
+                companyRecruitmentStageService.isStageActiveForCompany(companyId, ApplicationStage.OFFER_EXTENDED)
+                        ? ApplicationStage.OFFER_EXTENDED
+                        : null;
             case REJECT -> ApplicationStage.REJECTED;
             case HOLD -> null;
         };
@@ -1080,10 +1084,11 @@ public class InterviewServiceImpl implements InterviewService {
     }
 
     private Set<ApplicationStage> getSchedulableStages(String companyId) {
-        List<CompanyRecruitmentStage> companyStages = companyRecruitmentStageService.getCompanyStages(companyId).stream()
+        List<CompanyRecruitmentStage> companyStages = companyRecruitmentStageService.getCompanyStages(companyId)
+                .stream()
                 .filter(CompanyRecruitmentStage::isActive)
                 .toList();
-                
+
         int interviewIndex = -1;
         for (int i = 0; i < companyStages.size(); i++) {
             if (companyStages.get(i).getStage() == ApplicationStage.INTERVIEW) {
@@ -1091,12 +1096,12 @@ public class InterviewServiceImpl implements InterviewService {
                 break;
             }
         }
-        
+
         Set<ApplicationStage> schedulableStages = new java.util.HashSet<>();
         schedulableStages.add(ApplicationStage.INTERVIEW);
         schedulableStages.add(ApplicationStage.INTERVIEW_SCHEDULED);
         schedulableStages.add(ApplicationStage.INTERVIEW_COMPLETED);
-        
+
         if (interviewIndex > 0) {
             schedulableStages.add(companyStages.get(interviewIndex - 1).getStage());
         } else if (interviewIndex == -1) {
@@ -1261,7 +1266,8 @@ public class InterviewServiceImpl implements InterviewService {
     }
 
     private String buildCandidateInterviewRoomUrl(Interview interview) {
-        if (interview == null || interview.getType() != InterviewType.ONLINE || !StringUtils.hasText(interview.getMeetingLink())) {
+        if (interview == null || interview.getType() != InterviewType.ONLINE
+                || !StringUtils.hasText(interview.getMeetingLink())) {
             return null;
         }
 

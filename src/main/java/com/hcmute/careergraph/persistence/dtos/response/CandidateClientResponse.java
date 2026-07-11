@@ -122,12 +122,32 @@ public final class CandidateClientResponse {
             String applicationId,
             String jobName,
             String jobId,
+            String companyId,
             String companyName,
             String linkResume,
             String appliedAt,
             String deadline,
-            String status
+            String status,
+            String statusLabel
     ){}
+
+    @Builder
+    public record AppliedJobCompanyOption(
+            String companyId,
+            String companyName
+    ) {}
+
+    @Builder
+    public record AppliedJobStageOption(
+            String stage,
+            String label
+    ) {}
+
+    @Builder
+    public record AppliedJobFilterOptions(
+            List<AppliedJobCompanyOption> companies,
+            List<AppliedJobStageOption> stages
+    ) {}
 
 
 

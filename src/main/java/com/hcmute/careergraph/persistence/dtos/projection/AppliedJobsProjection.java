@@ -5,6 +5,7 @@ import com.hcmute.careergraph.enums.application.ApplicationStage;
 public interface AppliedJobsProjection {
     String getApplicationId();
     String getJobName();
+    String getCompanyId();
     String getCompanyName();
     String getJobId();
     String getAppliedAt();
