@@ -385,6 +385,9 @@ public class ApplicationServiceImpl implements ApplicationService {
         if (currentStage != ApplicationStage.APPLIED && currentStage != ApplicationStage.SCREENING) {
             return;
         }
+        if (!isHrContactedAfterCurrentStage(application, currentStage)) {
+            return;
+        }
 
         ApplicationStageUpdateRequest request = new ApplicationStageUpdateRequest();
         request.setStage(ApplicationStage.HR_CONTACTED);
@@ -394,6 +397,32 @@ public class ApplicationServiceImpl implements ApplicationService {
         }
 
         updateApplicationStage(applicationId, request);
+    }
+
+    private boolean isHrContactedAfterCurrentStage(Application application, ApplicationStage currentStage) {
+        Company company = Optional.ofNullable(application)
+                .map(Application::getJob)
+                .map(Job::getCompany)
+                .orElse(null);
+        if (company == null || !StringUtils.hasText(company.getId())) {
+            return true;
+        }
+
+        Integer currentOrder = null;
+        Integer hrContactedOrder = null;
+        for (CompanyRecruitmentStage stage : companyRecruitmentStageService.getCompanyStages(company.getId())) {
+            if (stage.getStage() == currentStage) {
+                currentOrder = stage.getDisplayOrder();
+            }
+            if (stage.getStage() == ApplicationStage.HR_CONTACTED) {
+                hrContactedOrder = stage.getDisplayOrder();
+            }
+            if (currentOrder != null && hrContactedOrder != null) {
+                break;
+            }
+        }
+
+        return currentOrder == null || hrContactedOrder == null || hrContactedOrder > currentOrder;
     }
 
     private void validateStageTransition(
