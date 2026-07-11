@@ -42,7 +42,7 @@ public class MailServiceImpl implements MailService {
     @Override
     @Async("mailTaskExecutor")
     public void sendOtp(String toEmail, String otp) {
-        sendOtp(toEmail, otp, "á»¨ng viÃªn", PLATFORM_NAME);
+        sendOtp(toEmail, otp, "Ứng viên", PLATFORM_NAME);
     }
 
     @Override
@@ -54,10 +54,10 @@ public class MailServiceImpl implements MailService {
 
             helper.setTo(toEmail);
             String normalizedPlatformName = StringUtils.hasText(platformName) ? platformName.trim() : PLATFORM_NAME;
-            helper.setSubject(normalizedPlatformName + " | MÃ£ xÃ¡c thá»±c OTP");
+            helper.setSubject(normalizedPlatformName + " | Mã xác thực OTP");
 
             Context context = new Context();
-            context.setVariable("username", StringUtils.hasText(recipientLabel) ? recipientLabel.trim() : "NgÆ°á»i dÃ¹ng");
+            context.setVariable("username", StringUtils.hasText(recipientLabel) ? recipientLabel.trim() : "Người dùng");
             context.setVariable("otp", otp);
             context.setVariable("companyName", normalizedPlatformName);
             context.setVariable("logoUrl", null);
@@ -92,7 +92,7 @@ public class MailServiceImpl implements MailService {
 
             helper.setTo(toEmail);
             String resolvedStageLabel = StringUtils.hasText(stageLabel) ? stageLabel.trim() : stage.getLabel();
-            helper.setSubject(String.format("CareerGraph | Cáº­p nháº­t há»“ sÆ¡: %s", resolvedStageLabel));
+            helper.setSubject(String.format("CareerGraph | Cập nhật hồ sơ: %s", resolvedStageLabel));
 
             Context context = new Context();
             context.setVariable("candidateName", candidateName);
@@ -135,17 +135,17 @@ public class MailServiceImpl implements MailService {
 
             helper.setTo(toEmail);
             helper.setSubject(rescheduled
-                    ? "CareerGraph | Lá»‹ch phá»ng váº¥n Ä‘Ã£ Ä‘Æ°á»£c cáº­p nháº­t"
-                    : "CareerGraph | Báº¡n cÃ³ lá»‹ch phá»ng váº¥n má»›i");
+                    ? "CareerGraph | Lịch phỏng vấn đã được cập nhật"
+                    : "CareerGraph | Bạn có lịch phỏng vấn mới");
 
             Context context = new Context();
             context.setVariable("candidateName", candidateName);
             context.setVariable("jobTitle", jobTitle);
             context.setVariable("companyName", companyName);
             context.setVariable("scheduleLabel",
-                    scheduledAt != null ? scheduledAt.format(DATE_TIME_FORMATTER) : "Sáº½ Ä‘Æ°á»£c cáº­p nháº­t");
+                    scheduledAt != null ? scheduledAt.format(DATE_TIME_FORMATTER) : "Sẽ được cập nhật");
             context.setVariable("durationMinutes", durationMinutes);
-            context.setVariable("interviewTypeLabel", interviewType == InterviewType.ONLINE ? "Phá»ng váº¥n trá»±c tuyáº¿n" : "Phá»ng váº¥n trá»±c tiáº¿p");
+            context.setVariable("interviewTypeLabel", interviewType == InterviewType.ONLINE ? "Phỏng vấn trực tuyến" : "Phỏng vấn trực tiếp");
             context.setVariable("location", location);
             context.setVariable("interviewRoomUrl", interviewRoomUrl);
             context.setVariable("hasInterviewRoomUrl", StringUtils.hasText(interviewRoomUrl));
@@ -177,16 +177,16 @@ public class MailServiceImpl implements MailService {
             MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
 
             helper.setTo(toEmail);
-            helper.setSubject("CareerGraph | ThÃ´ng bÃ¡o há»§y lá»‹ch phá»ng váº¥n");
+            helper.setSubject("CareerGraph | Thông báo hủy lịch phỏng vấn");
 
             Context context = new Context();
             context.setVariable("candidateName", candidateName);
             context.setVariable("jobTitle", jobTitle);
             context.setVariable("companyName", companyName);
             context.setVariable("scheduleLabel",
-                    scheduledAt != null ? scheduledAt.format(DATE_TIME_FORMATTER) : "Sáº½ Ä‘Æ°á»£c cáº­p nháº­t");
+                    scheduledAt != null ? scheduledAt.format(DATE_TIME_FORMATTER) : "Sẽ được cập nhật");
             context.setVariable("durationMinutes", null);
-            context.setVariable("interviewTypeLabel", interviewType == InterviewType.ONLINE ? "Phá»ng váº¥n trá»±c tuyáº¿n" : "Phá»ng váº¥n trá»±c tiáº¿p");
+            context.setVariable("interviewTypeLabel", interviewType == InterviewType.ONLINE ? "Phỏng vấn trực tuyến" : "Phỏng vấn trực tiếp");
             context.setVariable("location", null);
             context.setVariable("interviewRoomUrl", null);
             context.setVariable("hasInterviewRoomUrl", false);
