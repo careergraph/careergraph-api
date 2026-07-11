@@ -183,10 +183,21 @@ public class CandidateController {
     }
 
     @GetMapping("/applied-jobs")
-    public RestResponse<List<CandidateClientResponse.AppliedJobs>> appliedJobs (@RequestParam(value="status" ,required = false) String status) throws ChangeSetPersister.NotFoundException{
+    public RestResponse<List<CandidateClientResponse.AppliedJobs>> appliedJobs (
+            @RequestParam(value="status" ,required = false) String status,
+            @RequestParam(value = "companyId", required = false) String companyId) throws ChangeSetPersister.NotFoundException{
         return RestResponse.<List<CandidateClientResponse.AppliedJobs>>builder()
                 .status(HttpStatus.OK)
-                .data(candidateService.getAppliedJobs(securityUtils.getCandidateId().get(), status))
+                .data(candidateService.getAppliedJobs(securityUtils.getCandidateId().get(), status, companyId))
+                .build();
+    }
+
+    @GetMapping("/applied-jobs/filter-options")
+    public RestResponse<CandidateClientResponse.AppliedJobFilterOptions> appliedJobFilterOptions(
+            @RequestParam(value = "companyId", required = false) String companyId) throws ChangeSetPersister.NotFoundException {
+        return RestResponse.<CandidateClientResponse.AppliedJobFilterOptions>builder()
+                .status(HttpStatus.OK)
+                .data(candidateService.getAppliedJobFilterOptions(securityUtils.getCandidateId().get(), companyId))
                 .build();
     }
     @GetMapping("/saved-jobs")

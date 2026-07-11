@@ -19,4 +19,8 @@ public interface CompanyRecruitmentStageService {
     boolean isStageActiveForCompany(String companyId, ApplicationStage stage);
 
     ApplicationStage findNextActiveStage(String companyId, ApplicationStage currentStage);
+
+    String resolveStageLabel(String companyId, ApplicationStage stage);
+
+    boolean isTerminalStageForCompany(String companyId, ApplicationStage stage);
 }

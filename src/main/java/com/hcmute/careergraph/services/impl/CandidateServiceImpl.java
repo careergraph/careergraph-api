@@ -21,6 +21,7 @@ import com.hcmute.careergraph.persistence.models.*;
 import com.hcmute.careergraph.repositories.*;
 import com.hcmute.careergraph.services.CandidateService;
 import com.hcmute.careergraph.services.CloudinaryService;
+import com.hcmute.careergraph.services.CompanyRecruitmentStageService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
@@ -45,6 +46,24 @@ import java.util.stream.Collectors;
 @Slf4j
 public class CandidateServiceImpl implements CandidateService {
 
+    private static final List<ApplicationStage> GLOBAL_STANDARD_FILTER_STAGES = List.of(
+            ApplicationStage.APPLIED,
+            ApplicationStage.SCREENING,
+            ApplicationStage.HR_CONTACTED,
+            ApplicationStage.INTERVIEW,
+            // ApplicationStage.SCHEDULED,
+            // ApplicationStage.INTERVIEW_SCHEDULED,
+            ApplicationStage.INTERVIEW_COMPLETED,
+            ApplicationStage.TRIAL,
+            ApplicationStage.OFFER_EXTENDED,
+            // ApplicationStage.OFFER_ACCEPTED,
+            // ApplicationStage.OFFER_DECLINED,
+            ApplicationStage.HIRED,
+            ApplicationStage.OFFBOARDED,
+            ApplicationStage.REJECTED
+    // ApplicationStage.WITHDRAWN
+    );
+
     private final CandidateRepository candidateRepository;
     private final SecurityUtils securityUtils;
 
@@ -65,6 +84,7 @@ public class CandidateServiceImpl implements CandidateService {
     private final FileMapper fileMapper;
     private final SavedJobRepository savedJobRepository;
     private final CloudinaryService cloudinaryService;
+    private final CompanyRecruitmentStageService companyRecruitmentStageService;
     private final ApplicationEventPublisher eventPublisher;
 
     @Override
@@ -72,7 +92,7 @@ public class CandidateServiceImpl implements CandidateService {
             throws ChangeSetPersister.NotFoundException {
 
         candidateRepository.findById(candidateId)
-            .orElseThrow(() -> new ChangeSetPersister.NotFoundException());
+                .orElseThrow(() -> new ChangeSetPersister.NotFoundException());
 
         // Check permission
         if (!securityUtils.getCandidateId().get().equals(candidateId)) {
@@ -416,12 +436,16 @@ public class CandidateServiceImpl implements CandidateService {
             list.add(CandidateClientResponse.AppliedJobs.builder()
                     .applicationId(application.getId())
                     .jobName(application.getJob().getTitle())
-                    .companyName(application.getJob().getCompany().getName())
                     .jobId(application.getJob().getId())
+                    .companyId(application.getJob().getCompany().getId())
+                    .companyName(application.getJob().getCompany().getName())
                     .appliedAt(application.getAppliedDate())
                     .deadline(application.getJob().getExpiryDate())
                     .linkResume(application.getResumeUrl())
                     .status(application.getCurrentStage().toString())
+                    .statusLabel(companyRecruitmentStageService.resolveStageLabel(
+                            application.getJob().getCompany().getId(),
+                            application.getCurrentStage()))
                     .build());
         });
         return list;
@@ -431,31 +455,122 @@ public class CandidateServiceImpl implements CandidateService {
     @Override
     public List<CandidateClientResponse.AppliedJobs> getAppliedJobs(String candidateId, String status)
             throws ChangeSetPersister.NotFoundException {
-        // Pageable pageable = PageRequest.of(0, 5,
-        // Sort.by("appliedDate").descending());
+        return getAppliedJobs(candidateId, status, null);
+    }
+
+    @Override
+    public List<CandidateClientResponse.AppliedJobs> getAppliedJobs(String candidateId, String status, String companyId)
+            throws ChangeSetPersister.NotFoundException {
         Pageable pageable = PageRequest.of(0, 100, Sort.by("appliedDate").descending());
-        ApplicationStage aStatus = null;
-        if (!status.trim().isEmpty()) {
-            try {
-                aStatus = ApplicationStage.valueOf(status);
-            } catch (IllegalArgumentException e) {
-                // aStatus = null;
-            }
-        }
-        Page<AppliedJobsProjection> page = applicationRepository.findAppliedJobsAllByCandidateId(candidateId, aStatus,
+        ApplicationStage aStatus = parseApplicationStage(status);
+        String normalizedCompanyId = StringUtils.trimToNull(companyId);
+        Page<AppliedJobsProjection> page = applicationRepository.findAppliedJobsAllByCandidateId(
+                candidateId,
+                aStatus,
+                normalizedCompanyId,
                 pageable);
         return page.getContent().stream()
                 .map(p -> CandidateClientResponse.AppliedJobs.builder()
                         .applicationId(p.getApplicationId())
                         .jobName(p.getJobName())
-                        .companyName(p.getCompanyName())
                         .jobId(p.getJobId())
+                        .companyId(p.getCompanyId())
+                        .companyName(p.getCompanyName())
                         .appliedAt(p.getAppliedAt())
                         .deadline(p.getDeadline())
                         .linkResume(p.getLinkResume())
                         .status(p.getStatus().toString())
+                        .statusLabel(resolveAppliedJobStatusLabel(p))
                         .build())
                 .toList();
+    }
+
+    @Override
+    public CandidateClientResponse.AppliedJobFilterOptions getAppliedJobFilterOptions(String candidateId,
+            String companyId)
+            throws ChangeSetPersister.NotFoundException {
+        List<CandidateClientResponse.AppliedJobCompanyOption> companies = applicationRepository
+                .findDistinctAppliedCompaniesByCandidateId(candidateId)
+                .stream()
+                .map(company -> CandidateClientResponse.AppliedJobCompanyOption.builder()
+                        .companyId(company.getCompanyId())
+                        .companyName(company.getCompanyName())
+                        .build())
+                .toList();
+
+        String normalizedCompanyId = StringUtils.trimToNull(companyId);
+        List<CandidateClientResponse.AppliedJobStageOption> stages = normalizedCompanyId == null
+                ? buildGlobalStageFilterOptions()
+                : buildCompanyStageFilterOptions(candidateId, normalizedCompanyId);
+
+        return CandidateClientResponse.AppliedJobFilterOptions.builder()
+                .companies(companies)
+                .stages(stages)
+                .build();
+    }
+
+    private String resolveAppliedJobStatusLabel(AppliedJobsProjection projection) {
+        if (projection == null || projection.getStatus() == null) {
+            return projection != null && projection.getStatus() != null ? projection.getStatus().getLabel() : null;
+        }
+
+        return Optional.ofNullable(projection.getCompanyId())
+                .map(companyId -> companyRecruitmentStageService.resolveStageLabel(companyId, projection.getStatus()))
+                .orElse(projection.getStatus().getLabel());
+    }
+
+    private List<CandidateClientResponse.AppliedJobStageOption> buildGlobalStageFilterOptions() {
+        return GLOBAL_STANDARD_FILTER_STAGES.stream()
+                .map(stage -> CandidateClientResponse.AppliedJobStageOption.builder()
+                        .stage(stage.name())
+                        .label(stage.getLabel())
+                        .build())
+                .toList();
+    }
+
+    private List<CandidateClientResponse.AppliedJobStageOption> buildCompanyStageFilterOptions(
+            String candidateId,
+            String companyId) {
+        LinkedHashSet<ApplicationStage> orderedStages = new LinkedHashSet<>();
+
+        companyRecruitmentStageService.getCompanyStages(companyId).stream()
+                .filter(CompanyRecruitmentStage::isActive)
+                .map(CompanyRecruitmentStage::getStage)
+                .filter(Objects::nonNull)
+                .forEach(orderedStages::add);
+
+        applicationRepository.findDistinctAppliedStagesByCandidateIdAndCompanyId(candidateId, companyId).stream()
+                .map(stage -> stage != null ? stage.getStatus() : null)
+                .filter(Objects::nonNull)
+                .sorted(Comparator.comparingInt(this::resolveApplicationStageSortOrder))
+                .forEach(orderedStages::add);
+
+        return orderedStages.stream()
+                .map(stage -> CandidateClientResponse.AppliedJobStageOption.builder()
+                        .stage(stage.name())
+                        .label(companyRecruitmentStageService.resolveStageLabel(companyId, stage))
+                        .build())
+                .toList();
+    }
+
+    private int resolveApplicationStageSortOrder(ApplicationStage stage) {
+        int configuredIndex = GLOBAL_STANDARD_FILTER_STAGES.indexOf(stage);
+        if (configuredIndex >= 0) {
+            return configuredIndex;
+        }
+        return GLOBAL_STANDARD_FILTER_STAGES.size() + stage.ordinal();
+    }
+
+    private ApplicationStage parseApplicationStage(String status) {
+        String normalizedStatus = StringUtils.trimToNull(status);
+        if (normalizedStatus == null) {
+            return null;
+        }
+        try {
+            return ApplicationStage.valueOf(normalizedStatus);
+        } catch (IllegalArgumentException e) {
+            return null;
+        }
     }
 
     @Override
@@ -507,7 +622,8 @@ public class CandidateServiceImpl implements CandidateService {
     }
 
     @Override
-    public FileResponse renameFile(String candidateId, String fileId, String newName) throws ChangeSetPersister.NotFoundException {
+    public FileResponse renameFile(String candidateId, String fileId, String newName)
+            throws ChangeSetPersister.NotFoundException {
         if (StringUtils.isBlank(candidateId) || StringUtils.isBlank(fileId)) {
             throw new InternalException("Invalid file rename request");
         }

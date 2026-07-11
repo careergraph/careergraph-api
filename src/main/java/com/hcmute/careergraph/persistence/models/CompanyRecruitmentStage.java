@@ -32,6 +32,9 @@ public class CompanyRecruitmentStage extends BaseEntity {
     @Column(name = "stage", nullable = false, length = 40)
     private ApplicationStage stage;
 
+    @Column(name = "label")
+    private String label;
+
     @Column(name = "display_order", nullable = false)
     private Integer displayOrder;
 }

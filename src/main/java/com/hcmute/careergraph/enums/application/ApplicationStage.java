@@ -9,8 +9,10 @@ import java.util.Map;
 import java.util.Set;
 
 /**
- * Represents the standardized lifecycle stages a job application can move through.
- * The transition map keeps the workflow extensible while enforcing realistic HR rules.
+ * Represents the standardized lifecycle stages a job application can move
+ * through.
+ * The transition map keeps the workflow extensible while enforcing realistic HR
+ * rules.
  */
 public enum ApplicationStage {
     APPLIED("Đã ứng tuyển"),
@@ -27,9 +29,14 @@ public enum ApplicationStage {
     HIRED("Đã nhận việc"),
     OFFBOARDED("Đã nghỉ việc"),
     REJECTED("Không phù hợp"),
-    WITHDRAWN("Đã rút hồ sơ");
+    WITHDRAWN("Đã rút hồ sơ"),
+    CUSTOM_1("Tùy chỉnh 1"),
+    CUSTOM_2("Tùy chỉnh 2"),
+    CUSTOM_3("Tùy chỉnh 3"),
+    CUSTOM_4("Tùy chỉnh 4"),
+    CUSTOM_5("Tùy chỉnh 5");
 
-        private static final List<ApplicationStage> CONFIGURABLE_STAGES = List.of(
+    private static final List<ApplicationStage> CONFIGURABLE_STAGES = List.of(
             APPLIED,
             SCREENING,
             HR_CONTACTED,
@@ -39,10 +46,14 @@ public enum ApplicationStage {
             OFFER_EXTENDED,
             HIRED,
             OFFBOARDED,
-            REJECTED
-        );
+            REJECTED,
+            CUSTOM_1,
+            CUSTOM_2,
+            CUSTOM_3,
+            CUSTOM_4,
+            CUSTOM_5);
 
-        private static final Set<ApplicationStage> REQUIRED_STAGES = EnumSet.of(APPLIED, REJECTED);
+    private static final Set<ApplicationStage> REQUIRED_STAGES = EnumSet.of(APPLIED, REJECTED);
 
     private static final Map<ApplicationStage, Set<ApplicationStage>> TRANSITIONS;
 
@@ -50,7 +61,7 @@ public enum ApplicationStage {
         Map<ApplicationStage, Set<ApplicationStage>> transitions = new EnumMap<>(ApplicationStage.class);
 
         transitions.put(APPLIED, EnumSet.of(SCHEDULED, SCREENING, INTERVIEW_SCHEDULED, REJECTED, WITHDRAWN));
-        transitions.put(SCHEDULED , EnumSet.of(INTERVIEW, REJECTED, WITHDRAWN));
+        transitions.put(SCHEDULED, EnumSet.of(INTERVIEW, REJECTED, WITHDRAWN));
         transitions.put(SCREENING, EnumSet.of(HR_CONTACTED, REJECTED, WITHDRAWN, INTERVIEW));
         transitions.put(INTERVIEW, EnumSet.of(TRIAL, REJECTED));
         transitions.put(HR_CONTACTED, EnumSet.of(INTERVIEW_SCHEDULED, REJECTED, WITHDRAWN));

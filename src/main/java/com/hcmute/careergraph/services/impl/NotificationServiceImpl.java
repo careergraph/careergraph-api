@@ -11,6 +11,7 @@ import com.hcmute.careergraph.repositories.AccountRepository;
 import com.hcmute.careergraph.repositories.ApplicationRepository;
 import com.hcmute.careergraph.repositories.MessageRepository;
 import com.hcmute.careergraph.repositories.NotificationRepository;
+import com.hcmute.careergraph.services.CompanyRecruitmentStageService;
 import com.hcmute.careergraph.services.NotificationService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -49,6 +50,7 @@ public class NotificationServiceImpl implements NotificationService {
   private final ApplicationRepository applicationRepository;
   private final MessageRepository messageRepository;
   private final SocketNotificationPusher socketNotificationPusher;
+  private final CompanyRecruitmentStageService companyRecruitmentStageService;
 
   @org.springframework.beans.factory.annotation.Value("${notification.message.cooldown-minutes:2}")
   private long messageCooldownMinutes;
@@ -173,6 +175,10 @@ public class NotificationServiceImpl implements NotificationService {
         .map(Job::getCompany)
         .map(this::resolveCompanyName)
         .orElse("Company");
+    String companyId = Optional.ofNullable(application.getJob())
+        .map(Job::getCompany)
+        .map(Company::getId)
+        .orElse(null);
     String jobTitle = Optional.ofNullable(application.getJob())
         .map(Job::getTitle)
         .orElse("the job");
@@ -195,7 +201,7 @@ public class NotificationServiceImpl implements NotificationService {
       return;
     }
 
-    NotificationContent content = resolveApplicationNotificationContent(companyName, jobTitle, newStage);
+    NotificationContent content = resolveApplicationNotificationContent(companyId, companyName, jobTitle, newStage);
 
     createOrUpdateApplicationNotification(
         candidateAccountOpt.get().getId(),
@@ -691,7 +697,8 @@ public class NotificationServiceImpl implements NotificationService {
     };
   }
 
-  private NotificationContent resolveApplicationNotificationContent(String companyName,
+  private NotificationContent resolveApplicationNotificationContent(String companyId,
+      String companyName,
       String jobTitle,
       ApplicationStage newStage) {
     if (newStage == null) {
@@ -719,8 +726,15 @@ public class NotificationServiceImpl implements NotificationService {
           "Cập nhật hồ sơ ứng tuyển",
           String.format("Hồ sơ của bạn tại %s đã được cập nhật sang trạng thái %s.",
               companyName,
-              getVietnameseApplicationStageLabel(newStage)));
+              resolveApplicationStageLabel(companyId, newStage)));
     };
+  }
+
+  private String resolveApplicationStageLabel(String companyId, ApplicationStage stage) {
+    String configuredLabel = companyRecruitmentStageService.resolveStageLabel(companyId, stage);
+    return StringUtils.hasText(configuredLabel)
+        ? configuredLabel
+        : getVietnameseApplicationStageLabel(stage);
   }
 
   private String getVietnameseApplicationStageLabel(ApplicationStage stage) {
@@ -744,6 +758,7 @@ public class NotificationServiceImpl implements NotificationService {
       case OFFBOARDED -> "Nghỉ việc";
       case REJECTED -> "Ứng tuyển bị từ chối";
       case WITHDRAWN -> "Đã rút hồ sơ";
+      default -> stage.getLabel();
     };
   }
 

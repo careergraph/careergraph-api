@@ -104,7 +104,7 @@ public class InterviewServiceImpl implements InterviewService {
             throw new AppException(ErrorType.BAD_REQUEST, "Thời lượng phỏng vấn tối thiểu là 15 phút");
         }
 
-        validateApplicationStageForScheduling(application);
+        validateApplicationStageForScheduling(application, companyId);
 
         LocalDateTime endAt = scheduledAt.plusMinutes(request.getDurationMinutes());
 
@@ -412,7 +412,8 @@ public class InterviewServiceImpl implements InterviewService {
             throw new AppException(ErrorType.BAD_REQUEST, "Lịch phỏng vấn không thuộc công ty của bạn");
         }
 
-        // Prepare new interview times first so we can validate conflicts before mutating the original record.
+        // Prepare new interview times first so we can validate conflicts before
+        // mutating the original record.
         LocalDate date = LocalDate.parse(request.getNewDate(), DateTimeFormatter.ISO_LOCAL_DATE);
         LocalTime startTime = LocalTime.parse(request.getNewStartTime(), DateTimeFormatter.ofPattern("HH:mm"));
         LocalDateTime scheduledAt = LocalDateTime.of(date, startTime);
@@ -421,7 +422,8 @@ public class InterviewServiceImpl implements InterviewService {
         }
         LocalDateTime endAt = scheduledAt.plusMinutes(request.getDurationMinutes());
 
-        // Cancel the original only after the replacement slot is accepted by business rules.
+        // Cancel the original only after the replacement slot is accepted by business
+        // rules.
         original.setInterviewStatus(InterviewStatus.CANCELLED);
         original.setCancellationReason("Rescheduled");
         original.setHiddenFromCandidate(false);
@@ -635,8 +637,11 @@ public class InterviewServiceImpl implements InterviewService {
                 jobId,
                 ACTIVE_STATUSES,
                 LocalDateTime.now());
+
+        Set<ApplicationStage> schedulableStages = getSchedulableStages(companyId);
+
         return allApps.stream()
-                .filter(app -> app.getCurrentStage() != null && SCHEDULABLE_STAGES.contains(app.getCurrentStage()))
+                .filter(app -> app.getCurrentStage() != null && schedulableStages.contains(app.getCurrentStage()))
                 .filter(app -> !scheduledAppIds.contains(app.getId()))
                 .toList();
     }
@@ -718,7 +723,8 @@ public class InterviewServiceImpl implements InterviewService {
         LocalDateTime scheduledAt = LocalDateTime.of(proposal.getProposedDate(), proposal.getProposedStartTime());
         LocalDateTime endAt = scheduledAt.plusMinutes(proposal.getProposedDurationMinutes());
 
-        // Cancel the original interview only after the replacement time passes privacy checks.
+        // Cancel the original interview only after the replacement time passes privacy
+        // checks.
         interview.setInterviewStatus(InterviewStatus.CANCELLED);
         interview.setCancellationReason("Rescheduled per candidate proposal");
         interview.setHiddenFromCandidate(false);
@@ -1003,6 +1009,10 @@ public class InterviewServiceImpl implements InterviewService {
                 return;
 
             ApplicationStage currentStage = application.getCurrentStage();
+            if (currentStage != null && currentStage.name().startsWith("CUSTOM_")) {
+                return;
+            }
+
             ApplicationStage newStage = resolveStageFromFeedback(application, recommendation);
             if (newStage == null) {
                 return;
@@ -1054,9 +1064,10 @@ public class InterviewServiceImpl implements InterviewService {
                 ApplicationStage next = companyRecruitmentStageService.findNextActiveStage(companyId, currentStage);
                 yield next;
             }
-            case EXTEND_OFFER -> companyRecruitmentStageService.isStageActiveForCompany(companyId, ApplicationStage.OFFER_EXTENDED)
-                    ? ApplicationStage.OFFER_EXTENDED
-                    : null;
+            case EXTEND_OFFER ->
+                companyRecruitmentStageService.isStageActiveForCompany(companyId, ApplicationStage.OFFER_EXTENDED)
+                        ? ApplicationStage.OFFER_EXTENDED
+                        : null;
             case REJECT -> ApplicationStage.REJECTED;
             case HOLD -> null;
         };
@@ -1072,13 +1083,42 @@ public class InterviewServiceImpl implements InterviewService {
         };
     }
 
-    private void validateApplicationStageForScheduling(Application application) {
+    private Set<ApplicationStage> getSchedulableStages(String companyId) {
+        List<CompanyRecruitmentStage> companyStages = companyRecruitmentStageService.getCompanyStages(companyId)
+                .stream()
+                .filter(CompanyRecruitmentStage::isActive)
+                .toList();
+
+        int interviewIndex = -1;
+        for (int i = 0; i < companyStages.size(); i++) {
+            if (companyStages.get(i).getStage() == ApplicationStage.INTERVIEW) {
+                interviewIndex = i;
+                break;
+            }
+        }
+
+        Set<ApplicationStage> schedulableStages = new java.util.HashSet<>();
+        schedulableStages.add(ApplicationStage.INTERVIEW);
+        schedulableStages.add(ApplicationStage.INTERVIEW_SCHEDULED);
+        schedulableStages.add(ApplicationStage.INTERVIEW_COMPLETED);
+
+        if (interviewIndex > 0) {
+            schedulableStages.add(companyStages.get(interviewIndex - 1).getStage());
+        } else if (interviewIndex == -1) {
+            schedulableStages.addAll(SCHEDULABLE_STAGES);
+        }
+        return schedulableStages;
+    }
+
+    private void validateApplicationStageForScheduling(Application application, String companyId) {
         ApplicationStage currentStage = application.getCurrentStage();
         if (currentStage == null) {
             throw new AppException(ErrorType.BAD_REQUEST, "Hồ sơ ứng viên chưa có trạng thái hợp lệ để lên lịch");
         }
 
-        if (!SCHEDULABLE_STAGES.contains(currentStage)) {
+        Set<ApplicationStage> schedulableStages = getSchedulableStages(companyId);
+
+        if (!schedulableStages.contains(currentStage)) {
             throw new AppException(
                     ErrorType.BAD_REQUEST,
                     String.format("Không thể lên lịch phỏng vấn khi hồ sơ đang ở trạng thái %s", currentStage));
@@ -1226,7 +1266,8 @@ public class InterviewServiceImpl implements InterviewService {
     }
 
     private String buildCandidateInterviewRoomUrl(Interview interview) {
-        if (interview == null || interview.getType() != InterviewType.ONLINE || !StringUtils.hasText(interview.getMeetingLink())) {
+        if (interview == null || interview.getType() != InterviewType.ONLINE
+                || !StringUtils.hasText(interview.getMeetingLink())) {
             return null;
         }
 

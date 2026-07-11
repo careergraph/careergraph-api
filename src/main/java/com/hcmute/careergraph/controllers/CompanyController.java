@@ -64,7 +64,7 @@ public class CompanyController {
             List<CompanyRecruitmentStageResponse> data = stages.stream()
                 .map(stage -> CompanyRecruitmentStageResponse.builder()
                     .stage(stage.getStage())
-                    .label(stage.getStage() != null ? stage.getStage().getLabel() : null)
+                    .label(stage.getLabel() != null ? stage.getLabel() : (stage.getStage() != null ? stage.getStage().getLabel() : null))
                     .displayOrder(stage.getDisplayOrder())
                     .active(stage.isActive())
                     .required(stage.getStage() != null
@@ -95,7 +95,7 @@ public class CompanyController {
             List<CompanyRecruitmentStageResponse> data = updated.stream()
                 .map(stage -> CompanyRecruitmentStageResponse.builder()
                     .stage(stage.getStage())
-                    .label(stage.getStage() != null ? stage.getStage().getLabel() : null)
+                    .label(stage.getLabel() != null ? stage.getLabel() : (stage.getStage() != null ? stage.getStage().getLabel() : null))
                     .displayOrder(stage.getDisplayOrder())
                     .active(stage.isActive())
                     .required(stage.getStage() != null
